@@ -1,0 +1,16 @@
+# Dependências de execução (versões fixadas — ver TECHNICAL_DECISIONS.md D13)
+anthropic==2.3.0
+pandas==3.1.0
+pydantic==2.14.2
+pypdf==6.21.4
+python-dotenv==1.2.4
+rapidfuzz==3.14.6
+rich==15.0.0
+# Base de fusos horários para zoneinfo (necessária no Windows: America/Campo_Grande)
+tzdata==2026.6
+
+# Desenvolvimento
+pytest==9.2.0
+
+# Instala o próprio pacote (src/emporio_agent) em modo editável
+-e .

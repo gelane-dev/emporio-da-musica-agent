@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "emporio-agent"
+version = "0.1.0"
+description = "Agente de atendimento por texto da Empório da Música (desafio técnico Artefact)"
+requires-python = ">=3.13"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = [
+    "llm: testes que chamam um provedor de LLM real (pulados por padrão)",
+]
+addopts = "-m 'not llm'"

@@ -1,0 +1,27 @@
+# Ambiente virtual
+venv/
+.venv/
+
+# Segredos
+.env
+
+# Arquivos gerados em execução (transcripts, handoffs)
+runtime/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Ferramentas
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editores / SO
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
