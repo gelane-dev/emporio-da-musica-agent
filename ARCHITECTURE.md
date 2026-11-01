@@ -363,6 +363,74 @@ class PolicyStore:
 ```
 Formato de `knowledge/policies.md`: cada bloco começa com `<!-- topic: trocas_devolucoes -->` seguido de `## 4. Política de Trocas e Devoluções`. O `PolicyStore` falha na inicialização se algum tópico do `Literal` não existir no arquivo. O texto é **fiel ao PDF**: divergências (telefones, e-mails, parcelamento) não são corrigidas no `.md`, apenas anotadas no topo do arquivo.
 
+#### 5.4.1 Contrato detalhado da T06 (extração do PDF → `knowledge/policies.md`)
+
+Fonte única para quem implementa (IA/RAG) e para quem valida (QA). A T07 (`PolicyStore`) **não** faz parte da T06.
+
+**Script `scripts/build_policies.py`** (CLI; sem import pelo pacote `emporio_agent`)
+```text
+python scripts/build_policies.py [--pdf PATH] [--out PATH] [--check]
+  --pdf    padrão: <repo>/data/políticas_da_loja.pdf   (somente leitura; nunca escrever nele)
+  --out    padrão: <repo>/knowledge/policies.md
+  --check  não escreve; sai com código 0 se --out já é idêntico ao que seria gerado, 1 caso contrário
+```
+- Usa `pypdf` (o modo `extraction_mode="layout"` é recomendado para as tabelas). Determinístico e idempotente: duas execuções geram bytes idênticos.
+- Saída UTF-8, quebras de linha `\n`, terminando com uma única `\n`.
+- **Todo texto de política vem do PDF.** O script só pode conter literais de *estrutura*: mapa seção → tópico, cabeçalho/rodapé a remover, cabeçalhos de tabela, título H1, linha `## Capa` e a nota de extração. É proibido digitar conteúdo do manual no script.
+- Remove cabeçalho repetido (`Empório da Música Manual de Políticas e Procedimentos`, páginas 2–8) e rodapé (`Página N`). Nada mais é descartado (inclui a capa e o rodapé final "Empório da Música — Sua música começa aqui. / Última atualização: Junho de 2025 — Versão 2.1", que ficam no último bloco).
+- Não corrige divergências (P1 telefones, P2 grafias do e-mail, P3/P4 parcelamento): reproduz o PDF e as lista na nota de extração.
+
+**Formato de `knowledge/policies.md`**
+```markdown
+# Manual de Políticas e Procedimentos — Empório da Música
+
+> Nota de extração: gerado por scripts/build_policies.py a partir de data/políticas_da_loja.pdf (Versão 2.1 — Junho de 2025).
+> Texto fiel ao PDF. Divergências do próprio manual NÃO corrigidas: P1 (telefones), P2 (grafias do e-mail), P3/P4 (parcelamento). Ver DATA_ANALYSIS.md §4.2.
+
+<!-- topic: sobre_loja -->
+## Capa
+<texto da página 1, linha a linha>
+
+<!-- topic: sobre_loja -->
+## 1. Sobre a Empório da Música
+...
+### 1.1 Missão
+...
+```
+Blocos, em ordem do documento (cada bloco = do marcador `<!-- topic: X -->` até o próximo marcador; a primeira linha após o marcador é o `## ` do bloco; um tópico pode ter mais de um bloco):
+
+| # | topic | `## ` (texto literal do PDF) | Subtítulos `### ` |
+|---|---|---|---|
+| 1 | `sobre_loja` | `## Capa` (único título acrescentado) | — |
+| 2 | `sobre_loja` | `## 1. Sobre a Empório da Música` | 1.1, 1.2 |
+| 3 | `horarios` | `## 2. Horário de Funcionamento` | — |
+| 4 | `pagamento` | `## 3. Formas de Pagamento` | 3.1 |
+| 5 | `trocas_devolucoes` | `## 4. Política de Trocas e Devoluções` | 4.1–4.4 |
+| 6 | `frete_entrega` | `## 5. Política de Frete e Entregas` | 5.1–5.3 |
+| 7 | `promocoes` | `## 6. Promoções e Descontos` | 6.1, 6.2 |
+| 8 | `atendimento` | `## 7. Atendimento via WhatsApp` | 7.1–7.3 |
+| 9 | `garantia` | `## 8. Garantia` | 8.1–8.3 |
+| 10 | `privacidade` | `## 9. Privacidade e Proteção de Dados` | — |
+| 11 | `atendimento` | `## 10. Disposições Finais` | — |
+
+Subtítulos `### ` usam o texto literal (ex.: `### 4.1 Direito de Arrependimento (Compras Online)`). Listas com `•` viram `- `; a lista numerada da 7.2 mantém `1.` … `5.`; rótulos em negrito do PDF (ex.: `Cumulatividade:`) podem usar `**…**`.
+
+Tabelas Markdown (cabeçalho literal, células literais; células quebradas em várias linhas no PDF são unidas com um espaço):
+
+| Seção | Cabeçalho | Linhas de dados |
+|---|---|---|
+| 1.2 | `\| Campo \| Informação \|` | 7 |
+| 2 | `\| Dia \| Horário \|` | 3 |
+| 3 | `\| Forma \| Condições \| Observações \|` | 4 |
+| 5.2 | `\| Modalidade \| Prazo Estimado \| Rastreamento \| Seguro \|` | 3 |
+
+**Critério de fidelidade (verificável por teste)** — sequência de palavras:
+- `W_pdf`: para cada página (ordem 1→8), `page.extract_text()` no modo **padrão** do pypdf, `split()` em espaços; nas páginas 2–8 remover as 8 primeiras palavras se forem o cabeçalho e as 2 últimas se forem `Página <n>`; remover tokens `•`.
+- `W_md`: do `.md`, (1) remover comentários `<!-- … -->`; (2) remover as linhas: H1 (`# `), linhas iniciadas por `>`, separadores de tabela (`|---|…`), a linha `## Capa`; (3) remover marcadores no início da linha: `#`/`##`/`###` + espaço e `- `; (4) remover `**`; (5) trocar `|` por espaço; (6) `split()`.
+- **Exigência: `W_md == W_pdf`** (mesmas palavras, mesma ordem). Garante que nada foi omitido, alterado ou acrescentado fora das áreas permitidas.
+
+Referência medida pelo coordenador em 2026-11-01: `len(W_pdf) == 1651`; cabeçalho e rodapé presentes em todas as páginas 2–8.
+
 ### 5.5 `tools/` — contrato com o LLM
 ```python
 class ToolError(BaseModel):
