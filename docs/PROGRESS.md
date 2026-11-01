@@ -17,9 +17,10 @@
 | T08 Adaptador LLM | concluída (smoke real pendente de credencial) | `35485ec` | [[ARCHITECTURE#5.6.1 Contrato detalhado da T08]]; D16 |
 | T09 Ferramentas | concluída | `8594164` | [[ARCHITECTURE#5.5.1 Contrato detalhado da T09 (ferramentas)]] |
 | T10 Prompt | concluída | `db61a89` | [[ARCHITECTURE#5.7.1 Contrato detalhado da T10 (prompt de sistema)]] |
-| T11 Loop do agente | concluída | (commit `feat(agent): loop`) | [[ARCHITECTURE#5.7.2 Contrato detalhado da T11 (loop do agente e sessão)]] |
-| T12 Encaminhamento | concluída | (commit `feat(tools): registro`) | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
-| T13–T17 | pendentes | — T14/T15 exigem credencial da API (ver pendências) |
+| T11 Loop do agente | concluída | `f7e1088` | [[ARCHITECTURE#5.7.2 Contrato detalhado da T11 (loop do agente e sessão)]] |
+| T12 Encaminhamento | concluída | `585ac91` |
+| T13 CLI | em andamento | — | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
+| T14–T17 | pendentes | — T14/T15 exigem credencial da API (ver pendências) |
 
 Suíte atual: 826 testes passando + 1 smoke real pulado (após a T12).
 

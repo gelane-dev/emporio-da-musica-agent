@@ -728,7 +728,26 @@ Constantes (português, sem emojis): `FALLBACK_MAX_ITERATIONS`, `FALLBACK_REFUSA
 Log INFO por tool call (nome, ok, duração) e por chamada ao LLM (`usage`), sem argumentos de `consultar_pedido` (contêm e-mail/telefone).
 
 ### 5.8 `cli.py`
-`python -m emporio_agent [--debug] [--save]` — comandos: `/sair`, `/salvar`, `/nova` (nova sessão). Ao iniciar, mostra saudação (gerada localmente, sem chamada de LLM). Se o horário estiver fora do expediente, a saudação informa o próximo horário (política 7.1).
+
+#### 5.8.1 Contrato detalhado da T13 (CLI)
+```python
+def build_agent(settings: Settings, *, llm: LLMClient | None = None,
+                env: Mapping[str, str] | None = None) -> Agent
+    # load_all(settings.data_dir) → CatalogRepository/OrderRepository → PolicyStore.from_markdown(settings.policies_path)
+    # → build_tool_registry(..., clock=lambda: now(settings), runtime_dir=settings.runtime_dir) (8 ferramentas)
+    # → llm or create_llm_client(settings, env) → Agent(llm, registry, settings)
+def greeting(now: datetime, status: StoreStatus) -> str      # local, sem LLM, sem emojis
+def main(argv: list[str] | None = None, *, settings: Settings | None = None, llm: LLMClient | None = None,
+         input_fn: Callable[[str], str] = input, console: rich.console.Console | None = None) -> int
+```
+- `python -m emporio_agent [--debug] [--save]` (`__main__.py` chama `sys.exit(main())`). Na entrada, `sys.stdout`/`sys.stderr` reconfigurados para UTF-8 quando possível (Git Bash/PowerShell — RK11).
+- Inicialização: `LLMError` (sem chave, provedor desconhecido) ou `DataLoadError`/`PolicyStoreError` ⇒ mensagem clara em português, **sem traceback**, código de saída **2**.
+- Saudação: apresenta a Mel; se a loja estiver fechada pelo horário regular, informa a próxima abertura (dia da semana, data e hora) — política 7.1.
+- Laço: lê a mensagem (`input_fn("Você: ")`); linha vazia é ignorada; resposta exibida como "Mel:" (Markdown via `rich`), com indicador de espera durante a chamada.
+- Comandos: `/sair` (encerra, código 0), `/salvar` (grava `settings.runtime_dir/transcripts/conversa-<AAAAMMDD-HHMMSS>-<id da sessão>.md` com `Session.to_markdown()` e mostra o caminho), `/nova` (nova sessão + saudação), `/ajuda` (lista os comandos).
+- `--debug`: após cada resposta, uma linha por ferramenta: nome, argumentos (para `consultar_pedido`, só `pedido_id` — e-mail/telefone ocultos), ok/erro e duração; e o `stop` do agente.
+- `--save`: grava o transcript automaticamente ao encerrar (inclui Ctrl+C/EOF).
+- Ctrl+C e EOF encerram com despedida, código 0, sem traceback.
 
 ### 5.9 Composição (injeção de dependências)
 Feita em um único lugar (`cli.py` → `build_agent(settings)`): `load_all → repositórios → PolicyStore → ToolRegistry([...]) → AnthropicClient → Agent`. Testes montam o mesmo grafo com `FakeLLM` e `clock` fixo.

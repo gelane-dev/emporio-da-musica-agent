@@ -253,13 +253,16 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 
 ## T13 — CLI
 **Objetivo.** Interface de conversa.
-**Escopo.** `cli.py` com `rich`, `build_agent(settings)`, flags `--debug`/`--save`, comandos `/sair`, `/salvar`, `/nova`.
+**Contrato.** ARCHITECTURE §5.8.1.
+**Escopo.** `cli.py` (`build_agent`, `greeting`, `main`) e `__main__.py`.
 **Critérios de aceite.**
-- [ ] `python -m emporio_agent` abre conversa; saudação local indica se a loja está aberta.
-- [ ] `--debug` mostra nome/args/status de cada tool call.
-- [ ] `/salvar` grava transcript `.md` em `runtime/transcripts/` e informa o caminho.
-- [ ] Ctrl+C / EOF encerram sem traceback.
+- [ ] `python -m emporio_agent` abre conversa; saudação local indica se a loja está aberta e, se fechada, a próxima abertura.
+- [ ] Sem credencial (ou provedor inválido) ⇒ mensagem clara, código 2, sem traceback.
+- [ ] `--debug` mostra nome/args/status/duração de cada tool call, ocultando e-mail/telefone do `consultar_pedido`.
+- [ ] `/salvar` grava transcript `.md` em `runtime/transcripts/` e informa o caminho; `--save` grava ao encerrar; `/nova` e `/ajuda` funcionam.
+- [ ] Ctrl+C / EOF encerram sem traceback (código 0).
 - [ ] Acentuação correta no terminal do Windows (PowerShell e Git Bash).
+- [ ] `build_agent` monta as 8 ferramentas com os dados reais (teste com `FakeLLM`).
 **Commit.** `feat(cli): interface de linha de comando para conversar com o agente`
 
 ## T14 — Cenários E2E e ajuste de prompt
