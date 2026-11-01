@@ -1,7 +1,7 @@
 # TECHNICAL_DECISIONS.md — Decisões técnicas (para aprovação)
 
 Formato de cada decisão: **contexto → decisão → alternativas descartadas → consequências**.
-Itens marcados com ⚠️ **APROVAR** dependem de escolha sua antes do desenvolvimento.
+Todas as decisões que dependiam de aprovação foram aprovadas em 2026-11-01 (ver "Decisões aprovadas"); D17 substituiu o provedor de D5 por decisão do usuário.
 
 ---
 
@@ -60,7 +60,7 @@ Itens marcados com ⚠️ **APROVAR** dependem de escolha sua antes do desenvolv
 
 **Decisão.** Carregar os CSVs uma vez na inicialização, normalizar tipos e expor funções de consulta (repositório). Nada de banco.
 
-**Alternativas.** SQLite (útil se houvesse escrita/concorrência; não há). Dicionários puros com `csv` (viável; pandas simplifica filtros e é familiar a avaliadores). ⚠️ Se preferir zero dependências pesadas, trocar pandas por `csv` + dataclasses é trivial — os contratos não mudam.
+**Alternativas.** SQLite (útil se houvesse escrita/concorrência; não há). Dicionários puros com `csv` (viável; pandas simplifica filtros e é familiar a avaliadores). (Aprovado: pandas.)
 
 **Consequências.** Os arquivos originais **nunca** são alterados; correções/normalizações acontecem em memória e são documentadas.
 
@@ -115,15 +115,15 @@ Itens marcados com ⚠️ **APROVAR** dependem de escolha sua antes do desenvolv
 
 **Consequência.** Contrato em ARCHITECTURE §5.6.1.
 
-## D5 — Modelo e provedor ⚠️ APROVAR
+## D5 — Modelo e provedor (aprovado; provedor substituído por D17)
 
 **Recomendação.** **Anthropic Claude via API**, modelo `claude-sonnet-5-5` como padrão (bom equilíbrio custo/qualidade em tool use e português), `claude-haiku-5-5` como opção econômica para testes. SDK oficial `anthropic`.
 
 **Mitigação de lock-in.** Interface `LLMClient` fina (ver ARCHITECTURE §5.6) — trocar para OpenAI, Gemini ou Ollama (local, gratuito) exige só um novo adaptador. Configuração via `.env` (`LLM_PROVIDER`, `LLM_MODEL`, `ANTHROPIC_API_KEY`).
 
-**Pergunta para você:** confirma Claude (API paga) ou prefere um provedor gratuito/local (ex.: Ollama com Qwen/Llama — tool use menos confiável em PT-BR) ou outro provedor que você já tenha chave?
+**Aprovado (2026-11-01):** Claude Sonnet via API com camada independente de provedor. **Substituído por D17:** o usuário passou a usar a Groq como provedor padrão; o adaptador Anthropic permanece como alternativa por configuração.
 
-## D6 — Interface: **CLI** (+ UI opcional) ⚠️ APROVAR
+## D6 — Interface: **CLI** (aprovado; sem UI)
 
 **Decisão.** CLI interativa (`python -m emporio_agent`) com `rich` para formatação, flag `--debug` que exibe as tool calls. Foco do desafio é o agente funcionando.
 
@@ -147,7 +147,7 @@ Itens marcados com ⚠️ **APROVAR** dependem de escolha sua antes do desenvolv
 
 **Diretriz aprovada:** nunca identificar cliente por nome ou e-mail isoladamente. A identificação é sempre `order_id` + dado de contato, conferido contra o cliente daquele pedido; o e-mail compartilhado entre os clientes #11 e #43 não permite acessar pedidos do outro.
 
-## D9 — Data de referência ("hoje") ⚠️ APROVAR
+## D9 — Data de referência ("hoje") (aprovado)
 
 **Contexto.** Pedidos vão até 2026-03-22; hoje é 2026-10-31. Com a data real, todo pedido "shipped" está 8 meses atrasado e nenhum está no prazo de arrependimento.
 
