@@ -8,7 +8,11 @@ Variáveis suportadas (todas opcionais):
 
 - ``LLM_PROVIDER``: provedor do modelo (padrão ``anthropic``).
 - ``LLM_MODEL``: identificador do modelo (padrão ``claude-sonnet-5-5``).
-- ``LLM_MAX_TOKENS``: máximo de tokens por resposta (padrão ``1024``).
+- ``LLM_MAX_TOKENS``: máximo de tokens por resposta (padrão ``16000``).
+- ``LLM_EFFORT``: profundidade do raciocínio: ``low``, ``medium``, ``high``,
+  ``xhigh`` ou ``max`` (padrão ``low``).
+- ``LLM_REFUSAL_FALLBACK``: ``true``/``false``/``1``/``0`` — fallback de recusa no
+  servidor (padrão ``true``).
 - ``REFERENCE_DATE``: data/hora controlada para testes e exemplos, em ISO 8601
   (``2026-03-25`` ou ``2026-03-25T10:30``). Sem fuso explícito, é interpretada
   no fuso da loja; só data equivale a 00:00. Ausente ou vazia ⇒ hora real.
@@ -25,6 +29,7 @@ import os
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from dotenv import dotenv_values
@@ -44,7 +49,9 @@ class Settings(BaseModel):
     runtime_dir: Path = REPO_ROOT / "runtime"
     llm_provider: str = "anthropic"
     llm_model: str = "claude-sonnet-5-5"
-    llm_max_tokens: int = Field(default=1024, gt=0)
+    llm_max_tokens: int = Field(default=16000, gt=0)
+    llm_effort: Literal["low", "medium", "high", "xhigh", "max"] = "low"
+    llm_refusal_fallback: bool = True
     timezone: str = STORE_TIMEZONE
     reference_datetime: datetime | None = None
     max_tool_iterations: int = Field(default=6, gt=0)
@@ -90,26 +97,37 @@ def parse_reference_date(raw: str, timezone: str = STORE_TIMEZONE) -> datetime:
     return parsed
 
 
-def load_settings(
+def read_env(
     env_file: Path | None = None,
     environ: Mapping[str, str] | None = None,
-) -> Settings:
-    """Monta ``Settings`` a partir do ``.env`` e do ambiente.
+) -> dict[str, str]:
+    """Mescla ``.env`` e ambiente (o ambiente tem prioridade).
 
     ``env_file`` padrão: ``<repo>/.env`` (ignorado se não existir).
-    ``environ`` padrão: ``os.environ``; tem prioridade sobre o ``.env``.
+    ``environ`` padrão: ``os.environ``.
     """
     env_path = env_file if env_file is not None else REPO_ROOT / ".env"
     values: dict[str, str] = {}
     if env_path.is_file():
         values.update({k: v for k, v in dotenv_values(env_path).items() if v is not None})
     values.update(os.environ if environ is None else environ)
+    return values
+
+
+def load_settings(
+    env_file: Path | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> Settings:
+    """Monta ``Settings`` a partir do ``.env`` e do ambiente (ver ``read_env``)."""
+    values = read_env(env_file, environ)
 
     kwargs: dict[str, object] = {}
     mapping = {
         "LLM_PROVIDER": "llm_provider",
         "LLM_MODEL": "llm_model",
         "LLM_MAX_TOKENS": "llm_max_tokens",
+        "LLM_EFFORT": "llm_effort",
+        "LLM_REFUSAL_FALLBACK": "llm_refusal_fallback",
         "MAX_TOOL_ITERATIONS": "max_tool_iterations",
         "MAX_HISTORY_TURNS": "max_history_turns",
     }

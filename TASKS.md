@@ -181,14 +181,14 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Contrato.** ARCHITECTURE §5.6.1; decisões D5/D16.
 **Escopo.** `llm/base.py`, `llm/anthropic_client.py`, `llm/factory.py`, acréscimos em `config.py` e `.env.example`, `tests/fakes.py`.
 **Critérios de aceite.**
-- [ ] Conversão `Message` ⇒ formato Anthropic coberta por teste unitário (sem rede): texto, `provider_content` reenviado intacto, tool_use, e várias mensagens `tool` agrupadas em **um** `user` com `tool_result` (incl. `is_error`).
-- [ ] `from_anthropic_response` com `anthropic.types.Message` real (texto + tool_use + bloco não textual): `text`, `tool_calls` (`arguments` dict), `provider_content` completo, `stop_reason` mapeado (`pause_turn` ⇒ `other`).
-- [ ] Requisição montada sem `temperature`, sem `tool_choice`, sem `thinking`; com `output_config.effort`, cache só no bloco estável do sistema; caminho beta com fallback quando `refusal_fallback=True` (verificado com cliente SDK falso injetado).
-- [ ] Exceções do SDK mapeadas para `LLMError.kind` conforme o contrato; mensagens sem a chave.
-- [ ] `create_llm_client` sem chave ⇒ `LLMError(kind="auth")` com instrução do `.env`; provedor desconhecido ⇒ `kind="config"`.
-- [ ] `Settings`: `llm_effort` (padrão `low`), `llm_refusal_fallback` (padrão `True`), `llm_max_tokens` padrão 16000; `read_env` reaproveitado por `load_settings`; testes da T01 continuam verdes.
-- [ ] Smoke test real (marcado `@pytest.mark.llm`, pulado por padrão) responde a "olá".
-- [ ] `FakeLLM` roteirizável (respostas e exceções) e registra as chamadas.
+- [x] Conversão `Message` ⇒ formato Anthropic coberta por teste unitário (sem rede): texto, `provider_content` reenviado intacto, tool_use, e várias mensagens `tool` agrupadas em **um** `user` com `tool_result` (incl. `is_error`).
+- [x] `from_anthropic_response` com `anthropic.types.Message` real (texto + tool_use + bloco não textual): `text`, `tool_calls` (`arguments` dict), `provider_content` completo, `stop_reason` mapeado (`pause_turn` ⇒ `other`).
+- [x] Requisição montada sem `temperature`, sem `tool_choice`, sem `thinking`; com `output_config.effort`, cache só no bloco estável do sistema; caminho beta com fallback quando `refusal_fallback=True` (verificado com cliente SDK falso injetado).
+- [x] Exceções do SDK mapeadas para `LLMError.kind` conforme o contrato; mensagens sem a chave.
+- [x] `create_llm_client` sem chave ⇒ `LLMError(kind="auth")` com instrução do `.env`; provedor desconhecido ⇒ `kind="config"`.
+- [x] `Settings`: `llm_effort` (padrão `low`), `llm_refusal_fallback` (padrão `True`), `llm_max_tokens` padrão 16000; `read_env` reaproveitado por `load_settings`; testes da T01 continuam verdes.
+- [ ] Smoke test real (marcado `@pytest.mark.llm`, pulado por padrão) responde a "olá". **Escrito; execução pendente da credencial (ver PROGRESS).**
+- [x] `FakeLLM` roteirizável (respostas e exceções) e registra as chamadas.
 **Commit.** `feat(llm): interface LLMClient e adaptador Anthropic`
 
 ## T09 — Tools + registry
