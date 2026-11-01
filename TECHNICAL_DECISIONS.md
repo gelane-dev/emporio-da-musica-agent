@@ -87,6 +87,19 @@ Itens marcados com ⚠️ **APROVAR** dependem de escolha sua antes do desenvolv
 
 **Status.** Tratamentos de DATA_ANALYSIS §4.2 **aprovados em 2026-11-01**, com dois ajustes: limite máximo de 12x sempre respeitado; pagamento combinado somente acima de R$ 2.000,00 (exatamente R$ 2.000,00 ⇒ limitação explícita).
 
+## D17 — Provedor Groq como padrão (decisão do usuário, 2026-11-01)
+
+**Contexto.** O usuário decidiu usar a Groq como provedora de LLM (`GROQ_API_KEY`). A abstração `LLMClient` (D5, §5.6.1) foi feita para essa troca.
+
+**Decisão.**
+- Novo adaptador `llm/groq_client.py` (SDK oficial `groq`), selecionado por `LLM_PROVIDER=groq` (novo padrão). O adaptador Anthropic permanece (troca por configuração).
+- Modelo padrão **`openai/gpt-oss-120b`**: modelo de produção da Groq com suporte a tool use (documentação de *tool use* e *models* da Groq consultada em 2026-11-01); aceita `reasoning_effort` (`low|medium|high`), mapeado de `LLM_EFFORT`. Alternativa por configuração: `llama-3.3-70b-versatile` (produção, chamadas paralelas). Modelos em *preview* descartados para a entrega.
+- `max_completion_tokens` padrão 4096: o limite de vazão por minuto da Groq (base do plano Developer: 8K tokens/min para o gpt-oss-120b) torna inviável reservar 16000.
+- Raciocínio do gpt-oss não é devolvido nem reenviado (`include_reasoning=false`): a Groq não documenta o reenvio, e o histórico fica só com texto e chamadas de ferramenta.
+- `tool_use_failed` (chamada malformada gerada pelo modelo) é repetido uma vez antes de virar erro; 429 com `retry-after` tratado pelo SDK (`max_retries=5`); `run_scenarios.py --pause` espaça os cenários.
+
+**Consequência.** Nenhuma mudança em agente, ferramentas, domínio ou dados. Contrato em ARCHITECTURE §5.6.2. D16 passa a valer só para o adaptador Anthropic.
+
 ## D16 — Parâmetros de chamada ao modelo (2026-11-01, antes da T08)
 
 **Contexto.** Regras atuais da API para o Claude Sonnet 5.5 (`claude-sonnet-5-5`, modelo aprovado em D5), conferidas na documentação da API antes de escrever o adaptador.

@@ -191,6 +191,19 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 - [x] `FakeLLM` roteirizável (respostas e exceções) e registra as chamadas.
 **Commit.** `feat(llm): interface LLMClient e adaptador Anthropic`
 
+## T08b — Adaptador Groq (provedor padrão)
+**Objetivo.** Migrar o provedor padrão para a Groq preservando a abstração (D17).
+**Contrato.** ARCHITECTURE §5.6.2.
+**Escopo.** `llm/groq_client.py`, `llm/factory.py`, `config.py` (padrões), `.env.example`, `requirements.txt` (`groq==1.7.0`), `scripts/run_scenarios.py` (`--pause`); testes novos e ajuste dos testes que fixavam os padrões antigos.
+**Critérios de aceite.**
+- [ ] Conversões `to_groq_messages`/`to_groq_tools`/`from_groq_response` cobertas por testes com objetos reais do SDK `groq` (sem rede): system estável + dinâmico, tool calls com `arguments` em JSON, mensagens `tool`, mapeamento de `finish_reason`, JSON de argumentos inválido.
+- [ ] Requisição com `tool_choice="auto"`, `max_completion_tokens`, `reasoning_effort` só para `gpt-oss` (com mapeamento `xhigh|max`⇒`high`), `include_reasoning=False` só para `gpt-oss`; sem `temperature`.
+- [ ] `tool_use_failed` repetido uma vez e depois `LLMError(bad_request)`; demais exceções mapeadas sem texto da API nem a chave.
+- [ ] `create_llm_client`: `groq` sem `GROQ_API_KEY` ⇒ `LLMError(auth)` com instrução; `anthropic` inalterado; provedor desconhecido ⇒ `config`.
+- [ ] Padrões: provedor `groq`, modelo `openai/gpt-oss-120b`, `max_tokens` 4096; suíte inteira verde (testes da T01/T08 que fixavam os padrões antigos ajustados).
+- [ ] Smoke test real Groq (`@pytest.mark.llm`) escrito; executado quando a chave existir.
+**Commit.** `feat(llm): adaptador Groq como provedor padrão`
+
 ## T09 — Tools + registry
 **Objetivo.** Expor dados, domínio e políticas ao LLM com contratos estáveis, repassando conflitos e limitações.
 **Contrato.** ARCHITECTURE §5.5.1 (7 ferramentas; `estimar_frete` acrescentada em 2026-11-01 para expor o domínio da T05, conforme D4).

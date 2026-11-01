@@ -654,6 +654,37 @@ def fake_text(text: str) -> LLMResponse
 def fake_tool_calls(*calls: tuple[str, dict], ids: list[str] | None = None) -> LLMResponse
 ```
 
+#### 5.6.2 Contrato do adaptador Groq (T08b — provedor padrão desde 2026-11-01, D17)
+
+**`llm/groq_client.py`** — SDK oficial `groq` (1.7.0), API de chat no formato OpenAI. Implementa o mesmo `LLMClient` (§5.6.1); nada fora de `llm/` e `config.py` muda.
+```python
+class GroqClient:   # implementa LLMClient
+    def __init__(self, *, model: str, effort: str, api_key: str | None = None,
+                 client: "groq.Groq | None" = None, max_retries: int = 5,
+                 tool_use_failed_retries: int = 1): ...
+def to_groq_messages(system: str, system_dynamic: str | None, messages: list[Message]) -> list[dict]
+def to_groq_tools(tools: list[ToolSpec]) -> list[dict]
+def from_groq_response(response) -> LLMResponse        # response: groq.types.chat.ChatCompletion
+```
+Requisição (`complete`): `client.chat.completions.create(model, messages=to_groq_messages(...), tools=to_groq_tools(...) (omitido se vazio), tool_choice="auto" (só com tools), max_completion_tokens=max_tokens, reasoning_effort=…, include_reasoning=False)`.
+- `reasoning_effort`: só para modelos `openai/gpt-oss-*`; `low|medium|high` passam direto, `xhigh|max` ⇒ `high`. Outros modelos: parâmetro omitido. `include_reasoning=False` também só para `gpt-oss`.
+- Sem `temperature`/`top_p` (mantém o padrão do modelo; critérios de aceite por fatos — RK13); sem `parallel_tool_calls` explícito (padrão do modelo; o loop executa chamadas em sequência de qualquer forma).
+
+Conversões:
+- `to_groq_messages`: `{"role":"system","content": system}` + (se houver) `{"role":"system","content": system_dynamic}`; `user` ⇒ `{"role":"user","content"}`; `assistant` ⇒ `{"role":"assistant","content": content or None, "tool_calls": [{"id","type":"function","function":{"name","arguments": json.dumps(arguments, ensure_ascii=False)}}]}` (chave `tool_calls` omitida se vazia; `provider_content` ignorado); `tool` ⇒ `{"role":"tool","tool_call_id","content"}` (o `is_error` já está no JSON do resultado: `"ok": false`).
+- `to_groq_tools`: `[{"type":"function","function":{"name","description","parameters": input_schema}}]`.
+- `from_groq_response`: `choice = response.choices[0]`; `text = message.content` (None se vazio); `tool_calls` com `arguments = json.loads(function.arguments or "{}")` (JSON inválido ⇒ `arguments = {}` e a tool devolverá `INVALID_ARGUMENT`); `stop_reason`: `stop`⇒`end_turn`, `tool_calls`⇒`tool_use`, `length`⇒`max_tokens`, `content_filter`⇒`refusal`, outro⇒`other` (`raw_stop_reason` = original); `usage = {"input_tokens": prompt_tokens, "output_tokens": completion_tokens}`; `provider_content = None` (o raciocínio do gpt-oss não é reenviado).
+
+Erros (exceções do SDK ⇒ `LLMError`, mensagens fixas, nunca texto bruto da API nem a chave): `AuthenticationError`/`PermissionDeniedError` ⇒ `auth` (cita `GROQ_API_KEY` no `.env`); `RateLimitError` ⇒ `rate_limit`; `APIConnectionError`/`APITimeoutError` ⇒ `connection`; `BadRequestError` ⇒ `bad_request` (só request id seguro); `APIStatusError` ≥ 500 ⇒ `server`; outros ⇒ `api`.
+- **`tool_use_failed`**: `BadRequestError` cujo corpo tem `error.code == "tool_use_failed"` (o modelo gerou uma chamada de ferramenta malformada) é **repetido** até `tool_use_failed_retries` vezes antes de virar `LLMError(bad_request)`; log WARNING sem o conteúdo gerado.
+- Retries de 429/5xx/rede: SDK (`max_retries=5`, respeita `retry-after`).
+
+**`llm/factory.py`**: `llm_provider == "groq"` ⇒ `GroqClient(model=settings.llm_model, effort=settings.llm_effort, api_key=env["GROQ_API_KEY"])`; sem `GROQ_API_KEY` ⇒ `LLMError(kind="auth")` com instrução do `.env`. `"anthropic"` continua suportado (inalterado). Provedor desconhecido ⇒ `config`, citando `anthropic` e `groq`.
+
+**`config.py`**: padrões passam a `llm_provider="groq"`, `llm_model="openai/gpt-oss-120b"`, `llm_max_tokens=4096` (limite de vazão por minuto da Groq; a resposta + raciocínio `low` cabem com folga). `llm_refusal_fallback` permanece, usado só pelo adaptador Anthropic. `.env.example` documenta `GROQ_API_KEY` (e mantém `ANTHROPIC_API_KEY` como alternativa comentada).
+
+**`scripts/run_scenarios.py`**: nova opção `--pause SEGUNDOS` (padrão 20) entre cenários, para respeitar o limite de tokens por minuto do plano da Groq.
+
 ### 5.7 `agent/`
 ```python
 class Session:
