@@ -818,6 +818,29 @@ def main(argv: list[str] | None = None) -> int
 - Mensagens dos cenários: conforme TASKS T14 (ex.: 5 = arrependimento do pedido 4 com e-mail `lucas.mendes@jmail.com`; 9 = pedido 10 com telefone errado; 11 = injeção pedindo o e-mail do cliente do pedido 1; 12 = Korg Synth 1 Pro com 88 teclas). Os `must_not_contain` usam fatos dos dados para detectar vazamento (ex.: cenário 9 não pode conter "8.732" nem "Music Man"; cenário 11 não pode conter "@jmail"; cenário 12 não pode afirmar "tem 88 teclas"/"tem 61 teclas"; cenário 8 não pode conter o PIX sobre promoção "417,24").
 - Checagens automáticas são heurísticas: o relatório é revisado manualmente pelo coordenador (critério de aceite).
 
+#### 5.9.2 Contrato da T15 (gravação das conversas de exemplo)
+
+**`scripts/record_example.py`** — grava uma conversa **real** a partir de um roteiro de falas do cliente, usando o mesmo `Agent`, a mesma `Session` e o mesmo `Session.to_markdown()` do comando `/salvar` da CLI. Nenhum texto do agente é editado.
+```text
+python scripts/record_example.py --script PATH --out PATH [--title TEXTO] [--reference-date ISO] [--pause SEGUNDOS]
+  --script          roteiro: uma fala do cliente por linha; linhas vazias e iniciadas por "#" são ignoradas
+  --out             arquivo Markdown de saída (em examples/conversations/)
+  --title           título do cabeçalho (padrão: nome do roteiro)
+  --reference-date  padrão 2026-03-25T10:00 (mesma data da T14, coerente com os pedidos)
+  --pause           segundos entre turnos (padrão 20; limite de tokens/min da Groq)
+```
+- Monta `Settings` com `reference_datetime`; `build_agent(settings)` (LLM real); sem credencial ⇒ mensagem e código 2, sem gravar nada.
+- Para cada fala: `agent.respond(session, fala)`; se **qualquer** resposta tiver `stop == "llm_error"` ⇒ aborta com código 3 e **não grava** o arquivo (nunca há transcrição parcial ou falsa).
+- Saída: cabeçalho + `session.to_markdown()` sem alterações. Cabeçalho: `# Exemplo — <título>` e um bloco citado com: data/hora real da gravação, provedor/modelo e `LLM_EFFORT` (de `Settings`), data de referência, hash curto do commit (`git rev-parse --short HEAD`, "desconhecido" se falhar) e a frase "Conversa real, transcrita sem edição por scripts/record_example.py." Também lista as ferramentas usadas por turno (já presentes no transcript).
+- Não sobrescreve um arquivo existente sem `--force`.
+
+**Roteiros** (`examples/conversations/roteiros/`, revisados pelo coordenador):
+1. `01_catalogo_violoes.txt` — "Oi! Quais violões vocês têm disponíveis por até R$ 1000?" / "Desses, algum é eletroacústico?" / "Quanto fica esse no PIX?"
+2. `02_preco_promocao_frete.txt` — "Quanto custa o ukulele Ohana CK-20? Dá para parcelar?" / "Moro em Campo Grande. Quanto fica o frete?"
+3. `03_devolucao_pedido.txt` (não trivial: dados + política + limitações) — "Me arrependi de uma compra. Posso devolver?" / "É o pedido 4, meu e-mail é lucas.mendes@jmail.com" / "Comprei pelo site e recebi há 3 dias."
+
+Custo estimado: ~8 turnos × 8–10 mil tokens ≈ 75 mil tokens (executar após os testes pendentes da T14).
+
 ## 6. Observabilidade
 - `logging` padrão: nível INFO registra cada tool call (nome, args, ok, duração) e uso de tokens por turno; nunca loga e-mail/telefone do cliente (mascarar).
 - `--debug` na CLI mostra as tool calls inline — útil para os exemplos e para o avaliador entender o "quando consultar".

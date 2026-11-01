@@ -307,7 +307,11 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 
 ## T15 — Conversas de exemplo (entregável)
 **Objetivo.** 3–5 conversas reais, variadas, ≥ 1 não trivial.
-**Escopo.** Gravadas com `--save`, copiadas para `examples/conversations/` sem edição de conteúdo (apenas cabeçalho com contexto: data de referência, modelo).
+**Contrato.** ARCHITECTURE §5.9.2 (gravação por `scripts/record_example.py`, que usa o mesmo Agent/Session/transcript do `/salvar` da CLI; revisado em 2026-11-01 para permitir execução sem digitação e sem edição).
+**Escopo.** Conversas reais gravadas a partir dos roteiros em `examples/conversations/roteiros/`, salvas em `examples/conversations/` sem edição de conteúdo (apenas cabeçalho com contexto: data de referência, modelo, commit).
+**Preparação (sem cota, 2026-11-01).**
+- [ ] `scripts/record_example.py` conforme o contrato, testado com `FakeLLM` (inclui: não grava em `llm_error`, código 2 sem credencial, não sobrescreve sem `--force`).
+- [ ] Três roteiros revisados em `examples/conversations/roteiros/`.
 **Sugestão de conjunto (5).**
 1. `01_catalogo_violoes_ate_1000.md` — busca com filtro + follow-up ("e qual tem eletrônica?").
 2. `02_informacoes_e_horarios.md` — endereço, horário, "estão abertos agora?".
