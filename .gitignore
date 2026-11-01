@@ -29,3 +29,6 @@ Thumbs.db
 # Obsidian (estado local da interface)
 .obsidian/workspace*.json
 .obsidian/cache
+
+# Frontend experimental (fora do escopo desta entrega; mantido só no disco)
+frontend/
