@@ -245,10 +245,10 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Contrato.** ARCHITECTURE §5.5.2.
 **Escopo.** `tools/handoff_tools.py`; parâmetro `runtime_dir` em `build_tool_registry`.
 **Critérios de aceite.**
-- [ ] Gera protocolo único no formato do contrato; cria pasta/arquivo; uma linha JSON por chamada.
-- [ ] Mascara e-mails e números longos no `resumo` antes de gravar.
-- [ ] `prazo_retorno` "24 horas úteis" só para `reclamacao`; demais motivos ⇒ `null` + limitação.
-- [ ] `build_tool_registry` com `runtime_dir` ⇒ 8 ferramentas; sem ⇒ 7 (testes da T09 intactos).
+- [x] Gera protocolo único no formato do contrato; cria pasta/arquivo; uma linha JSON por chamada.
+- [x] Mascara e-mails e números longos no `resumo` antes de gravar.
+- [x] `prazo_retorno` "24 horas úteis" só para `reclamacao`; demais motivos ⇒ `null` + limitação.
+- [x] `build_tool_registry` com `runtime_dir` ⇒ 8 ferramentas; sem ⇒ 7 (testes da T09 intactos).
 **Commit.** `feat(tools): registro de reclamações e encaminhamento para atendente`
 
 ## T13 — CLI

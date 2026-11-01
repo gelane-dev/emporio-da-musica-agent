@@ -18,10 +18,10 @@
 | T09 Ferramentas | concluída | `8594164` | [[ARCHITECTURE#5.5.1 Contrato detalhado da T09 (ferramentas)]] |
 | T10 Prompt | concluída | `db61a89` | [[ARCHITECTURE#5.7.1 Contrato detalhado da T10 (prompt de sistema)]] |
 | T11 Loop do agente | concluída | (commit `feat(agent): loop`) | [[ARCHITECTURE#5.7.2 Contrato detalhado da T11 (loop do agente e sessão)]] |
-| T12 Encaminhamento | em andamento | — | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
+| T12 Encaminhamento | concluída | (commit `feat(tools): registro`) | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
 | T13–T17 | pendentes | — T14/T15 exigem credencial da API (ver pendências) |
 
-Suíte atual: 730 testes passando + 1 smoke real pulado (após a T10).
+Suíte atual: 826 testes passando + 1 smoke real pulado (após a T12).
 
 ## Decisões recentes (resumo; detalhes nos documentos citados)
 
@@ -35,6 +35,7 @@ Suíte atual: 730 testes passando + 1 smoke real pulado (após a T10).
 |---|---|---|---|---|
 | T05 | `run_a5ecc3d46e82` | Backend (impl.), QA (testes TDD a partir do contrato) — Sonnet | `gelane-dev/t05-backend`, `gelane-dev/t05-qa` | integração por squash sem conflitos; implementação e testes independentes concordaram na 1ª execução |
 
+| T11+T12 | `run_2d70073736b9` | IA/RAG (T11), Backend (T12), QA (testes) — Sonnet | `t11-ia-rag`, `t12-backend`, `w3-qa` | integração sem correções: 96 testes do QA passaram na 1ª execução |
 | T09+T10 | `run_5532f4d9b606` | Backend (T09), IA/RAG (T10), QA (testes; +2 correções) — Sonnet | `t09-backend`, `t10-ia-rag`, `w2-qa` | testes do QA corrigidos: categoria com nome exato, P15 com dados sintéticos (sem skip) e verificação de conceitos no prompt em vez de frases exatas |
 | T07+T08 | `run_df55428d95e4` | Backend (T07), IA/RAG (T08 + 1 correção), QA (testes de ambas) — Sonnet, 3 em paralelo | `t07-backend`, `t08-ia-rag`, `w1-qa` | QA detectou vazamento potencial de texto da API (com a chave) na mensagem de `bad_request` → corrigido pelo IA/RAG |
 | T06 | `run_31a1ddbd85a8` | IA/RAG (script + .md; 2 dispatches), QA (testes de fidelidade; 3 dispatches) — Sonnet | `gelane-dev/t06-ia-rag`, `gelane-dev/t06-qa` | revisão do coordenador achou 4 desvios de estrutura (parágrafos, negrito por regex) → corrigidos pelo IA/RAG; QA corrigiu critério e falso positivo; integração 499 testes |
