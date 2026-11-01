@@ -58,10 +58,12 @@ emporio-da-musica-agent/
 │       ├── __main__.py                # python -m emporio_agent → cli.main()
 │       ├── config.py                  # Settings (env, caminhos, REFERENCE_DATE, timezone)
 │       ├── data/
-│       │   ├── models.py              # Product, Category, Promotion, Order, OrderItem, Customer
+│       │   ├── models.py              # Product, Category, Promotion, Order, OrderItem, Customer, ProductConflict
 │       │   ├── loader.py              # lê CSVs → DataFrames tipados/normalizados
+│       │   ├── quality.py             # detecção de conflitos de produto (DATA_ANALYSIS §3.1)
 │       │   └── repository.py          # CatalogRepository, OrderRepository
 │       ├── domain/
+│       │   ├── limitations.py         # Limitation (compartilhado por domain e tools)
 │       │   ├── pricing.py             # PriceQuote: promo, PIX, parcelas
 │       │   ├── store_hours.py         # aberto agora? próximo horário
 │       │   ├── shipping.py            # regra de frete metropolitano / outras cidades
@@ -134,7 +136,7 @@ Limite: MAX_TOOL_ITERATIONS (padrão 6) → resposta de fallback educada.
 | Reclamação / caso que exige humano | `encaminhar_atendente` (opcional) | grava em runtime/handoffs.jsonl |
 | Fora do escopo / acessórios | nenhuma | regra do prompt |
 
-Casos compostos (ex.: "posso devolver meu pedido 7?") → `consultar_pedido` **e** `consultar_politica("trocas_devolucoes")`; o resultado do pedido já traz `dias_desde_entrega_estimada` para o LLM não calcular datas.
+Casos compostos (ex.: "posso devolver meu pedido 7?") → `consultar_pedido` **e** `consultar_politica("trocas_devolucoes")`; o resultado do pedido traz os fatos (status, previsão de entrega rotulada como estimativa) e as limitações (canal de compra e data real de recebimento não registrados). O agente apresenta a regra e os fatos, mas **não** declara elegibilidade — a confirmação fica com a equipe (DATA_ANALYSIS P6/P7).
 
 ## 5. Contratos de integração
 
@@ -187,9 +189,19 @@ class Order(BaseModel):
 class Customer(BaseModel):
     id: int; name: str; phone_digits: str; email: str; city: str
 
+class ProductConflict(BaseModel):              # DATA_ANALYSIS §3.1
+    product_id: int
+    kind: Literal["marca", "cordas", "teclas", "revisao_manual"]
+    fields: tuple[str, ...]                    # campos envolvidos, ex.: ("name", "description")
+    values: dict[str, str]                     # valor de cada lado, ex.: {"name": "Music Man", "description": "Fender"}
+    detection: Literal["automatica", "revisao_manual"]
+    note: str                                  # explicação em PT
+
+@dataclass(frozen=True)
 class StoreData:                              # retorno de loader.load_all(data_dir)
     products: pd.DataFrame; categories: pd.DataFrame; promotions: pd.DataFrame
     orders: pd.DataFrame; order_items: pd.DataFrame; customers: pd.DataFrame
+    product_conflicts: dict[int, list[ProductConflict]]   # vazio para produtos sem conflito
 
 class CatalogRepository:
     def __init__(self, data: StoreData): ...
@@ -200,48 +212,75 @@ class CatalogRepository:
                sort: Literal["preco_asc", "preco_desc", "relevancia"] = "relevancia") -> list[Product]
     def find_by_name(self, query: str, limit: int = 3) -> list[tuple[Product, float]]  # fuzzy score 0–100
     def categories(self) -> list[tuple[Category, int]]                                # (categoria, nº disponíveis)
-    def active_promotion(self, product_id: int) -> Promotion | None                   # maior desconto ativo
-    def latest_inactive_promotion(self, product_id: int) -> Promotion | None          # p/ "promo expirada"
-    def similar(self, product: Product, limit: int = 3) -> list[Product]              # mesma categoria, disponível, preço ±40%
+    def active_promotions(self, product_id: int) -> list[Promotion]                   # TODAS as ativas; não escolhe (P15)
+    def latest_inactive_promotion(self, product_id: int) -> Promotion | None          # p/ "promo expirada" (maior promotion_id)
+    def conflicts(self, product_id: int) -> list[ProductConflict]
+    def similar(self, product: Product, limit: int = 3) -> list[Product]              # sugestão: mesma categoria, disponível, preço próximo
 
 class OrderRepository:
     def get(self, order_id: int) -> Order | None
     def customer_of(self, order: Order) -> Customer
 ```
-Regras do `loader` (normalização em memória): tipos numéricos/datas; `specs` → dict; strings `strip()`; telefone → só dígitos; e-mail → minúsculas; `is_active` → bool; `notes`/`tracking_code` vazios → `None`; join de `category_name`; flag de inconsistência (DATA_ANALYSIS Q1–Q2) registrada em log, sem alterar valores.
+Regras do `loader` (normalização em memória, sem alterar valores): tipos numéricos (`price`/`total` como `Decimal`) e datas (`date`); `specs` → `dict`; strings `strip()`; telefone → só dígitos; e-mail → minúsculas; `is_active` → `bool`; `notes`/`tracking_code`/`estimated_delivery` vazios → `None`; join de `category_name`; detecção de conflitos de produto (DATA_ANALYSIS §3.1) com log WARNING por conflito.
+
+`similar()` é uma heurística de **sugestão** (política 7.3: "sugerir alternativas semelhantes"), não uma regra de negócio; os resultados são apresentados como sugestões.
 
 ### 5.3 `domain/` — regras de negócio puras
+
+Toda função de domínio devolve, junto com o resultado, as **limitações** aplicáveis. Só regras confirmadas (DATA_ANALYSIS §4.1) produzem valores afirmativos; contradições e lacunas (§4.2) produzem `Limitation`.
+
 ```python
+class Limitation(BaseModel):                   # domain/limitations.py — compartilhado por domain e tools
+    code: Literal["MANUAL_CONTRADITORIO", "MANUAL_OMISSO",
+                  "DADO_NAO_REGISTRADO", "DADO_CONFLITANTE"]
+    message: str                               # PT, pronta para o agente repassar
+    source: str                                # ex.: "Manual v2.1, seções 3 e 3.1" | "products.csv #142"
+
 class InstallmentOption(BaseModel):
     n: int; value: Decimal
+    status: Literal["confirmada", "a_confirmar"]   # P3/P4
 
 class PromoInfo(BaseModel):
     percent: int; description: str; price: Decimal
 
 class PriceQuote(BaseModel):
     list_price: Decimal
-    promo: PromoInfo | None              # {percent, description, price}
-    final_price: Decimal                 # promo.price ou list_price
-    pix_price: Decimal | None            # None quando há promo (não cumulativo)
-    max_installments: int                # maior n válido (1..12)
-    installment_examples: list[InstallmentOption]   # ex.: 3x, 6x, max
-    combined_payment_allowed: bool       # final_price > 2000
+    promo: PromoInfo | None                    # só se houver exatamente 1 promoção ativa
+    final_price: Decimal                       # promo.price ou list_price
+    pix_price: Decimal | None                  # None com promo (6.2) ou com promoções ambíguas (P15)
+    installments: list[InstallmentOption]      # 1..12; omite opções vedadas por TODAS as leituras do manual
+    max_confirmed_installments: int | None     # maior n com parcela ≥ R$ 100; None se nenhum
+    combined_payment: Literal["permitido", "nao_permitido", "a_confirmar"]   # > 2000 | < 2000 | == 2000 (P12)
+    limitations: list[Limitation]
 
-def quote(price: Decimal, promotion: Promotion | None) -> PriceQuote
-def installment_options(amount: Decimal) -> list[InstallmentOption]   # todas as válidas
+def quote(price: Decimal, active_promotions: list[Promotion]) -> PriceQuote
+def installment_options(amount: Decimal) -> list[InstallmentOption]
+```
+Classificação de parcelas (`v = amount / n`, arredondado a 2 casas):
 
+| Faixa | `v ≥ 100` | `80 ≤ v < 100` | `v < 80` |
+|---|---|---|---|
+| 1x–3x | confirmada | a_confirmar (P4) | a_confirmar (P4) |
+| 4x–6x | confirmada | a_confirmar (P3) | omitida (vedada pela tabela e pela 3.1) |
+| 7x–12x | confirmada | omitida (vedada pelas duas) | omitida |
+
+```python
 class StoreStatus(BaseModel):
-    is_open: bool; today_hours: str | None; next_opening: datetime | None
-def store_status(now: datetime) -> StoreStatus      # seg–sex 9–18, sáb 9–13, dom fechado
-                                                     # feriados: fora do escopo (documentado)
+    is_open_regular_hours: bool                # pelo horário regular da seção 2
+    today_hours: str | None; next_opening: datetime | None
+    limitations: list[Limitation]              # feriados não conhecidos; datas especiais com horário estendido
+def store_status(now: datetime) -> StoreStatus
 
 class ShippingEstimate(BaseModel):
-    region: Literal["metropolitana", "outras_cidades"]
-    fee: Decimal | None                  # None = calculado por CEP (não disponível)
-    deadline: str                        # "1 a 3 dias úteis" | tabela PAC/SEDEX/Jadlog
-    notes: list[str]                     # ex.: frete especial p/ baterias/teclados
-def shipping_estimate(city: str, order_value: Decimal, category_id: int | None) -> ShippingEstimate
+    region: Literal["metropolitana", "nao_confirmada"]   # só "Campo Grande" é confirmada (P8)
+    fee_status: Literal["gratis", "taxa_fixa", "nao_disponivel"]
+    fee: Decimal | None                        # None quando nao_disponivel
+    deadlines: list[str]                       # "1 a 3 dias úteis" | PAC/SEDEX/Jadlog
+    notes: list[str]                           # frase literal do manual sobre frete especial (P13)
+    limitations: list[Limitation]              # P5 (R$ 500,00), P8 (outros municípios), valor por CEP
+def shipping_estimate(city: str | None, order_value: Decimal) -> ShippingEstimate
 ```
+Dinheiro em `Decimal`; arredondamento de exibição em 2 casas com `ROUND_HALF_UP` (técnico, não regra de negócio).
 
 ### 5.4 `policies/store.py`
 ```python
@@ -258,7 +297,7 @@ class PolicyStore:
     def get(self, topic: PolicyTopic) -> list[PolicySection]
     def topics(self) -> list[PolicyTopic]
 ```
-Formato de `knowledge/policies.md`: cada bloco começa com `<!-- topic: trocas_devolucoes -->` seguido de `## 4. Política de Trocas e Devoluções`. O `PolicyStore` falha na inicialização se algum tópico do `Literal` não existir no arquivo.
+Formato de `knowledge/policies.md`: cada bloco começa com `<!-- topic: trocas_devolucoes -->` seguido de `## 4. Política de Trocas e Devoluções`. O `PolicyStore` falha na inicialização se algum tópico do `Literal` não existir no arquivo. O texto é **fiel ao PDF**: divergências (telefones, e-mails, parcelamento) não são corrigidas no `.md`, apenas anotadas no topo do arquivo.
 
 ### 5.5 `tools/` — contrato com o LLM
 ```python
@@ -271,6 +310,7 @@ class ToolResult(BaseModel):
     ok: bool
     data: dict | list | None = None
     error: ToolError | None = None
+    limitations: list[Limitation] = []    # serializado como "limitacoes"; o agente DEVE repassá-las
     def to_llm(self) -> str               # JSON compacto, ensure_ascii=False
 
 class Tool(Protocol):
@@ -283,18 +323,22 @@ class ToolRegistry:
     def execute(self, name: str, raw_args: dict) -> ToolResult   # nunca lança: erros viram ToolResult(ok=False)
 ```
 
-| Tool | Argumentos | `data` em caso de sucesso |
-|---|---|---|
-| `buscar_produtos` | `texto?: str`, `categoria?: enum(nomes)`, `preco_min?: float`, `preco_max?: float`, `apenas_disponiveis: bool = true`, `ordenar?: enum`, `limite: int = 8 (≤15)` | `{total_encontrado, produtos: [ {id, nome, categoria, preco, preco_formatado, promocao?: {percentual, preco}, estoque_status: "disponível"/"últimas unidades"/"esgotado", status} ]}` |
-| `detalhar_produto` | `produto_id?: int`, `nome?: str` (um dos dois) | `{produto: {id, nome, categoria, descricao, specs, status, estoque_status, quantidade_estoque}, preco: PriceQuote formatado, promocao_expirada?: {descricao, percentual}, alternativas?: [...] (se indisponível)}`. `AMBIGUOUS` com candidatos se fuzzy < limiar |
-| `listar_categorias` | — | `[ {nome, descricao, produtos_disponiveis} ]` |
-| `consultar_pedido` | `pedido_id: int`, `email?: str`, `telefone?: str` (≥1 obrigatório) | `{pedido_id, primeiro_nome_cliente, data_pedido, status, status_descricao, total_formatado, forma_pagamento_descricao, itens: [{nome, quantidade}], codigo_rastreio?, previsao_entrega?, dias_desde_entrega_estimada?, observacoes?, cidade_entrega}` |
-| `consultar_politica` | `topico: PolicyTopic` | `{topico, secoes: [{titulo, fonte, texto}]}` |
-| `informacoes_loja` | — | `{nome, endereco, telefone, whatsapp, email, horarios: [...], aberto_agora, proxima_abertura?, data_hora_referencia}` |
-| `encaminhar_atendente` *(opcional)* | `motivo: enum(reclamacao, caso_complexo, pedido_cliente)`, `resumo: str`, `pedido_id?: int` | `{protocolo, prazo_retorno: "24 horas úteis"}` |
+| Tool | Argumentos | `data` em caso de sucesso | Limitações típicas |
+|---|---|---|---|
+| `buscar_produtos` | `texto?: str`, `categoria?: enum(nomes)`, `preco_min?: float`, `preco_max?: float`, `apenas_disponiveis: bool = true`, `ordenar?: enum`, `limite: int = 8 (≤15)` | `{total_encontrado, produtos: [ {id, nome, categoria, preco_formatado, promocao?: {percentual, preco_formatado}, disponivel: bool, status, informacoes_conflitantes: bool} ]}` | Promoções múltiplas (P15) |
+| `detalhar_produto` | `produto_id?: int`, `nome?: str` (um dos dois) | `{produto: {id, nome_cadastrado, categoria, status, disponivel, quantidade_estoque, descricao?, especificacoes}, conflitos: [{tipo, campos, valores, observacao}], preco: PriceQuote formatado, promocao_expirada?: {descricao, percentual}, alternativas_sugeridas?: [...]}`. Campos envolvidos em conflito **saem** de `produto` e aparecem só em `conflitos`. `AMBIGUOUS` com candidatos se fuzzy < limiar | `DADO_CONFLITANTE` (Q1/Q2), parcelas a confirmar (P3/P4), `coming_soon` (Q6), P12, P15 |
+| `listar_categorias` | — | `[ {nome, descricao, produtos_disponiveis} ]` | — |
+| `consultar_pedido` | `pedido_id: int` **e** (`email` **ou** `telefone`) | `{pedido_id, primeiro_nome_cliente, data_pedido, status, status_descricao, valor_total_registrado, forma_pagamento_descricao, itens: [{nome, quantidade}], codigo_rastreio?, previsao_entrega_estimada?, observacoes?}` | Canal de compra não registrado (P6); data real de recebimento não registrada (P7) |
+| `consultar_politica` | `topico: PolicyTopic` | `{topico, secoes: [{titulo, fonte, texto}]}` | Divergências conhecidas do tópico (ex.: P3/P4 em `pagamento`) |
+| `informacoes_loja` | — | `{nome, endereco, contatos: [{tipo, valor, rotulo_no_manual, fonte}], horarios: [...], aberto_agora_horario_regular, proxima_abertura?, data_hora_referencia}` | P1, P2, feriados/datas especiais |
+| `encaminhar_atendente` *(opcional)* | `motivo: enum(reclamacao, caso_complexo, pedido_cliente)`, `resumo: str`, `pedido_id?: int` | `{protocolo, prazo_retorno: "24 horas úteis"}` | — |
 
 Regras transversais das tools:
+- **Identificação de cliente**: nunca por nome ou e-mail isolados. `consultar_pedido` exige o número do pedido **e** e-mail ou telefone, conferidos contra o cliente **daquele** pedido.
 - Nunca retornam e-mail/telefone de cliente nem `customer_id`.
+- `status_descricao` é a tradução literal do status do sistema (pendente, confirmado, enviado, entregue, cancelado) — sem inferir significado não documentado.
+- Valores de pedido são apresentados como "valor total registrado no pedido"; nunca recalculados pelo preço atual (Q3).
+- Nenhuma tool emite **veredito** de elegibilidade de troca/devolução: devolvem fatos + regra + limitações (P6/P7).
 - Produtos `discontinued`/`coming_soon` só aparecem em `detalhar_produto` (consulta direta), com status explícito; nunca em `buscar_produtos` com `apenas_disponiveis=true`.
 - Mensagens de erro dizem ao LLM **o que fazer** (ex.: `VERIFICATION_FAILED: "Os dados não conferem. Peça ao cliente o e-mail ou telefone usado na compra; não revele dados do pedido."`).
 

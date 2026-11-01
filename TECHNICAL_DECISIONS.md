@@ -19,7 +19,7 @@ Itens marcados com ⚠️ **APROVAR** dependem de escolha sua antes do desenvolv
 | E1 | Repositório Git **público** com **histórico de commits real** (sem squash/force-push) | Commits por tarefa |
 | E2 | **README.md**: como rodar, justificativas técnicas, limitações, uso de assistentes de IA | T16 |
 | E3 | **3 a 5 conversas** de exemplo (.md/.txt/imagem), ≥1 não trivial | T15 |
-| E4 | Ambiguidades: assumir interpretação razoável e **documentar no README** | Seção "Suposições" (alimentada por DATA_ANALYSIS §3/§4.2) |
+| E4 | Ambiguidades: assumir interpretação razoável e **documentar no README** | Seção "Ambiguidades e limitações" (alimentada por DATA_ANALYSIS §3/§4.2). Por decisão aprovada (D15), ambiguidades do manual viram limitações explícitas, não regras |
 
 ### Implícitos (critérios de avaliação: lógica, clareza, iniciativa)
 - Decisões justificadas e rastreáveis; código legível; comportamento previsível.
@@ -66,11 +66,26 @@ Itens marcados com ⚠️ **APROVAR** dependem de escolha sua antes do desenvolv
 
 ## D4 — Cálculos de negócio **em Python, não no LLM**
 
-**Decisão.** Preço promocional, preço PIX, simulação de parcelas, frete metropolitano, "aberto agora?", dias desde a entrega — tudo calculado em `domain/` e retornado já pronto nas tools. O LLM só redige.
+**Decisão.** Preço promocional, preço PIX, simulação de parcelas, frete metropolitano, "aberto agora?" — tudo calculado em `domain/` e retornado já pronto nas tools. O LLM só redige.
 
 **Justificativa.** Política 7.1 ("informações incorretas podem configurar propaganda enganosa"); LLMs erram aritmética e datas. Torna o comportamento testável com pytest.
 
-**Regras adotadas** (ver DATA_ANALYSIS §4.1/§4.2): PIX 5% só sem promo; promo ativa de maior desconto se houver mais de uma; parcela mínima 50/80/100; combinação de pagamentos > R$ 2.000; frete grátis ≥ R$ 500 em Campo Grande. Valores com `Decimal`, arredondamento `ROUND_HALF_UP` em 2 casas.
+**Regras implementadas:** somente as **confirmadas** em DATA_ANALYSIS §4.1. Contradições e lacunas (§4.2) não viram regra: viram `Limitation` (D15). Valores com `Decimal`; arredondamento de exibição `ROUND_HALF_UP` em 2 casas.
+
+## D15 — Limitações explícitas em vez de interpretações (revisado em 2026-11-01)
+
+**Contexto.** O manual tem contradições (telefones, e-mails, parcelamento) e lacunas (valores-limite, região metropolitana, canal de compra, data de recebimento); os dados têm produtos com informações conflitantes.
+
+**Decisão.**
+1. Domínio e tools devolvem, ao lado dos valores, uma lista de `Limitation {code, message, source}` (ARCHITECTURE §5.3/§5.5).
+2. Só regras sem contradição produzem valores afirmativos. O que depende de uma leitura não confirmada é marcado como **"a confirmar"** (ex.: parcelas) ou omitido com limitação (ex.: frete de R$ 500,00).
+3. Conflitos de produto são detectados no carregamento e expostos à parte; os campos em conflito não são apresentados como fato.
+4. Nenhuma tool emite veredito de elegibilidade de troca/devolução sem dados suficientes; o agente expõe regra + fatos + limitação e indica a confirmação com a equipe (manual, seção 10: "em caso de dúvidas... consultar a gerência").
+5. O prompt (T10) obriga o agente a repassar as limitações recebidas, sem completá-las com suposições.
+
+**Alternativa descartada.** Escolher uma interpretação "razoável" e documentá-la (abordagem da versão inicial deste plano) — rejeitada na aprovação: pode gerar informação incorreta ao cliente.
+
+**Status.** Tratamentos de DATA_ANALYSIS §4.2 **aguardando aprovação antes da T04**.
 
 ## D5 — Modelo e provedor ⚠️ APROVAR
 
@@ -102,13 +117,13 @@ Itens marcados com ⚠️ **APROVAR** dependem de escolha sua antes do desenvolv
 
 **Normalização:** telefone comparado só por dígitos; e-mail em minúsculas e sem espaços.
 
+**Diretriz aprovada:** nunca identificar cliente por nome ou e-mail isoladamente. A identificação é sempre `order_id` + dado de contato, conferido contra o cliente daquele pedido; o e-mail compartilhado entre os clientes #11 e #43 não permite acessar pedidos do outro.
+
 ## D9 — Data de referência ("hoje") ⚠️ APROVAR
 
 **Contexto.** Pedidos vão até 2026-03-22; hoje é 2026-10-31. Com a data real, todo pedido "shipped" está 8 meses atrasado e nenhum está no prazo de arrependimento.
 
-**Decisão proposta.** `REFERENCE_DATE` configurável no `.env` (padrão: data/hora atual em `America/Campo_Grande`). A data é injetada no prompt de sistema e usada pelas tools (prazos, "aberto agora?").
-
-**Pergunta para você:** padrão = data real (mais honesto; exemplos mostram "fora do prazo") ou fixar uma data coerente com os dados (ex.: `2026-03-25`, permitindo demonstrar um caso **dentro** do prazo de 7 dias)? Recomendo **data real como padrão** e usar `REFERENCE_DATE=2026-03-25` apenas para gravar um dos exemplos, documentando isso no README.
+**Decisão proposta.** `REFERENCE_DATE` configurável no `.env` (padrão: data/hora atual em `Amer**Aprovado:** data real do sistema em produção; `REFERENCE_DATE` apenas em testes e exemplos (documentado no cabeçalho de cada exemplo). Com a revisão D15, a data controlada não serve para "provar" elegibilidade de devolução — o agente não emite esse veredito sem a data real de recebimento.adrão** e usar `REFERENCE_DATE=2026-03-25` apenas para gravar um dos exemplos, documentando isso no README.
 
 ## D10 — Escopo e guardrails
 

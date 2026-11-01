@@ -71,7 +71,7 @@ Colunas: `promotion_id, product_id, discount_percent, description, is_active`
 | 19 | #90 Crafter HT-100 Folk | 18% | Desconto Exclusivo |
 | 24 | #94 Taylor 110e Dreadnought | 8% | Desconto Exclusivo |
 
-- Produtos com **múltiplas promoções** (todas inativas): #93, #96, #99. Regra necessária: se houver >1 ativa, usar uma só (não cumulativas — política 6.2). Proposta: maior desconto.
+- Produtos com **múltiplas promoções** (todas inativas): #93, #96, #99. O manual diz que promoções não são cumulativas (6.2), mas não diz qual vale se houver mais de uma ativa — tratamento em §4.2 (P15).
 - Promoções inativas com nomes de campanhas (Black Friday, Semana do Músico…) são úteis para o cenário **"promoção expirada"** (política 7.3). Ex.: Takamine GD20 (#95) teve "Oferta Especial" 12%, hoje inativa.
 
 ### 2.3 `orders.csv` + `order_items.csv`
@@ -98,20 +98,38 @@ Colunas: `customer_id, name, phone, email, city`
 
 ## 3. Problemas de qualidade encontrados
 
-| # | Problema | Evidência | Impacto | Tratamento proposto |
+> **Revisado em 2026-11-01** conforme as diretrizes aprovadas (TECHNICAL_DECISIONS, "Diretrizes obrigatórias"):
+> nenhum dado conflitante é tratado como fato; nenhuma regra é inventada para resolver contradições.
+
+| # | Problema | Evidência | Impacto | Tratamento |
 |---|---|---|---|---|
-| Q1 | Nome × descrição divergentes em baixos/baterias/teclados | #135 "Music Man Bass 1X" descrito como "Fender Jazz Bass"; #136 "Ibanez" → "Precision"; #137 "Yamaha" → "Ibanez"; #139 "Yamaha" → "Pearl Export"; #140 "Pearl" → "Tama"; #142 "Korg" → "Roland" | Agente pode afirmar a marca errada | Tratar `name` como fonte de verdade da marca/modelo; na listagem, não repetir trechos de marca da descrição. Registrar flag `description_mismatch` e citar a limitação no README |
-| Q2 | Specs × descrição divergentes | #137 descrição "5 cordas" / specs `strings: 4`; #142 "88 teclas" / specs `keys: 61`; #143 "piano de palco" / specs `type: Synthesizer` | Informação técnica contraditória | Specs estruturados como fonte de verdade; agente orientado a não inventar specs |
-| Q3 | Total do pedido ≠ soma dos itens | #3: R$ 3.450 vs 2×1.749 = 3.498; #20: R$ 1.400 vs 799+689 = 1.488 | Pergunta "quanto paguei?" | Sempre exibir `total_brl` do pedido (valor faturado); não recalcular |
-| Q4 | Pedido entregue com produto `coming_soon` | #3 (delivered) contém #130 (coming_soon); #14 (pending) também | Inconsistência de cadastro | Não afeta resposta de status; ao falar do produto, respeitar `status` atual |
-| Q5 | Produto descontinuado com estoque | #136 discontinued, estoque 13 | Agente poderia oferecer item fora de catálogo | Regra: `discontinued` nunca é ofertado, independente do estoque |
-| Q6 | Produto `coming_soon` com estoque | #130 coming_soon, estoque 2 | Idem | Regra: `coming_soon` é informado como "em breve", sem venda |
-| Q7 | PIX sem desconto aplicado no total | #1, #5, #10 pagos via PIX com total = preço de tabela | Divergência com política (5% PIX) | Não recalcular pedidos históricos; documentar suposição |
-| Q8 | Parcelamento fora da regra de parcela mínima | #9 e #16 em 6x (parcelas R$ 58,32 e R$ 71,65 < R$ 80); #18 em 12x (R$ 38,33 < R$ 100) | Histórico contradiz política | Não usar histórico como referência; simulador de parcelas segue a política |
-| Q9 | Pedidos "parados" em relação à data atual | #8 `shipped` com previsão 2026-02-28; pendentes desde março/2026; hoje = 2026-10-31 | Agente pode dizer "atrasado 8 meses" | Data de referência configurável (`REFERENCE_DATE`) — ver TECHNICAL_DECISIONS D9 |
-| Q10 | Typo no nome | #84 "Giannini GN-15 Nylon **Cedr** Natural" | Busca por "cedro" falha | Busca textual normalizada + fuzzy; não alterar o nome exibido |
-| Q11 | Categorias vazias | Sopro (madeiras/metais), Cordas Orquestrais | Política diz que a loja vende esses itens | Responder "no momento não temos em estoque/catálogo" e oferecer contato com a loja |
-| Q12 | Catálogo pequeno vs. política | Política: "mais de 300 instrumentos"; CSV: 65 | Agente não deve prometer o que não está nos dados | Persona responde apenas com base no sistema |
+| Q1 | Nome × descrição divergentes (marca/modelo) | #135 "Music Man" → descrição "Fender Jazz Bass"; #136 "Ibanez" → "Precision" (modelo Fender); #137 "Yamaha" → "Ibanez"; #139 "Yamaha" → "Pearl Export"; #140 "Pearl" → "Tama"; #142 "Korg" → "Roland"; #144 "Roland" → "Yamaha" | Agente pode afirmar marca/modelo errados | **Não escolher fonte de verdade.** O loader (T02) detecta e expõe o conflito como dado estruturado (`ProductConflict`); a tool (T09) marca o produto como "informações conflitantes" e o agente não afirma marca/modelo/descrição além do nome cadastrado, informando a limitação |
+| Q2 | Specs × descrição divergentes | #137 "5 cordas" / specs `strings: 4`; #142 "88 teclas" / specs `keys: 61`; #143 "piano de palco" / specs `type: Synthesizer` | Informação técnica contraditória | Idem Q1: os **dois** valores são expostos como conflitantes; o agente não apresenta nenhum deles como confirmado |
+| Q3 | Total do pedido ≠ soma dos itens a preço atual | #3: R$ 3.450 vs 2×1.749 = 3.498; #20: R$ 1.400 vs 799+689 = 1.488 | Pergunta "quanto paguei?" | **Não é conflito confirmado**: `order_items` não guarda preço histórico, então o preço atual pode simplesmente ter mudado. Exibir `total_brl` como "valor total registrado no pedido"; nunca recalcular pelo preço atual |
+| Q4 | Pedido com produto hoje `coming_soon` | #3 (delivered) e #14 (pending) contêm #130 | Inconsistência de cadastro | Não afeta o status do pedido; ao falar do produto, usar o `status` atual |
+| Q5 | Produto descontinuado com estoque | #136 discontinued, estoque 13 | Agente poderia oferecer item fora de catálogo | Política 7.3: produto descontinuado "não faz mais parte do catálogo" ⇒ nunca ofertado, independente do estoque (regra do manual, não inventada) |
+| Q6 | Produto `coming_soon` com estoque | #130 coming_soon, estoque 2 | Venda/disponibilidade incerta | O manual não define `coming_soon`. A tool informa o status "em breve" e devolve **limitação**: disponibilidade para compra não confirmada; não é listado como disponível |
+| Q7 | PIX sem desconto aplicado no total | #1, #5, #10 pagos via PIX com total = preço de tabela | Divergência com política (5% PIX) | Pedidos históricos não são recalculados nem comentados; só o `total_brl` é exibido |
+| Q8 | Parcelamento histórico fora da parcela mínima | #9 e #16 em 6x (R$ 58,32 e R$ 71,65); #18 em 12x (R$ 38,33) | Histórico contradiz política | Histórico nunca é usado como referência de regra |
+| Q9 | Pedidos "parados" em relação à data atual | #8 `shipped` com previsão 2026-02-28; pendentes desde março/2026 | Agente pode afirmar atraso | Data real em produção; data controlada (`REFERENCE_DATE`) em testes/exemplos (D9). A tool informa a previsão como **estimativa** e não afirma atraso nem causa |
+| Q10 | Typo no nome | #84 "Giannini GN-15 Nylon **Cedr** Natural" | Busca por "cedro" falha | Busca textual normalizada + fuzzy; nome exibido não é alterado |
+| Q11 | Categorias vazias | Sopro (madeiras/metais), Cordas Orquestrais | Política diz que a loja trabalha com esses itens | Informar que não há produtos dessas categorias no sistema no momento e indicar o contato da loja |
+| Q12 | Catálogo pequeno vs. política | Política: "mais de 300 instrumentos"; CSV: 65 | Agente não deve prometer o que não está nos dados | Responder apenas com base no sistema |
+
+### 3.1 Detecção de conflitos de produto (Q1/Q2)
+
+Duas camadas, ambas no loader (T02), sem alterar valores:
+
+1. **Verificação automática** (pega casos novos se os dados mudarem):
+   - *marca*: a descrição menciona uma marca de instrumento conhecida e nenhuma delas aparece no nome. Lista de marcas = fabricantes de instrumentos presentes nos dados (Yamaha, Tagima, Giannini, Rozini, Shelby, Crafter, Martin, Taylor, Takamine, Kala, Ohana, Kalani, Fender, Gibson, Ibanez, PRS, Music Man, Pearl, Tama, Korg, Nord, Roland). Marcas de componentes (LR Baggs, Aquila, Atmosfeel) **não** entram, pois não indicam o fabricante do instrumento.
+   - *número de cordas*: "N cordas" na descrição ≠ `specs.strings`.
+   - *número de teclas*: "N teclas" na descrição ≠ `specs.keys`.
+   - Resultado verificado nos dados atuais: #135, #137 (marca e cordas), #139, #140, #142 (marca e teclas), #144.
+2. **Lista revisada manualmente** (casos que a heurística não cobre sem gerar falsos positivos):
+   - #136: descrição cita o modelo "Precision" (linha de outro fabricante) num produto Ibanez.
+   - #143: descrição "piano de palco" × `specs.type = Synthesizer`.
+
+Fora do escopo da detecção (documentado como limitação): nomes genéricos com modelo específico na descrição **da mesma marca** (#138 "Music Man Bass 4X" → "StingRay"; #141 "Yamaha Kit 3" → "Stage Custom") não são contradição explícita e não são marcados.
 
 ## 4. Análise do PDF de políticas
 
@@ -132,35 +150,58 @@ Colunas: `customer_id, name, phone, email, city`
 
 Tamanho estimado: ~2,5–3,5 mil tokens no total — **cabe inteiro no contexto** de qualquer LLM moderno.
 
-### 4.1 Regras que viram lógica determinística (não deixar para o LLM calcular)
+**Fuso horário.** Os arquivos não citam fuso; ele decorre do endereço da loja (Campo Grande/MS — enunciado do desafio e seção 1.2 do manual). O identificador IANA correspondente é `America/Campo_Grande` (UTC−4, sem horário de verão desde 2019 — conferido na base `tzdata` 2026f).
 
-- **PIX**: 5% de desconto sobre preço de tabela; **não** se aplica sobre preço promocional.
-- **Promoções**: não cumulativas; exibir preço original + preço promocional + percentual.
-- **Parcelamento** (até 12x sem juros):
-  - 1–3x: parcela mínima R$ 50,00 (interpretação de "sem valor mínimo, exceto abaixo de R$ 50");
-  - 4–6x: parcela mínima R$ 80,00;
-  - 7–12x: parcela mínima R$ 100,00.
-- **Pagamento combinado**: permitido acima de R$ 2.000,00.
-- **Frete metropolitano**: grátis acima de R$ 500,00; senão R$ 35,00; 1–3 dias úteis.
-- **Outras cidades**: PAC 5–12, SEDEX 2–5, Jadlog 3–8 dias úteis; valor calculado por CEP (agente **não** tem como cotar).
-- **Horário de funcionamento** → "estamos abertos agora?" e mensagem fora do expediente (7.1).
-- **Prazos**: arrependimento 7 dias corridos após recebimento; troca por defeito 30 dias após compra; troca por preferência 7 dias; garantia legal 90 dias após recebimento.
+### 4.1 Regras confirmadas (viram lógica determinística)
 
-### 4.2 Inconsistências e ambiguidades no PDF
+Só entram aqui regras **sem contradição** no manual. Valores calculados em Python (TECHNICAL_DECISIONS D4).
 
-| # | Inconsistência | Decisão proposta |
+| Regra | Fonte | Observação |
 |---|---|---|
-| P1 | Telefone: capa/tabela "(67) 3341-4444" vs. seção 7 "WhatsApp (67) 3321-4500" | Informar ambos com rótulo: telefone da loja 3341-4444; WhatsApp de atendimento 3321-4500 (seção 7 é a específica do canal). Documentar |
-| P2 | E-mail: capa `contato@emporiodamusica.com.br` vs. tabela 1.2 `contato@empóriodamusica.com.br` (com acento) | Usar a versão sem acento (domínios com acento são improváveis) |
-| P3 | Tabela de pagamento: "crédito até 12x, parcela mínima R$ 100" vs. 3.1 com faixas (50/80/100) | Seção 3.1 (mais detalhada) prevalece; R$ 100 vale para 7–12x |
-| P4 | "Sem valor mínimo de parcela (exceto abaixo de R$ 50,00)" é autocontraditório | Interpretar como mínimo de R$ 50 por parcela de 1–3x |
-| P5 | "Frete grátis acima de R$ 500" / "taxa para abaixo de R$ 500" — exatamente R$ 500 não definido | Considerar ≥ R$ 500,00 como grátis (favorável ao cliente); documentar |
-| P6 | Arrependimento só para compras **online**, mas pedidos não têm canal | Assumir que pedidos do sistema são online; agente pergunta em caso de dúvida |
-| P7 | Arrependimento conta do **recebimento**, mas só existe `estimated_delivery` | Usar `estimated_delivery` como proxy e deixar claro que é estimativa; casos-limite → atendente humano |
-| P8 | "Região metropolitana de Campo Grande" não é definida (quais cidades) | Considerar apenas o município de Campo Grande como metropolitano nos dados; demais → "outras cidades" |
-| P9 | Garantia: "a partir do recebimento"; troca por defeito: "após a compra" — referências de data diferentes | Respeitar literalmente cada regra, explicitando a referência ao cliente |
-| P10 | Política fala em "registrar reclamação e encaminhar" | Tool de handoff que registra em arquivo local (ver TASKS T12) |
-| P11 | Campanhas sazonais no PDF (ex.: Black Friday em novembro) vs. promoções inativas no CSV | **Fonte de verdade para preço é o CSV** (`is_active`). O PDF descreve campanhas genéricas, não vigência |
+| PIX: 5% sobre preço de tabela | 3 (tabela) | — |
+| PIX não se aplica sobre preço promocional; promoções não cumulativas | 6.2 | — |
+| Preço promocional exibido com preço original e percentual | 6.2 | — |
+| Promoção vigente = `is_active` no sistema | 7.3 ("verificar se ela encontra-se ativa no sistema") | O manual define o sistema como fonte; campanhas da seção 6.1 não indicam vigência |
+| Crédito: até 12x sem juros | 3 e 3.1 (concordam) | — |
+| Parcela ≥ R$ 100,00 é aceita em **qualquer** número de parcelas (1–12x) | 3 (mín. R$ 100) e 3.1 (mín. ≤ R$ 100 em todas as faixas) | Interseção das duas fontes: atende a todas as leituras. Ver P3/P4 para o restante |
+| Pagamento combinado permitido para compras **acima de** R$ 2.000,00 | 3.1 | Valor exatamente R$ 2.000,00 ⇒ limitação (P12) |
+| Frete na região metropolitana: grátis **acima de** R$ 500,00; R$ 35,00 **abaixo de** R$ 500,00; 1 a 3 dias úteis | 5.1 | Exatamente R$ 500,00 ⇒ limitação (P5) |
+| Campo Grande pertence à região metropolitana de Campo Grande | 5.1 (a região leva o nome do município-sede) | Demais municípios ⇒ limitação (P8) |
+| Outras cidades: PAC 5–12, SEDEX 2–5, Jadlog 3–8 dias úteis; valor por CEP, peso e dimensões | 5.2 | Agente **não** cota valor (sem dados) ⇒ limitação |
+| "Instrumentos de grande porte (baterias acústicas, pianos digitais, contrabaixos) podem exigir frete especial" | 5.2 | Repassado literalmente; o agente não classifica qual produto exige (ver P13) |
+| Horário: seg–sex 09:00–18:00; sáb 09:00–13:00; domingo e feriados fechado | 2 | Feriados não são conhecidos pelo sistema ⇒ limitação ao responder "aberto agora?" |
+| Datas especiais podem ter horário estendido, comunicado em redes sociais/WhatsApp | 2 | Repassado como ressalva |
+| Arrependimento (compras online): 7 dias corridos após o **recebimento** | 4.1 | Ver P6/P7 |
+| Troca por defeito: 30 dias corridos após a **compra** | 4.2 | — |
+| Troca por preferência: até 7 dias | 4.3 | Referência de data não especificada — ver P14 |
+| Garantia legal: 90 dias após o **recebimento** | 8.1 | — |
+| Produto descontinuado: informar que saiu do catálogo e oferecer equivalentes | 7.3 | — |
+| Produto fora de estoque: informar indisponibilidade e sugerir alternativas disponíveis | 7.3 | — |
+
+### 4.2 Contradições, lacunas e tratamento
+
+Princípio: **quando o manual é contraditório ou omisso, a ferramenta devolve uma limitação explícita** (`Limitation`, ver ARCHITECTURE §5.5) e o agente informa o cliente e indica a confirmação com a equipe. Nenhuma interpretação é aplicada como regra.
+
+> Status: **proposto — aguardando aprovação antes da T04.**
+
+| # | Contradição / lacuna | O que é confirmado | Tratamento (limitação) |
+|---|---|---|---|
+| P1 | Telefone: seção 1.2 "Telefone / WhatsApp (67) 3341-4444" × seção 7 "WhatsApp (67) 3321-4500" | Os dois números constam no manual | `informacoes_loja` devolve **os dois**, cada um com a seção de origem e o rótulo exato do manual, mais a limitação "o manual cita dois números de WhatsApp". O agente não afirma qual é o correto |
+| P2 | E-mail: capa `contato@emporiodamusica.com.br` × seção 1.2 `contato@empóriodamusica.com.br` | Ambas as grafias constam | Devolver as duas grafias com a origem e a limitação. O telefone (67) 3341-4444, idêntico na capa e na seção 1.2, é o contato sem divergência |
+| P3 | Tabela de pagamento: crédito "parcela mínima de R$ 100,00" × seção 3.1: 4x–6x com mínimo de R$ 80,00 | Parcelas ≥ R$ 100 (qualquer nº de vezes) | Opções com parcela ≥ R$ 100 são **confirmadas**. Opções 4x–6x com parcela entre R$ 80,00 e R$ 99,99 são devolvidas como **"a confirmar"**, com limitação citando as duas regras |
+| P4 | Seção 3.1: até 3x "sem valor mínimo de parcela (exceto abaixo de R$ 50,00)" — autocontraditório; e conflita com o mínimo de R$ 100 da tabela | Parcelas ≥ R$ 100 | Opções 1x–3x com parcela < R$ 100 são **"a confirmar"**, com limitação citando o texto literal. Nenhum mínimo de R$ 50 é aplicado |
+| P5 | Frete metropolitano: "acima de R$ 500" grátis / "abaixo de R$ 500" taxa — exatamente R$ 500,00 não está coberto | Demais valores | Valor = R$ 500,00 ⇒ `fee=None` + limitação |
+| P6 | Arrependimento vale para compras **online**; pedidos não registram o canal | Regra de 7 dias | `consultar_pedido` devolve limitação "canal de compra não registrado"; o agente pergunta ao cliente e não conclui sozinho |
+| P7 | Arrependimento conta do **recebimento**; só existe `estimated_delivery` | Previsão de entrega | A tool devolve a previsão rotulada como **estimativa** e limitação "data real de recebimento não registrada". **Nenhum veredito de elegibilidade** é calculado; o agente expõe a regra, os dados disponíveis e encaminha a confirmação para a equipe |
+| P8 | "Região metropolitana de Campo Grande" não lista os municípios | Campo Grande pertence | Outra cidade ⇒ limitação "o manual não define os municípios da região metropolitana"; o agente apresenta as regras de 5.1 e 5.2 e indica confirmação |
+| P9 | Garantia conta do recebimento; troca por defeito conta da compra | Ambas literais | Sem conflito real: cada prazo é informado com sua referência de data |
+| P10 | "Registrar reclamação e encaminhar" | Fluxo do manual | T12 (opcional): registro local + protocolo |
+| P11 | Campanhas sazonais (6.1) × promoções inativas no CSV | Seção 7.3 manda verificar no sistema | Preço sempre pelo CSV (`is_active`); a seção 6.1 não é usada para afirmar descontos vigentes |
+| P12 | Pagamento combinado "acima de R$ 2.000,00" — exatamente R$ 2.000,00 não está coberto | Demais valores | Valor = R$ 2.000,00 ⇒ limitação |
+| P13 | "Contrabaixos" (frete especial) pode ser acústico (Cordas Orquestrais) ou elétrico (as descrições dos baixos usam "contrabaixo elétrico"); "pianos digitais" × teclados cadastrados como sintetizador | Texto literal | O agente repassa a frase do manual ("podem exigir frete especial com cotação individual") sem classificar o produto |
+| P14 | Troca por preferência: "até 7 dias" sem dizer se após compra ou recebimento | Prazo de 7 dias | Informar "até 7 dias" com limitação sobre a referência de data |
+| P15 | Mais de uma promoção ativa para o mesmo produto: não cumulativas, mas o manual não diz qual vale | Não cumulativas | Hoje nenhum produto tem duas ativas. Se ocorrer: exibir preço de tabela + limitação "há mais de uma promoção ativa; confirmar qual se aplica". Nenhuma é escolhida automaticamente |
+| P16 | `status = coming_soon` não é definido no manual | Status do sistema | Ver Q6 |
 
 ## 5. Mapeamento dos cenários sugeridos no desafio
 
@@ -168,13 +209,14 @@ Tamanho estimado: ~2,5–3,5 mil tokens no total — **cabe inteiro no contexto*
 |---|---|---|
 | "Quais opções de violões disponíveis custando até R$1000?" | products + promotions | **12 violões** ativos com estoque (#81, 82, 83, 84, 85, 86, 87, 88, 89, 91, 107, 112). Excluir #96 (estoque 0) e #113 (descontinuado) |
 | "Qual o endereço da loja?" | PDF 1.2 | Rua 14 de Maio, 3200 — Centro, Campo Grande/MS, CEP 79202-333 |
-| "Quanto custa o Takamine GD20?" | products #95 + promotions | R$ 2.199,00 (estoque 5); PIX R$ 2.089,05; até 12x de R$ 183,25; promoção de 12% **inativa** |
-| "Me arrependi da minha compra, posso devolver?" | orders + PDF 4.1/4.4 | Pedir nº do pedido + verificação; avaliar status e prazo de 7 dias; com a data de referência atual, todos os entregues estão fora do prazo → explicar alternativas (defeito/garantia) |
+| "Quanto custa o Takamine GD20?" | products #95 + promotions | R$ 2.199,00 (estoque 5); PIX R$ 2.089,05; até 12x de R$ 183,25 (confirmado: parcela ≥ R$ 100); promoção de 12% **inativa** |
+| "Me arrependi da minha compra, posso devolver?" | orders + PDF 4.1/4.4 | Pedir nº do pedido + e-mail ou telefone; informar status, previsão de entrega (estimativa) e a regra de 7 dias após o recebimento; perguntar data de recebimento e canal de compra; **não** declarar elegibilidade — encaminhar a confirmação à equipe |
 
 Cenários extras de alto valor para os exemplos:
 - Pedido cancelado (#19) → explicar motivo (`notes`) com empatia.
 - Produto esgotado (#96) → sugerir similares disponíveis (mesma categoria/faixa de preço).
-- Produto em promoção ativa (#121: R$ 549 → R$ 439,20, 20% off) → mostrar original + promo + %; PIX não acumula.
+- Produto em promoção ativa (#121: R$ 549 → R$ 439,20, 20% off) → mostrar original + promo + %; PIX não acumula; até 4x de R$ 109,80 confirmado; 5x de R$ 87,84 "a confirmar" (P3).
+- Produto com informações conflitantes (#142) → informar nome e preço, avisar que há divergência no cadastro (marca e número de teclas) e sugerir confirmar com a loja.
 - Pedido de acessório ("vocês vendem cordas?") → redirecionamento educado (política 7.1).
 - Fora de escopo total ("qual a capital da França?") → recusa gentil e retorno ao tema.
 - Categoria vazia ("vocês têm saxofone?") → transparência + contato da loja.
