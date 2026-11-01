@@ -74,7 +74,7 @@ python -m pytest -q          # full suite, never calls the real model
 python -m pytest -q -m llm   # smoke tests against the real provider (require GROQ_API_KEY / ANTHROPIC_API_KEY)
 ```
 
-Unit and integration tests use a fake LLM (`FakeLLM`); tests marked `llm` are skipped by default (`addopts = "-m 'not llm'"`). Current state: 1016 passing; 2 real-provider smoke tests skipped by default (`-m llm`).
+Unit and integration tests use a fake LLM (`FakeLLM`); tests marked `llm` are skipped by default (`addopts = "-m 'not llm'"`). Current state: 1029 passing; 2 real-provider smoke tests skipped by default (`-m llm`).
 
 ## Utilities
 

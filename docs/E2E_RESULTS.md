@@ -49,6 +49,22 @@ Critério de aceite dos pendentes: cenários selecionados passam em todas as rep
 
 Como verificar a cota antes de rodar: o erro 429 da Groq informa "tokens per day (TPD): Limit 200000, Used …" e o tempo de espera; não rode a regressão (B) se a cota restante for menor que ~100 mil tokens.
 
-## 4. Conversas de exemplo (T15)
+## 4. Conversas de exemplo (T15) — pendentes por falta de cota
 
-Dependem da mesma cota. Ver o estado atual em [[docs/PROGRESS]] e no `README.md`; nenhuma conversa será escrita à mão.
+Preparação concluída (sem cota): `scripts/record_example.py` testado com `FakeLLM` (não grava nada se houver erro do LLM) e três roteiros revisados em `examples/conversations/roteiros/`. Nenhuma conversa será escrita à mão.
+
+| Prioridade | Conversa | Objetivo | Comando | Custo estimado |
+|---|---|---|---|---|
+| C1 | `01_catalogo_violoes` | Busca com filtro de preço e follow-ups (eletroacústico, PIX) | `python scripts/record_example.py --script examples/conversations/roteiros/01_catalogo_violoes.txt --out examples/conversations/01_catalogo_violoes.md --title "Catálogo: violões até R$ 1000"` | ~25 mil tokens |
+| C2 | `02_preco_promocao_frete` | Promoção com preço original + percentual, parcelas "a confirmar", frete em Campo Grande | `python scripts/record_example.py --script examples/conversations/roteiros/02_preco_promocao_frete.txt --out examples/conversations/02_preco_promocao_frete.md --title "Preço, parcelamento e frete"` | ~20 mil tokens |
+| C3 | `03_devolucao_pedido` (não trivial) | Verificação do pedido + política de arrependimento + limitações (canal e data de recebimento), sem veredito | `python scripts/record_example.py --script examples/conversations/roteiros/03_devolucao_pedido.txt --out examples/conversations/03_devolucao_pedido.md --title "Devolução de pedido"` | ~30 mil tokens |
+
+Padrões dos comandos: data de referência `2026-03-25T10:00` (igual à T14) e pausa de 20 s entre turnos. Código 3 = erro do LLM (cota): nada é gravado; repetir mais tarde.
+
+## 5. Ordem de execução quando a cota renovar
+
+1. Prioridade A (§3): cenários 5 e 10 (2 repetições) e 9 (1 repetição) — ~50 mil tokens.
+2. Conversas C1–C3 (§4) — ~75 mil tokens.
+3. Regressão B (§3) somente se ainda houver cota (~100 mil tokens).
+
+Todos os comandos assumem o ambiente virtual ativo (`venv\Scripts\Activate.ps1` no PowerShell ou `source venv/Scripts/activate` no Git Bash) e `GROQ_API_KEY` no `.env`.

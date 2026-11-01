@@ -25,7 +25,7 @@
 | T16 README | em inglês e atualizado para Groq (resultados e exemplos pendentes de T14/T15) | (commit `docs: README em inglês`) | `20c9785` rascunho PT | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
 | T15, T17 | pendentes | — T14/T15 exigem credencial da API (ver pendências) |
 
-Suíte atual: 968 testes passando + 2 smokes reais pulados (Anthropic e Groq) após a T08b.
+Suíte atual: 1029 testes passando + 2 smokes reais pulados (Anthropic e Groq), sem avisos; verificada também em clone limpo e em ambiente virtual novo instalado só pelo `requirements.txt`.
 
 ## Decisões recentes (resumo; detalhes nos documentos citados)
 
@@ -79,6 +79,7 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 - **Histórico reescrito em 01/11/2026 (autorizado pelo usuário, antes de qualquer publicação):** o PDF foi removido de todos os commits (`git filter-branch --index-filter`), referências de backup e reflog expurgadas, `git gc --prune=now`; verificado que nenhum commit ou objeto contém o PDF e `git fsck` limpo. Todos os hashes mudaram; as referências desta documentação foram atualizadas (38 commits mapeados um a um pela mensagem).
 - Remoto configurado (sem push): `origin` = https://github.com/gelane-dev/emporio-da-musica-agent.git
 - Publicação só após aprovação explícita do usuário.
+- Revisão sem cota (01/11, noite): clone limpo (1029 testes, `build_policies --check`, CLI sem `.env` ⇒ código 2); instalação do zero em venv novo (`pip check` limpo); `compileall` ok; dependências declaradas = importadas; sem TODO/print de depuração; achado **F1** (argumentos de `encaminhar_atendente` em log INFO) corrigido em `e7ee89a`; aviso `PytestRemovedIn10Warning` eliminado; marcações de aprovação pendente já resolvidas removidas de TECHNICAL_DECISIONS. Observação de ambiente: no Windows, instalar o projeto em caminho muito longo pode exceder 260 caracteres por causa do SDK `anthropic` (ocorreu só no diretório temporário da ferramenta).
 
 ## Retomada quando a cota da Groq renovar (prevista para 02/11 a partir de ~17h30)
 
@@ -91,7 +92,6 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 
 - Nenhuma decisão de negócio pendente.
 - **Provedor alterado para Groq (decisão do usuário, D17).** T14/T15 executam quando `GROQ_API_KEY` estiver no `.env` (ainda ausente em 2026-11-01).
-- `tests/test_build_policies.py`: fixture de classe definida como método de instância gera `PytestRemovedIn10Warning` (sem efeito hoje) — ajustar quando houver nova rodada de QA.
 - RK11 (acentuação no Git Bash) resolvido na T13 (validação manual).
 
 ## Integridade dos dados originais
