@@ -227,17 +227,17 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Contrato.** ARCHITECTURE §5.7.2.
 **Escopo.** `agent/session.py`, `agent/agent.py`.
 **Critérios de aceite (com `FakeLLM` e o registry real).**
-- [ ] Resposta direta (sem tool) ⇒ 1 chamada ao LLM, `tool_calls` vazio, `stop="end_turn"`.
-- [ ] Tool call ⇒ tool executada, resultado anexado com `tool_call_id` correto e `is_error` coerente, 2ª chamada retorna texto.
-- [ ] Várias tool calls numa mesma resposta são todas executadas, na ordem, e devolvidas.
-- [ ] Tool inexistente pedida pelo LLM ⇒ resultado de erro devolvido ao LLM (sem crash).
-- [ ] `max_tool_iterations` atingido ⇒ `FALLBACK_MAX_ITERATIONS`, `stop="max_iterations"`, log WARNING.
-- [ ] `LLMError` ⇒ `FALLBACK_LLM_ERROR`, `stop="llm_error"`, mensagem técnica fora do texto ao cliente; próxima `respond` funciona.
-- [ ] `refusal`, `max_tokens` e texto vazio tratados conforme o contrato.
-- [ ] `system` estável igual em todas as chamadas; `system_dynamic` reflete o `clock`; `provider_content` das respostas preservado no histórico (append-only).
-- [ ] `window()` nunca separa tool call de resultado nem começa fora de uma mensagem `user`; com poucos turnos devolve o histórico inteiro.
-- [ ] `Session.to_markdown()` com falas e linhas de ferramenta (ok/erro), sem `provider_content`.
-- [ ] Logs não contêm e-mail/telefone passados ao `consultar_pedido`.
+- [x] Resposta direta (sem tool) ⇒ 1 chamada ao LLM, `tool_calls` vazio, `stop="end_turn"`.
+- [x] Tool call ⇒ tool executada, resultado anexado com `tool_call_id` correto e `is_error` coerente, 2ª chamada retorna texto.
+- [x] Várias tool calls numa mesma resposta são todas executadas, na ordem, e devolvidas.
+- [x] Tool inexistente pedida pelo LLM ⇒ resultado de erro devolvido ao LLM (sem crash).
+- [x] `max_tool_iterations` atingido ⇒ `FALLBACK_MAX_ITERATIONS`, `stop="max_iterations"`, log WARNING.
+- [x] `LLMError` ⇒ `FALLBACK_LLM_ERROR`, `stop="llm_error"`, mensagem técnica fora do texto ao cliente; próxima `respond` funciona.
+- [x] `refusal`, `max_tokens` e texto vazio tratados conforme o contrato.
+- [x] `system` estável igual em todas as chamadas; `system_dynamic` reflete o `clock`; `provider_content` das respostas preservado no histórico (append-only).
+- [x] `window()` nunca separa tool call de resultado nem começa fora de uma mensagem `user`; com poucos turnos devolve o histórico inteiro.
+- [x] `Session.to_markdown()` com falas e linhas de ferramenta (ok/erro), sem `provider_content`.
+- [x] Logs não contêm e-mail/telefone passados ao `consultar_pedido`.
 **Commit.** `feat(agent): loop de tool use e gerenciamento de sessão`
 
 ## T12 — Encaminhamento a humano

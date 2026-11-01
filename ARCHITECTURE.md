@@ -722,7 +722,8 @@ Fluxo de `respond`:
 3. Se `response.tool_calls`: executa **todas** na ordem via `tools.execute` (registra `ToolCallRecord` com duração), adiciona uma `Message(role="tool", tool_call_id, content=result.to_llm(), is_error=not result.ok)` por chamada e repete. Ao atingir `settings.max_tool_iterations` rodadas de ferramentas sem resposta final ⇒ texto `FALLBACK_MAX_ITERATIONS`, `stop="max_iterations"`, log WARNING.
 4. Sem tool calls: `text = response.text`; `stop` = `end_turn` | `max_tokens` (texto devolvido como veio) | `refusal` (texto `FALLBACK_REFUSAL` se vier vazio); texto vazio em `end_turn` ⇒ `FALLBACK_EMPTY`.
 5. `LLMError` ⇒ `FALLBACK_LLM_ERROR` (+ `error.message` só no log, nunca ao cliente), `stop="llm_error"`; a sessão continua utilizável.
-6. Sempre que a resposta final for um texto de fallback, ele é registrado na sessão como `Message(role="assistant", content=…)` (histórico alternado e append-only).
+6. Sempre que a resposta final for um texto de fallback, ele é registrado na sessão como `Message(role="assistant", content=…)` (histórico alternado e append-only). Exceção implementada: resposta vazia **sem** `provider_content` (só ocorre com o `FakeLLM`) é substituída pelo fallback, pois uma mensagem vazia seria inválida para a API.
+7. Ao atingir `max_tool_iterations`, as tool calls da última resposta não são executadas, mas recebem um `tool_result` de erro ("Chamada não executada."), porque a API exige um resultado para cada `tool_use`.
 Constantes (português, sem emojis): `FALLBACK_MAX_ITERATIONS`, `FALLBACK_REFUSAL`, `FALLBACK_EMPTY`, `FALLBACK_LLM_ERROR` — pedem desculpas, não inventam dados e oferecem o contato com a equipe.
 Log INFO por tool call (nome, ok, duração) e por chamada ao LLM (`usage`), sem argumentos de `consultar_pedido` (contêm e-mail/telefone).
 
