@@ -1,183 +1,196 @@
-# Empório da Música — agente de atendimento
+# Empório da Música — customer service agent
 
-> Rascunho do README (T16). As seções que dependem de execução com credencial da API estão marcadas como pendentes e serão preenchidas após as tarefas T14/T15.
+> README draft (T16). Sections that depend on a run with a live API key are marked as pending and will be filled in after tasks T14/T15.
 
-## Visão geral
+## Overview
 
-Protótipo em Python de um agente de atendimento por texto para a loja fictícia Empório da Música (desafio técnico Artefact). A assistente, chamada Mel, conversa em português com o cliente e responde sobre:
+Python prototype of a text-based customer service agent for the fictional store Empório da Música (Artefact technical challenge). The assistant, named Mel, talks to the customer in Brazilian Portuguese and answers questions about:
 
-- catálogo de produtos (busca, detalhes, categorias, preço promocional, preço no PIX e parcelas);
-- pedidos (consulta com verificação de identidade);
-- políticas da loja (horários, pagamento, trocas e devoluções, frete, garantia, privacidade);
-- informações gerais da loja e encaminhamento para atendente humano.
+- the product catalog (search, details, categories, promotional price, PIX price and installments);
+- orders (lookup with identity verification);
+- store policies (opening hours, payment, exchanges and returns, shipping, warranty, privacy);
+- general store information and handoff to a human agent.
 
-O agente usa **function calling (tool use)**: o modelo decide quando chamar ferramentas determinísticas que consultam os CSVs ou o manual de políticas. Toda regra numérica (preços, parcelas, frete, horário) é calculada em Python; o modelo apenas redige a resposta. Quando o manual ou os dados são contraditórios ou omissos, o agente informa a limitação em vez de inventar uma regra.
+The agent uses **function calling (tool use)**: the model decides when to call deterministic tools that query the CSV files or the policy manual. Every numeric rule (prices, installments, shipping, opening hours) is computed in Python; the model only writes the reply. When the manual or the data are contradictory or silent, the agent reports a limitation instead of inventing a rule.
 
-## Requisitos
+## Requirements
 
 - Python 3.13 (`requires-python = ">=3.13"`).
-- Chave de API da Anthropic (`ANTHROPIC_API_KEY`) para conversar com o modelo real. Os testes automatizados não precisam de chave.
+- A Groq API key (`GROQ_API_KEY`) to talk to the default model. Alternatively, an Anthropic key (`ANTHROPIC_API_KEY`) with `LLM_PROVIDER=anthropic`. The automated tests need no key.
 
-## Instalação
+## Installation
 
 ```bash
 python -m venv venv
-# Linux/macOS/Git Bash:        source venv/bin/activate   (Git Bash no Windows: source venv/Scripts/activate)
+# Linux/macOS/Git Bash:        source venv/bin/activate   (Git Bash on Windows: source venv/Scripts/activate)
 # PowerShell:                  venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 cp .env.example .env           # PowerShell: Copy-Item .env.example .env
 ```
 
-Edite o `.env` e preencha `ANTHROPIC_API_KEY`. O arquivo `.env` não é versionado. As demais variáveis têm padrões adequados:
+Edit `.env` and fill in `GROQ_API_KEY`. The `.env` file is not versioned. The remaining variables have sensible defaults (see [.env.example](.env.example)):
 
-| Variável | Padrão | Função |
+| Variable | Default | Purpose |
 |---|---|---|
-| `LLM_PROVIDER` | `anthropic` | provedor de IA (trocável por configuração) |
-| `LLM_MODEL` | `claude-sonnet-5-5` | modelo |
-| `LLM_MAX_TOKENS` | `16000` | limite de tokens da resposta |
-| `LLM_EFFORT` | `low` | profundidade do raciocínio (`low` a `max`) |
-| `LLM_REFUSAL_FALLBACK` | `true` | fallback de recusa no servidor |
-| `REFERENCE_DATE` | vazio | data/hora controlada (ver abaixo) |
-| `MAX_TOOL_ITERATIONS` | `6` | limite de iterações do loop de ferramentas |
-| `MAX_HISTORY_TURNS` | `50` | janela do histórico |
+| `LLM_PROVIDER` | `groq` | AI provider (`groq` or `anthropic`; switchable by configuration) |
+| `LLM_MODEL` | `openai/gpt-oss-120b` | model |
+| `LLM_MAX_TOKENS` | `4096` | response token limit |
+| `LLM_EFFORT` | `low` | reasoning depth (`low`, `medium`, `high`, `xhigh`, `max`); on Groq it maps to `reasoning_effort` for `gpt-oss` models (`xhigh` and `max` become `high`) |
+| `LLM_REFUSAL_FALLBACK` | `true` | server-side refusal fallback (Anthropic provider only) |
+| `GROQ_API_KEY` | empty | Groq API key (default provider) |
+| `ANTHROPIC_API_KEY` | empty | Anthropic API key (only with `LLM_PROVIDER=anthropic`) |
+| `REFERENCE_DATE` | empty | controlled date/time (see below) |
+| `MAX_TOOL_ITERATIONS` | `6` | tool loop iteration limit |
+| `MAX_HISTORY_TURNS` | `50` | history window |
 
-## Como rodar
+To use Anthropic instead, set `LLM_PROVIDER=anthropic`, `LLM_MODEL=claude-sonnet-5-5`, `LLM_MAX_TOKENS=16000` and `ANTHROPIC_API_KEY`.
+
+## Running
 
 ```bash
-python -m emporio_agent            # conversa interativa
-python -m emporio_agent --debug    # mostra as ferramentas chamadas em cada resposta
-python -m emporio_agent --save     # grava a conversa ao encerrar
+python -m emporio_agent            # interactive conversation
+python -m emporio_agent --debug    # shows the tools called in each reply
+python -m emporio_agent --save     # saves the conversation on exit
 python -m emporio_agent --version
 ```
 
-Comandos dentro da conversa:
+Commands inside the conversation (in Portuguese, like the rest of the customer-facing interface):
 
-| Comando | Efeito |
+| Command | Effect |
 |---|---|
-| `/salvar` | grava a conversa em `runtime/transcripts/conversa-<data>-<id>.md` |
-| `/nova` | inicia uma nova conversa |
-| `/ajuda` | lista os comandos |
-| `/sair` | encerra |
+| `/salvar` | saves the conversation to `runtime/transcripts/conversa-<date>-<id>.md` |
+| `/nova` | starts a new conversation |
+| `/ajuda` | lists the commands |
+| `/sair` | exits |
 
-Por padrão o agente usa a data e hora reais do sistema (fuso `America/Campo_Grande`). Para reproduzir uma situação com data fixa (testes e exemplos), defina `REFERENCE_DATE` no `.env` em ISO 8601, por exemplo `2026-03-25` ou `2026-03-25T10:30`. Os pedidos do dataset vão até 2026-03-22; com a data real, qualquer pedido já aparece como antigo.
+By default the agent uses the real system date and time (time zone `America/Campo_Grande`). To reproduce a situation with a fixed date (tests and examples), set `REFERENCE_DATE` in `.env` in ISO 8601, for example `2026-03-25` or `2026-03-25T10:30`. Orders in the dataset go up to 2026-03-22; with the real date, every order already looks old.
 
-Sem chave de API, a CLI encerra com mensagem clara em português e código de saída 2.
+Without an API key for the selected provider, the CLI exits with a clear message in Portuguese and exit code 2.
 
-## Testes
-
-```bash
-python -m pytest -q          # suíte completa, sem chamar o modelo real
-python -m pytest -q -m llm   # smoke test com o provedor real (exige ANTHROPIC_API_KEY)
-```
-
-Os testes de unidade e de integração usam um LLM falso (`FakeLLM`); os testes marcados com `llm` são ignorados por padrão (`addopts = "-m 'not llm'"`). Estado atual: 905 testes passando e 1 smoke real ignorado.
-
-## Utilitários
+## Tests
 
 ```bash
-python scripts/build_policies.py          # regenera knowledge/policies.md a partir do PDF
-python scripts/build_policies.py --check  # verifica se o .md versionado está em dia com o PDF
-python scripts/run_scenarios.py           # cenários end-to-end com o modelo real (T14)
+python -m pytest -q          # full suite, never calls the real model
+python -m pytest -q -m llm   # smoke tests against the real provider (require GROQ_API_KEY / ANTHROPIC_API_KEY)
 ```
 
-`scripts/run_scenarios.py` é entregue pela T14 (contrato em [ARCHITECTURE.md](ARCHITECTURE.md), §5.9.1), exige credencial da API e aceita `--only`, `--repeat`, `--reference-date` e `--report`.
+Unit and integration tests use a fake LLM (`FakeLLM`); tests marked `llm` are skipped by default (`addopts = "-m 'not llm'"`). Current state: 968 passing; 2 real-provider smoke tests skipped by default (`-m llm`).
 
-## Arquitetura resumida
+## Utilities
 
-```
-Cliente → CLI (cli.py) → Agent (loop de tool use + Session)
-                           ├─ llm/     adaptador do provedor (Anthropic por padrão)
-                           └─ tools/   8 ferramentas tipadas
-                                ├─ data/     CSVs carregados em memória (pandas), somente leitura
-                                ├─ domain/   regras puras: preços, PIX, parcelas, horários, frete
-                                └─ policies/ seções de knowledge/policies.md (gerado do PDF)
+```bash
+python scripts/build_policies.py          # regenerates knowledge/policies.md from the PDF
+python scripts/build_policies.py --check  # checks that the versioned .md is up to date with the PDF
+python scripts/run_scenarios.py           # end-to-end scenarios with the real model (T14)
+python scripts/run_scenarios.py --pause 30 --report runtime/scenarios.md   # spaced out, with a Markdown report
 ```
 
-Princípios: `data/` original nunca é alterado; o LLM redige e o Python calcula; dependências em um só sentido (`cli → agent → tools → data | domain | policies`); tudo testável sem LLM, exceto o próprio loop (testado com LLM falso); sem framework de agentes, banco ou vector store. Detalhes, estrutura de pastas e contratos entre módulos: [ARCHITECTURE.md](ARCHITECTURE.md).
+`scripts/run_scenarios.py` was delivered by T14 (contract in [ARCHITECTURE.md](ARCHITECTURE.md), §5.9.1). It requires an API key (exit code 2 without one) and accepts `--only` (scenario ids, e.g. `5,9`), `--repeat` (default 2), `--reference-date` (default `2026-03-25T10:00`), `--pause SECONDS` (pause between scenarios and repetitions, default 20) and `--report` (writes a Markdown report to the given path). The pause exists because of the Groq per-minute rate limits (see decision D17 below).
 
-## Decisões técnicas
+## Architecture overview
 
-Justificativas completas em [TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md).
+```
+Customer → CLI (cli.py) → Agent (tool-use loop + Session)
+                            ├─ llm/     provider adapter (Groq by default, Anthropic as alternative)
+                            └─ tools/   8 typed tools
+                                 ├─ data/     CSVs loaded in memory (pandas), read-only
+                                 ├─ domain/   pure rules: prices, PIX, installments, hours, shipping
+                                 └─ policies/ sections of knowledge/policies.md (generated from the PDF)
+```
 
-- **Abordagem do agente (D1).** Function calling com loop próprio de cerca de 100 linhas, com limite de iterações. Descartados: agente de SQL (abre margem para consultas erradas e expõe a tabela de clientes), RAG puro (preço e estoque exigem exatidão e filtros numéricos) e LangChain/LangGraph/LlamaIndex (abstração sem ganho neste tamanho). Cada decisão de consulta fica observável no log de ferramentas (`--debug`).
-- **Cálculos em Python (D4).** Preço promocional, PIX, parcelas, frete e "aberto agora?" saem prontos das ferramentas, com `Decimal` e arredondamento `ROUND_HALF_UP`. O manual considera informação incorreta como propaganda enganosa, e modelos erram aritmética e datas.
-- **Modelo e parâmetros (D5, D16).** `claude-sonnet-5-5` via API da Anthropic, atrás de uma interface `LLMClient` fina; provedor e modelo trocáveis por configuração. Sem `temperature`/`top_p`/`top_k` nem `tool_choice` forçado (o modelo rejeita), raciocínio adaptativo com esforço `low` por padrão, `max_tokens` 16000, blocos de raciocínio reenviados sem alteração no histórico, cache de prompt apenas no prefixo estável do sistema. Como não há `temperature`, os critérios de avaliação checam fatos e ferramentas chamadas, não texto exato.
-- **Retrieval de políticas (D2).** O PDF é convertido offline para `knowledge/policies.md` (revisado e versionado), dividido por seção em tópicos fixos, e a ferramenta `consultar_politica(topico)` recebe um `enum` de tópicos e devolve o texto integral da seção. É determinístico e auditável. Embeddings foram descartados: com cerca de 10 seções, um enum bem descrito recupera melhor e sem risco de trazer o trecho errado.
-- **Estratégia de prompt (D10).** O prompt de sistema define a persona (Mel, sem emojis), o escopo (só instrumentos da loja), a regra de grounding (preço, estoque e prazo só via ferramenta), a recusa gentil de temas alheios e a obrigação de repassar as limitações recebidas das ferramentas. Regras de conduta do manual vão no prompt; conteúdo de políticas vem por ferramenta. Não há classificador de intenção separado. A defesa contra prompt injection está na camada de ferramentas, não no prompt.
-- **Tratamento de dados (D3, D8).** pandas em memória, sem banco; correções e normalizações só em memória. Consulta de pedido exige número do pedido e e-mail ou telefone que confiram com o cliente daquele pedido, e nunca devolve contatos ou endereço. Nunca se identifica cliente por nome ou e-mail isoladamente (há e-mail duplicado entre os clientes 11 e 43).
-- **Histórico (D7).** Histórico em memória por sessão (necessário para follow-ups como "e em 10x?"), com janela de turnos configurável e exportação de transcript em Markdown. Sem persistência entre sessões, para evitar guardar dados pessoais (LGPD).
-- **Interface (D6).** Somente CLI, com `rich` para formatação e `--debug` para observabilidade. O foco do desafio é o agente funcionando.
-- **Data de referência (D9).** Data real do sistema em produção; `REFERENCE_DATE` apenas para testes e exemplos.
+Principles: the original `data/` is never modified; the LLM writes and Python computes; dependencies flow one way (`cli → agent → tools → data | domain | policies`); everything is testable without an LLM except the loop itself (tested with a fake LLM); no agent framework, database or vector store. Details, folder structure and contracts between modules: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Tratamento de dados e ambiguidades
+## Technical decisions
 
-Análise completa em [DATA_ANALYSIS.md](DATA_ANALYSIS.md).
+Full rationale in [TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md).
 
-**Princípio (D15): limitação explícita em vez de interpretação.** Ferramentas e domínio devolvem, junto dos valores, uma lista de `Limitation {code, message, source}`. Só regras sem contradição produzem valores afirmativos; o que depende de leitura não confirmada aparece como "a confirmar" ou é omitido com limitação. O prompt obriga o agente a repassar as limitações sem completá-las com suposições.
+- **Agent approach (D1).** Function calling with a custom loop of about 100 lines and an iteration limit. Rejected: SQL agent (room for wrong queries and it exposes the customer table), pure RAG (price and stock need exactness and numeric filters) and LangChain/LangGraph/LlamaIndex (abstraction with no gain at this size). Every query decision is observable in the tool log (`--debug`).
+- **Calculations in Python (D4).** Promotional price, PIX, installments, shipping and "open now?" come out of the tools ready to use, with `Decimal` and `ROUND_HALF_UP` rounding. The manual treats incorrect information as false advertising, and models make arithmetic and date mistakes.
+- **Default provider: Groq (D5, D17).** The decision to use Groq came from the user. `LLM_PROVIDER=groq` selects the adapter in `llm/groq_client.py` (official `groq` SDK) behind a thin `LLMClient` interface; provider and model are switchable by configuration.
+  - Model `openai/gpt-oss-120b`: a Groq production model (not preview) with tool use support and a `reasoning_effort` parameter (`low|medium|high`), mapped from `LLM_EFFORT`. A configurable alternative is `llama-3.3-70b-versatile` (production, parallel tool calls).
+  - `LLM_MAX_TOKENS=4096`: Groq's per-minute throughput limit (Developer plan baseline: 8K tokens/min for `gpt-oss-120b`) makes reserving 16000 tokens unworkable.
+  - Rate limits and resilience: HTTP 429 with `retry-after` is handled by the SDK (`max_retries=5`); a malformed tool call generated by the model (`tool_use_failed`) is retried once before becoming an error; `run_scenarios.py --pause` spaces out the scenarios.
+  - The `gpt-oss` reasoning is neither returned nor resent (`include_reasoning=false`): Groq does not document resending it, so the history keeps only text and tool calls.
+- **Anthropic as an alternative (D5, D16).** The Anthropic adapter remains (`LLM_PROVIDER=anthropic`, `claude-sonnet-5-5`). D16 applies only to it: no `temperature`/`top_p`/`top_k` and no forced `tool_choice` (the model rejects them), adaptive reasoning with `low` effort by default, `max_tokens` 16000, reasoning blocks resent unchanged in the history, prompt caching only on the stable system prefix. Since there is no `temperature`, the evaluation criteria check facts and tools called, not exact text.
+- **Policy retrieval (D2).** The PDF is converted offline into `knowledge/policies.md` (reviewed and versioned) and split by section into fixed topics. The `consultar_politica(topico)` tool takes an `enum` of topics and returns the full text of the section. It is deterministic and auditable. Embeddings were rejected: with about 10 sections, a well-described enum retrieves better and with no risk of returning the wrong passage.
+- **Prompt strategy (D10).** The system prompt defines the persona (Mel, no emojis), the scope (only the store's instruments), the grounding rule (price, stock and delivery time only via tools), polite refusal of unrelated topics, and the duty to pass on the limitations returned by the tools. The manual's conduct rules go in the prompt; policy content comes through a tool. There is no separate intent classifier. Prompt injection defense lives in the tool layer, not in the prompt.
+- **Data handling (D3, D8).** pandas in memory, no database; corrections and normalizations only in memory. An order lookup requires the order number plus an email or phone that matches the customer of that order, and never returns contact details or the address. A customer is never identified by name or email alone (customers 11 and 43 share an email).
+- **History (D7).** In-memory history per session (needed for follow-ups such as "and in 10x?"), with a configurable turn window and Markdown transcript export. No persistence across sessions, to avoid storing personal data (LGPD).
+- **Interface (D6).** CLI only, with `rich` for formatting and `--debug` for observability. The focus of the challenge is the working agent.
+- **Reference date (D9).** Real system date in production; `REFERENCE_DATE` only for tests and examples.
 
-**Qualidade dos dados (Q1–Q12), resumo:**
+## Data handling and ambiguities
 
-- Q1–Q2: produtos cujo nome diverge da descrição (marca/modelo) ou cujas especificações divergem da descrição (cordas, teclas, tipo). O loader detecta e expõe o conflito sem escolher fonte de verdade; o agente não afirma os campos em conflito. Detecção automática por heurística mais uma lista revisada manualmente (produtos 135–137, 139, 140, 142–144).
-- Q3 e Q7–Q8: totais e formas de pagamento históricos de pedidos divergem de regras atuais; o agente mostra apenas o valor total registrado e nunca recalcula pedidos antigos.
-- Q4–Q6: produtos `coming_soon` ou descontinuados aparecem com estoque; descontinuado nunca é ofertado (manual, 7.3) e `coming_soon` devolve limitação de disponibilidade.
-- Q9: pedidos "parados" em relação à data atual; a previsão é apresentada como estimativa, sem afirmar atraso.
-- Q10: typo no nome do produto 84 ("Cedr"); a busca é normalizada com fuzzy e o nome exibido não é alterado.
-- Q11–Q12: categorias vazias (sopro, cordas orquestrais) e catálogo de 65 itens contra "mais de 300" no manual; o agente responde só com base no sistema.
+Full analysis in [DATA_ANALYSIS.md](DATA_ANALYSIS.md).
 
-**Contradições e lacunas do manual (P1–P16), resumo:**
+**Principle (D15): explicit limitation instead of interpretation.** Tools and domain code return, alongside the values, a list of `Limitation {code, message, source}`. Only rules without contradiction produce affirmative values; anything that depends on an unconfirmed reading appears as "to be confirmed" or is omitted with a limitation. The prompt requires the agent to pass limitations on without filling them in with assumptions.
 
-- Contatos (P1–P2): dois números de WhatsApp e duas grafias de e-mail; ambos são informados, com a seção de origem, sem afirmar qual é o correto.
-- Pagamento (P3, P4, P12): mínimos de parcela contraditórios (R$ 100, R$ 80, R$ 50); parcelas dentro da faixa contraditória saem como "a confirmar". O limite de 12x vale sempre, e pagamento combinado só acima de R$ 2.000,00 (exatamente R$ 2.000,00 devolve limitação).
-- Frete (P5, P8, P13): exatamente R$ 500,00 e municípios da região metropolitana não são definidos no manual; frete especial de "contrabaixos" e "pianos digitais" é repassado literalmente, sem classificar o produto.
-- Arrependimento e trocas (P6, P7, P9, P14): o canal de compra e a data real de recebimento não estão registrados, então não há veredito de elegibilidade; o agente expõe regra, dados disponíveis e limitação.
-- Promoções e status (P11, P15, P16): preço sempre pelo CSV (`is_active`); mais de uma promoção ativa gera limitação e nenhuma é escolhida; `coming_soon` não é definido no manual.
-- P10: registro de reclamação e encaminhamento, implementado como protocolo local (T12).
+**Data quality (Q1–Q12), summary:**
 
-## Limitações conhecidas
+- Q1–Q2: products whose name diverges from the description (brand/model) or whose specifications diverge from the description (strings, keys, type). The loader detects and exposes the conflict without choosing a source of truth; the agent does not assert the conflicting fields. Detection is automatic by heuristic plus a manually reviewed list (products 135–137, 139, 140, 142–144).
+- Q3 and Q7–Q8: historical order totals and payment methods diverge from current rules; the agent shows only the recorded total and never recalculates old orders.
+- Q4–Q6: `coming_soon` or discontinued products appear with stock; a discontinued product is never offered (manual, 7.3) and `coming_soon` returns an availability limitation.
+- Q9: orders "stuck" relative to the current date; the forecast is presented as an estimate, without claiming a delay.
+- Q10: typo in the name of product 84 ("Cedr"); search is fuzzy-normalized and the displayed name is not changed.
+- Q11–Q12: empty categories (wind, orchestral strings) and a catalog of 65 items against "more than 300" in the manual; the agent answers only from the system.
 
-- **Dados inconsistentes de cadastro (Q1–Q12).** Os produtos com informações conflitantes são apresentados apenas pelo nome cadastrado, com aviso de divergência.
-- **Conflitos de produto não detectados automaticamente além da lista revisada.** A heurística cobre marca, número de cordas e de teclas; os casos 136 e 143 estão em lista manual. Divergências sutis (por exemplo, nome genérico com modelo específico da mesma marca, como #138 e #141) não são marcadas.
-- **Contradições do manual tratadas como limitação (P1–P16).** O agente não escolhe qual telefone, e-mail ou regra de parcela vale; informa a divergência e indica confirmação com a equipe.
-- **Feriados não conhecidos.** O horário de funcionamento considera só a grade regular; o manual não lista feriados, então o agente não afirma abertura em feriado.
-- **Frete por CEP indisponível.** O manual não traz tabela por CEP nem a lista de municípios da região metropolitana; fora de Campo Grande o agente apresenta as regras e a limitação.
-- **Sem veredito de devolução.** Não há canal de compra nem data real de recebimento nos pedidos, então o agente não diz se a devolução ou troca é elegível.
-- **Sem persistência entre sessões.** Cada conversa vive em memória; só o transcript opcional é gravado em disco.
-- **Sem canal WhatsApp real.** Somente CLI; Streamlit e integrações de mensageria não foram implementados.
-- **Cenários end-to-end heurísticos e pequenos.** São 13 cenários mais uma checagem de emojis, avaliados por presença de termos e ferramentas chamadas; o relatório precisa de revisão manual e há variabilidade do modelo entre execuções.
-- **Credencial.** O smoke test real e os cenários dependem de chave de API, que não estava disponível durante o desenvolvimento das tarefas T07–T13 (feitas com LLM falso).
+**Manual contradictions and gaps (P1–P16), summary:**
 
-## O que faria com mais tempo
+- Contacts (P1–P2): two WhatsApp numbers and two email spellings; both are given, with the source section, without claiming which is correct.
+- Payment (P3, P4, P12): contradictory installment minimums (R$ 100, R$ 80, R$ 50); installments within the contradictory range come out as "to be confirmed". The 12x limit always applies, and combined payment only above R$ 2,000.00 (exactly R$ 2,000.00 returns a limitation).
+- Shipping (P5, P8, P13): exactly R$ 500.00 and the municipalities of the metropolitan region are not defined in the manual; special shipping for "contrabaixos" and "pianos digitais" is passed on verbatim, without classifying the product.
+- Withdrawal and exchanges (P6, P7, P9, P14): the purchase channel and the actual delivery date are not recorded, so there is no eligibility verdict; the agent exposes the rule, the available data and a limitation.
+- Promotions and status (P11, P15, P16): price always comes from the CSV (`is_active`); more than one active promotion raises a limitation and none is chosen; `coming_soon` is not defined in the manual.
+- P10: complaint registration and handoff, implemented as a local protocol number (T12).
 
-- Executar e calibrar os cenários end-to-end com o modelo real e ampliar a avaliação (mais cenários, mais repetições, avaliação por juiz).
-- Resolver com a equipe as contradições P1–P16 e então transformar as limitações em regras.
-- Adicionar embeddings e vector store caso o manual cresça.
-- Persistência opcional de conversas com consentimento, canal WhatsApp real e feriados por calendário.
-- Detecção de conflitos de produto mais abrangente, com revisão assistida.
+## Known limitations
 
-## Uso de assistentes de IA
+- **Inconsistent catalog data (Q1–Q12).** Products with conflicting information are shown only by their registered name, with a divergence warning.
+- **Product conflicts not detected automatically beyond the reviewed list.** The heuristic covers brand, number of strings and number of keys; cases 136 and 143 are in a manual list. Subtle divergences (for example, a generic name with a specific model of the same brand, such as #138 and #141) are not flagged.
+- **Manual contradictions handled as limitations (P1–P16).** The agent does not choose which phone, email or installment rule applies; it reports the divergence and points to confirmation with the team.
+- **Holidays unknown.** Opening hours consider only the regular schedule; the manual does not list holidays, so the agent does not assert that the store is open on a holiday.
+- **No shipping by postal code.** The manual has no postal-code table or list of metropolitan-region municipalities; outside Campo Grande the agent presents the rules and the limitation.
+- **No return verdict.** Orders carry neither the purchase channel nor the real delivery date, so the agent does not say whether a return or exchange is eligible.
+- **No persistence across sessions.** Each conversation lives in memory; only the optional transcript is written to disk.
+- **No real WhatsApp channel.** CLI only; Streamlit and messaging integrations were not implemented.
+- **Small, heuristic end-to-end scenarios.** There are 13 scenarios plus an emoji check, evaluated by presence of terms and tools called; the report needs manual review and the model varies between runs.
+- **Groq rate limits.** The 4096-token cap and the per-minute limits make long answers and back-to-back runs slower; scenario runs need `--pause`.
+- **Credentials.** The real-provider smoke tests and the scenarios depend on an API key, which was not available during development (the code was built and tested without a live key).
 
-Ferramenta: **Claude Code**. O **Claude Opus 5.5** atuou como coordenador e arquiteto; agentes **Claude Sonnet** executaram as tarefas via **Orca**, em worktrees e branches separados, nos papéis de implementação (Backend), IA/RAG e QA.
+## What I would do with more time
+
+- Run and calibrate the end-to-end scenarios with the real model and broaden the evaluation (more scenarios, more repetitions, judge-based grading).
+- Resolve the P1–P16 contradictions with the team and then turn the limitations into rules.
+- Add embeddings and a vector store if the manual grows.
+- Optional conversation persistence with consent, a real WhatsApp channel and holidays from a calendar.
+- Broader product-conflict detection with assisted review.
+
+## Use of AI assistants
+
+Tool: **Claude Code**. **Claude Opus 5.5** acted as coordinator and architect; **Claude Sonnet** agents carried out the tasks through **Orca**, in separate worktrees and branches, in the roles of implementation (Backend), AI/RAG and QA.
 
 Workflow:
 
-- **Planejamento aprovado antes do código.** Análise dos dados e do manual (`DATA_ANALYSIS.md`), decisões técnicas (`TECHNICAL_DECISIONS.md`) e arquitetura (`ARCHITECTURE.md`) foram revisadas e aprovadas antes da T01. A aprovação gerou ajustes reais: troca de "interpretações razoáveis" por limitações explícitas (D15), proibição de identificar cliente por nome ou e-mail e persona sem emojis.
-- **Memória técnica.** O repositório é também um cofre do Obsidian; `CLAUDE.md` indexa os documentos, e `docs/AGENT_GUIDE.md` diz a cada agente o que ler e quais regras são invariáveis (nunca alterar `data/`, não inventar regras, editar só os arquivos do seu pedido).
-- **Contrato por tarefa.** Cada tarefa tem critérios de aceite em `TASKS.md` e, desde a T05, um contrato detalhado (assinaturas, tabela de casos e literais) em `ARCHITECTURE.md` §5. Isso permitiu que implementação e testes fossem escritos em paralelo e de forma independente: na T05, as duas versões concordaram na primeira execução.
-- **Revisão e integração pelo coordenador.** Um commit por tarefa, após validar os critérios; suíte verde antes de integrar; hashes SHA-256 de `data/` conferidos após cada tarefa e inalterados. O registro está em `docs/PROGRESS.md`.
+- **Planning approved before code.** The analysis of the data and the manual (`DATA_ANALYSIS.md`), the technical decisions (`TECHNICAL_DECISIONS.md`) and the architecture (`ARCHITECTURE.md`) were reviewed and approved before T01. The approval produced real adjustments: replacing "reasonable interpretations" with explicit limitations (D15), forbidding customer identification by name or email alone, and a persona without emojis.
+- **Technical memory.** The repository is also an Obsidian vault; `CLAUDE.md` indexes the documents, and `docs/AGENT_GUIDE.md` tells each agent what to read and which rules are invariant (never change `data/`, do not invent rules, edit only the files in your request).
+- **Contract per task.** Each task has acceptance criteria in `TASKS.md` and, since T05, a detailed contract (signatures, case table and literals) in `ARCHITECTURE.md` §5. This let implementation and tests be written in parallel and independently: in T05, the two versions agreed on the first run.
+- **Review and integration by the coordinator.** One commit per task, after validating the criteria; green suite before integrating; SHA-256 hashes of `data/` checked after each task and unchanged. The record is in `docs/PROGRESS.md`.
+- **Provider migration to Groq (T08b).** The user decided to use Groq as the LLM provider (D17). An AI/RAG agent wrote the new adapter behind the existing `LLMClient` interface and a QA agent wrote its tests, with no change to the agent, tools, domain or data. On integration, review found a script that captured `time.sleep` too early and test objects with overly strict validation; both were fixed.
 
-Exemplos de problemas pegos pelo processo (de `docs/PROGRESS.md`):
+Examples of problems caught by the process (from `docs/PROGRESS.md`):
 
-- T07+T08: o QA independente detectou que a mensagem de `bad_request` poderia vazar texto da API, incluindo a chave; foi corrigido pelo agente de IA/RAG.
-- T06: a revisão do coordenador achou quatro desvios de estrutura na extração do PDF (parágrafos e negrito por regex), corrigidos pelo agente; o QA corrigiu um critério e um falso positivo. Antes de despachar, verificar a viabilidade do critério no dado real mostrou que o kerning do pypdf exigia comparar caracteres, e não palavras.
-- T09+T10: o QA corrigiu seus próprios testes (nome exato de categoria, P15 com dados sintéticos, verificação de conceitos no prompt em vez de frases exatas).
-- T13: o agente Backend perguntou ao coordenador (`ask`) antes de alterar um teste da T01, e a flag `--version` foi aprovada.
-- Na T11+T12, 96 testes do QA passaram na primeira integração; na T13, 33.
-- Lições registradas: `send` só garante enfileiramento, então mudanças de contrato precisam ser confirmadas no `worker_done`; arquivos gerados com `--check` exigem `.gitattributes` com `eol=lf`.
+- T07+T08: independent QA found that the `bad_request` message could leak API text, including the key; the AI/RAG agent fixed it.
+- T06: the coordinator's review found four structural deviations in the PDF extraction (paragraphs and bold detected by regex), fixed by the agent; QA fixed one criterion and one false positive. Checking the criterion's feasibility against the real data before dispatching showed that pypdf kerning required comparing characters rather than words.
+- T09+T10: QA fixed its own tests (exact category name, P15 with synthetic data, checking concepts in the prompt instead of exact phrases).
+- T13: the Backend agent asked the coordinator (`ask`) before changing a T01 test, and the `--version` flag was approved.
+- In T11+T12, 96 QA tests passed on first integration; in T13, 33.
+- Usage-limit incident (T08b): the first attempt stopped at the account's 5-hour usage limit without producing anything (confirmed from the transcript). It was handled by stopping and abandoning the worker (`worker-stop`/`worker-abandon`) and re-dispatching with `--retry-of`.
+- Recorded lessons: `send` only guarantees queuing, so contract changes must be confirmed in `worker_done`; files generated with `--check` need a `.gitattributes` with `eol=lf`.
 
-## Resultados dos cenários end-to-end
+## End-to-end scenario results
 
-_Pendente: depende da execução com credencial da API (T14/T15)._
+_Pending: requires a run with GROQ_API_KEY configured (T14/T15)._
 
-## Exemplos de conversa
+## Conversation examples
 
-_Pendente: depende da execução com credencial da API (T14/T15)._
+_Pending: requires a run with GROQ_API_KEY configured (T14/T15)._
