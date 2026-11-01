@@ -48,7 +48,7 @@ Agente de atendimento por texto, em Python, baseado em **function calling**: o L
 emporio-da-musica-agent/
 ├── data/                              # ORIGINAIS (read-only, versionados)
 │   ├── desafio_tecnico_ai_eng - *.csv
-│   ├── desafio_tecnico_ai_eng_artefact.pdf
+│   ├── desafio_tecnico_ai_eng_artefact.pdf   # enunciado: só local, fora do Git
 │   └── políticas_da_loja.pdf
 ├── knowledge/
 │   └── policies.md                    # PDF convertido + revisado, com marcadores de seção

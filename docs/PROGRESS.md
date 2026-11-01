@@ -75,7 +75,8 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 - Tamanho do `.git`: 3 MB; maiores arquivos: PDFs de `data/`.
 - Histórico: commits incrementais (sem squash/force-push), autor `gelane-dev`.
 - `gh` não instalado; publicação depende de instalação/autenticação ou de um repositório vazio criado pelo usuário.
-- **Decisão pendente do usuário antes da publicação:** `data/desafio_tecnico_ai_eng_artefact.pdf` (enunciado do desafio) está versionado junto com os dados; não é necessário para executar o projeto.
+- `data/desafio_tecnico_ai_eng_artefact.pdf` (enunciado) removido do versionamento por decisão do usuário (preservado localmente, no `.gitignore`). Atenção: commits anteriores ainda o contêm no histórico.
+- Remoto configurado (sem push): `origin` = https://github.com/gelane-dev/emporio-da-musica-agent.git
 - Publicação só após aprovação explícita do usuário.
 
 ## Retomada quando a cota da Groq renovar (prevista para 02/11 a partir de ~17h30)
