@@ -167,13 +167,13 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Contrato.** ARCHITECTURE §5.4.2.
 **Escopo.** `policies/store.py`.
 **Critérios de aceite.**
-- [ ] Com o `knowledge/policies.md` versionado: 11 seções; `get("sobre_loja")` ⇒ títulos `["Capa", "1. Sobre a Empório da Música"]`; `get("atendimento")` ⇒ `["7. Atendimento via WhatsApp", "10. Disposições Finais"]`; `source` "…, capa" e "…, seção N".
-- [ ] A Capa preserva `contato@emporiodamusica.com.br`; a seção 1 preserva `contato@empóriodamusica.com.br` (P2).
-- [ ] `get("trocas_devolucoes")` contém "7 (sete) dias" e "30 (trinta) dias"; `get("pagamento")` contém "5% de desconto", a tabela e as faixas da 3.1.
-- [ ] `text` sem marcador, sem a linha `## ` e sem linhas em branco nas pontas; Markdown (### , tabelas, **) preservado.
-- [ ] Tópico inexistente ⇒ `KeyError` (a tool converte em `INVALID_ARGUMENT`).
-- [ ] Arquivo sem algum tópico ⇒ `PolicyStoreError` listando os ausentes; marcador com tópico desconhecido ⇒ `PolicyStoreError`; arquivo inexistente ⇒ `PolicyStoreError`.
-- [ ] O arquivo não é modificado pela leitura.
+- [x] Com o `knowledge/policies.md` versionado: 11 seções; `get("sobre_loja")` ⇒ títulos `["Capa", "1. Sobre a Empório da Música"]`; `get("atendimento")` ⇒ `["7. Atendimento via WhatsApp", "10. Disposições Finais"]`; `source` "…, capa" e "…, seção N".
+- [x] A Capa preserva `contato@emporiodamusica.com.br`; a seção 1 preserva `contato@empóriodamusica.com.br` (P2).
+- [x] `get("trocas_devolucoes")` contém "7 (sete) dias" e "30 (trinta) dias"; `get("pagamento")` contém "5% de desconto", a tabela e as faixas da 3.1.
+- [x] `text` sem marcador, sem a linha `## ` e sem linhas em branco nas pontas; Markdown (### , tabelas, **) preservado.
+- [x] Tópico inexistente ⇒ `KeyError` (a tool converte em `INVALID_ARGUMENT`).
+- [x] Arquivo sem algum tópico ⇒ `PolicyStoreError` listando os ausentes; marcador com tópico desconhecido ⇒ `PolicyStoreError`; arquivo inexistente ⇒ `PolicyStoreError`.
+- [x] O arquivo não é modificado pela leitura.
 **Commit.** `feat(policies): PolicyStore com recuperação por tópico`
 
 ## T08 — Adaptador LLM
