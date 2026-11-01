@@ -64,7 +64,7 @@ def build_agent(
 
 
 def greeting(current: datetime, status: StoreStatus) -> str:
-    text = "Olá! Eu sou a Mel, assistente virtual do Empório da Música. Como posso ajudar?"
+    text = "Olá! Eu sou a Mel, assistente virtual da Empório da Música. Como posso ajudar?"
     if status.is_open_regular_hours:
         return f"{text}\n\nA loja está aberta agora (hoje, das {status.today_hours})."
     opening = status.next_opening
@@ -92,7 +92,7 @@ def _configure_stdio() -> None:
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="python -m emporio_agent",
-        description="Converse com a Mel, assistente do Empório da Música.",
+        description="Converse com a Mel, assistente da Empório da Música.",
     )
     parser.add_argument("--debug", action="store_true", help="mostra as ferramentas usadas em cada resposta")
     parser.add_argument("--save", action="store_true", help="grava a conversa ao encerrar")

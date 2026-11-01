@@ -20,11 +20,11 @@
 | T11 Loop do agente | concluída | `f7e1088` | [[ARCHITECTURE#5.7.2 Contrato detalhado da T11 (loop do agente e sessão)]] |
 | T12 Encaminhamento | concluída | `585ac91` |
 | T13 CLI | concluída | `453a1cb` |
-| T14 Cenários E2E | preparação em andamento (execução real bloqueada pela credencial) | — | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
+| T14 Cenários E2E | preparação concluída; **execução real bloqueada pela credencial** | (commit `feat(scripts)`) | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
 | T16 README | rascunho em andamento | — | finalização depende de T14/T15 | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
 | T15, T17 | pendentes | — T14/T15 exigem credencial da API (ver pendências) |
 
-Suíte atual: 859 testes passando + 1 smoke real pulado (após a T13).
+Suíte atual: 905 testes passando + 1 smoke real pulado (após a preparação da T14).
 
 ## Decisões recentes (resumo; detalhes nos documentos citados)
 
@@ -38,6 +38,7 @@ Suíte atual: 859 testes passando + 1 smoke real pulado (após a T13).
 |---|---|---|---|---|
 | T05 | `run_a5ecc3d46e82` | Backend (impl.), QA (testes TDD a partir do contrato) — Sonnet | `gelane-dev/t05-backend`, `gelane-dev/t05-qa` | integração por squash sem conflitos; implementação e testes independentes concordaram na 1ª execução |
 
+| T14 (preparação) + README | `run_c7d7988248ee` | IA/RAG (script de cenários + ajustes de texto), QA (testes; +1 correção), Docs (rascunho do README) — Sonnet | `t14-ia-rag`, `w5-qa`, `t16-docs` | ambiguidade do contrato (emoji dentro ou fora do `evaluate`) resolvida a favor da checagem global |
 | T13 | `run_140a77ff0235` | Backend (CLI), QA (testes) — Sonnet | `t13-backend`, `w4-qa` | Backend perguntou (ask) antes de alterar teste da T01; aprovado `--version`; 33 testes do QA passaram na 1ª integração |
 | T11+T12 | `run_2d70073736b9` | IA/RAG (T11), Backend (T12), QA (testes) — Sonnet | `t11-ia-rag`, `t12-backend`, `w3-qa` | integração sem correções: 96 testes do QA passaram na 1ª execução |
 | T09+T10 | `run_5532f4d9b606` | Backend (T09), IA/RAG (T10), QA (testes; +2 correções) — Sonnet | `t09-backend`, `t10-ia-rag`, `w2-qa` | testes do QA corrigidos: categoria com nome exato, P15 com dados sintéticos (sem skip) e verificação de conceitos no prompt em vez de frases exatas |
@@ -54,11 +55,9 @@ Lições:
 ## Pendências abertas
 
 - Nenhuma decisão de negócio pendente.
-- Prompt T10: trocar "diga que a informação está em conferência" por "o cadastro tem informações divergentes; a equipe pode confirmar" na calibração da T14 (sugere processo inexistente).
 - **Credencial da API ausente** (sem `ANTHROPIC_API_KEY`, sem `.env`, sem CLI `ant`): T07–T13 seguem com `FakeLLM`; T14 (cenários reais) e T15 (conversas de exemplo) dependem do usuário fornecer a chave em `.env`.
 - `tests/test_build_policies.py`: fixture de classe definida como método de instância gera `PytestRemovedIn10Warning` (sem efeito hoje) — ajustar quando houver nova rodada de QA.
 - RK11 (acentuação no Git Bash) resolvido na T13 (validação manual).
-- Saudação da CLI usa "do Empório da Música"; o manual usa o feminino ("a/da Empório da Música") — corrigir na calibração da T14.
 
 ## Integridade dos dados originais
 
