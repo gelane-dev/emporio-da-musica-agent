@@ -66,12 +66,12 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Escopo.** Estrutura de pastas (ARCHITECTURE §2) com `__init__.py`; `pyproject.toml` (pytest com `pythonpath = ["src"]`); `requirements.txt` com versões fixadas (TECHNICAL_DECISIONS D13); `.gitignore`; `.env.example`; `config.py` com `Settings`, `load_settings()` e `now()`; `__main__.py` imprimindo versão.
 **Fora do escopo.** Qualquer lógica de negócio.
 **Critérios de aceite.**
-- [ ] `pip install -r requirements.txt` funciona no `venv` (Python 3.13).
-- [ ] `python -m emporio_agent` executa sem erro.
-- [ ] `pytest` roda (0 testes ou 1 smoke test) com sucesso.
-- [ ] `load_settings()` lê `.env`; `REFERENCE_DATE` ausente ⇒ `now()` retorna hora atual em `America/Campo_Grande`; presente ⇒ data fixa tz-aware.
-- [ ] `git status` não mostra `venv/`, `.env`, `runtime/`.
-- [ ] Arquivos em `data/` inalterados (checar `git diff --stat data/` vazio após o commit inicial dos dados).
+- [x] `pip install -r requirements.txt` funciona no `venv` (Python 3.13).
+- [x] `python -m emporio_agent` executa sem erro.
+- [x] `pytest` roda (0 testes ou 1 smoke test) com sucesso.
+- [x] `load_settings()` lê `.env`; `REFERENCE_DATE` ausente ⇒ `now()` retorna hora atual em `America/Campo_Grande`; presente ⇒ data fixa tz-aware.
+- [x] `git status` não mostra `venv/`, `.env`, `runtime/`.
+- [x] Arquivos em `data/` inalterados (checar `git diff --stat data/` vazio após o commit inicial dos dados).
 **Commit.** `chore: estrutura inicial do projeto, dependências e configuração`
 
 ## T02 — Loader e modelos de dados
@@ -79,36 +79,36 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Escopo.** `data/models.py` (Product, Category, Promotion, Order, OrderItem, Customer, ProductConflict), `data/quality.py` (detecção de conflitos — DATA_ANALYSIS §3.1) e `data/loader.py` (`load_all(data_dir) -> StoreData`) aplicando as normalizações de ARCHITECTURE §5.2. Log WARNING por conflito detectado.
 **Fora do escopo.** Q3/Q4 (pedidos) não são conflitos de cadastro detectáveis no loader (DATA_ANALYSIS §3) — apenas documentados. Consultas e regras de negócio (T03+).
 **Critérios de aceite.**
-- [ ] Carrega 65 produtos, 9 categorias, 25 promoções, 20 pedidos, 22 itens, 50 clientes.
-- [ ] `price`/`total` são `Decimal` (ex.: #81 = `Decimal("599.9")`); datas são `date`; `specs` é `dict[str, str]`; `is_active` é `bool`; `tracking_code`/`notes`/`estimated_delivery` vazios ⇒ `None`.
-- [ ] Produtos têm `category_name` (join com categorias).
-- [ ] Telefone normalizado só com dígitos (`"(67) 99812-3456"` ⇒ `"67998123456"`); e-mail em minúsculas e sem espaços.
-- [ ] Valores originais preservados: `name`, `description`, `specs` idênticos ao CSV (ex.: descrição do #135 continua citando "Fender").
-- [ ] `product_conflicts` contém exatamente os produtos {135, 136, 137, 139, 140, 142, 143, 144}:
+- [x] Carrega 65 produtos, 9 categorias, 25 promoções, 20 pedidos, 22 itens, 50 clientes.
+- [x] `price`/`total` são `Decimal` (ex.: #81 = `Decimal("599.9")`); datas são `date`; `specs` é `dict[str, str]`; `is_active` é `bool`; `tracking_code`/`notes`/`estimated_delivery` vazios ⇒ `None`.
+- [x] Produtos têm `category_name` (join com categorias).
+- [x] Telefone normalizado só com dígitos (`"(67) 99812-3456"` ⇒ `"67998123456"`); e-mail em minúsculas e sem espaços.
+- [x] Valores originais preservados: `name`, `description`, `specs` idênticos ao CSV (ex.: descrição do #135 continua citando "Fender").
+- [x] `product_conflicts` contém exatamente os produtos {135, 136, 137, 139, 140, 142, 143, 144}:
   - automáticos: #135, #139, #140, #144 (marca); #137 (marca **e** cordas 5×4); #142 (marca **e** teclas 88×61);
   - revisão manual: #136 (modelo "Precision"), #143 ("piano de palco" × `Synthesizer`);
   - cada conflito traz os valores dos dois lados e a origem (`automatica`/`revisao_manual`).
-- [ ] Sem falsos positivos: #138, #141, violões de 7 cordas e produtos que citam marcas de componentes (LR Baggs, Aquila — ex.: #102, #108, #116) não são marcados.
-- [ ] Um WARNING de log por conflito, sem dados de clientes.
-- [ ] Caminhos com espaço e acento (`desafio_tecnico_ai_eng - products.csv`) funcionam no Windows.
-- [ ] Falha clara (`DataLoadError` com nome do arquivo) se um CSV estiver ausente ou com coluna faltando.
-- [ ] Nenhum arquivo em `data/` é escrito (teste verifica hash/`mtime` inalterados).
+- [x] Sem falsos positivos: #138, #141, violões de 7 cordas e produtos que citam marcas de componentes (LR Baggs, Aquila — ex.: #102, #108, #116) não são marcados.
+- [x] Um WARNING de log por conflito, sem dados de clientes.
+- [x] Caminhos com espaço e acento (`desafio_tecnico_ai_eng - products.csv`) funcionam no Windows.
+- [x] Falha clara (`DataLoadError` com nome do arquivo) se um CSV estiver ausente ou com coluna faltando.
+- [x] Nenhum arquivo em `data/` é escrito (teste verifica hash/`mtime` inalterados).
 **Commit.** `feat(data): carregamento e normalização dos CSVs`
 
 ## T03 — Repositório de catálogo e pedidos
 **Objetivo.** Consultas usadas pelas tools.
 **Escopo.** `CatalogRepository` e `OrderRepository` (ARCHITECTURE §5.2), `domain/text.py` (normalização sem acentos/caixa), busca fuzzy com `rapidfuzz`.
 **Critérios de aceite.**
-- [ ] `search(category_id=5, max_price=1000)` retorna exatamente os 12 IDs de DATA_ANALYSIS §5 (exclui #96 e #113).
-- [ ] `search(only_available=True)` nunca retorna `discontinued`, `coming_soon` ou estoque 0.
-- [ ] `find_by_name("takamine gd20")`, `"Takamine GD-20"` e `"takamine gd 20"` ⇒ #95 com maior score.
-- [ ] `find_by_name("violao yamaha")` retorna múltiplos candidatos (para o caso `AMBIGUOUS`).
-- [ ] `active_promotions(121)` ⇒ [20%]; `active_promotions(95)` ⇒ []; `inactive_promotions(95)` ⇒ [12% "Oferta Especial"]; `inactive_promotions(96)` ⇒ as 2 encerradas (sem datas nos dados, nenhuma é tratada como "a mais recente").
-- [ ] Produto com várias promoções ativas (dado sintético) ⇒ `active_promotions` devolve **todas**, sem escolher nenhuma (P15).
-- [ ] `conflicts(142)` ⇒ 2 conflitos; `conflicts(95)` ⇒ [].
-- [ ] `similar(#96)` ⇒ violões disponíveis em faixa de preço próxima, sem o próprio #96.
-- [ ] `categories()` informa 0 disponíveis para Sopro/Cordas Orquestrais.
-- [ ] `OrderRepository.get(15)` traz 2 itens com nomes; `get(999)` ⇒ `None`.
+- [x] `search(category_id=5, max_price=1000)` retorna exatamente os 12 IDs de DATA_ANALYSIS §5 (exclui #96 e #113).
+- [x] `search(only_available=True)` nunca retorna `discontinued`, `coming_soon` ou estoque 0.
+- [x] `find_by_name("takamine gd20")`, `"Takamine GD-20"` e `"takamine gd 20"` ⇒ #95 com maior score.
+- [x] `find_by_name("violao yamaha")` retorna múltiplos candidatos (para o caso `AMBIGUOUS`).
+- [x] `active_promotions(121)` ⇒ [20%]; `active_promotions(95)` ⇒ []; `inactive_promotions(95)` ⇒ [12% "Oferta Especial"]; `inactive_promotions(96)` ⇒ as 2 encerradas (sem datas nos dados, nenhuma é tratada como "a mais recente").
+- [x] Produto com várias promoções ativas (dado sintético) ⇒ `active_promotions` devolve **todas**, sem escolher nenhuma (P15).
+- [x] `conflicts(142)` ⇒ 2 conflitos; `conflicts(95)` ⇒ [].
+- [x] `similar(#96)` ⇒ violões disponíveis em faixa de preço próxima, sem o próprio #96.
+- [x] `categories()` informa 0 disponíveis para Sopro/Cordas Orquestrais.
+- [x] `OrderRepository.get(15)` traz 2 itens com nomes; `get(999)` ⇒ `None`.
 **Commit.** `feat(data): repositórios de catálogo e pedidos com busca aproximada`
 
 ## T04 — Domínio: preços, PIX e parcelamento
@@ -116,18 +116,18 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Pré-requisito.** Tratamentos de DATA_ANALYSIS §4.2 — aprovados em 2026-11-01.
 **Escopo.** `domain/limitations.py` (`Limitation`), `domain/pricing.py`: `quote()`, `installment_options()`, formatação `R$ 1.234,56`. Classificação de parcelas conforme a tabela de ARCHITECTURE §5.3, usando o valor **exato** da parcela (sem arredondar antes de comparar).
 **Critérios de aceite.**
-- [ ] #95 (R$ 2.199, sem promo): PIX R$ 2.089,05; 1x–12x todas `confirmada`; `max_confirmed_installments = 12` (R$ 183,25); `combined_payment = "permitido"`; sem limitações.
-- [ ] #121 (R$ 549, promo 20%): final R$ 439,20; `pix_price is None` (6.2); 1x–4x `confirmada` (4x = R$ 109,80); 5x (R$ 87,84) `a_confirmar`; 6x–12x omitidas; `max_confirmed_installments = 4`; limitação `MANUAL_CONTRADITORIO` citando seções 3 e 3.1.
-- [ ] R$ 159,90: 1x `confirmada`; 2x (R$ 79,95) e 3x (R$ 53,30) `a_confirmar` (P4); 4x+ omitidas; `max_confirmed_installments = 1`.
-- [ ] R$ 90,00: 1x `a_confirmar`; `max_confirmed_installments is None`; limitação presente.
-- [ ] R$ 1.200,00: 12x de R$ 100,00 `confirmada` ("parcela mínima de R$ 100" inclui o próprio valor).
-- [ ] R$ 1.199,99: 12x (R$ 99,999…) **omitida** — comparação com valor exato.
-- [ ] R$ 500,00: 5x (R$ 100,00) `confirmada`; 6x (R$ 83,33) `a_confirmar`.
-- [ ] Limite de 12x: nenhuma opção acima de 12x é gerada, mesmo com parcela ≥ R$ 100 (ex.: R$ 19.567,00 ⇒ máximo 12x de R$ 1.630,58; `installment_options` nunca devolve n > 12).
-- [ ] Pagamento combinado (estritamente acima de R$ 2.000,00): R$ 1.999,99 ⇒ `nao_permitido`; R$ 2.000,00 ⇒ `a_confirmar` + limitação explícita `MANUAL_OMISSO` (P12); R$ 2.000,01 ⇒ `permitido`.
-- [ ] Duas promoções ativas (sintético) ⇒ `promo is None`, `final_price = list_price`, `pix_price is None`, limitação `MANUAL_OMISSO` (P15).
-- [ ] Nenhum mínimo de R$ 50 é aplicado em lugar nenhum (teste explícito).
-- [ ] Todos os valores com `Decimal`; exibição com `ROUND_HALF_UP` em 2 casas; formatação brasileira correta (`R$ 2.089,05`, `R$ 11.499,00`).
+- [x] #95 (R$ 2.199, sem promo): PIX R$ 2.089,05; 1x–12x todas `confirmada`; `max_confirmed_installments = 12` (R$ 183,25); `combined_payment = "permitido"`; sem limitações.
+- [x] #121 (R$ 549, promo 20%): final R$ 439,20; `pix_price is None` (6.2); 1x–4x `confirmada` (4x = R$ 109,80); 5x (R$ 87,84) `a_confirmar`; 6x–12x omitidas; `max_confirmed_installments = 4`; limitação `MANUAL_CONTRADITORIO` citando seções 3 e 3.1.
+- [x] R$ 159,90: 1x `confirmada`; 2x (R$ 79,95) e 3x (R$ 53,30) `a_confirmar` (P4); 4x+ omitidas; `max_confirmed_installments = 1`.
+- [x] R$ 90,00: 1x `a_confirmar`; `max_confirmed_installments is None`; limitação presente.
+- [x] R$ 1.200,00: 12x de R$ 100,00 `confirmada` ("parcela mínima de R$ 100" inclui o próprio valor).
+- [x] R$ 1.199,99: 12x (R$ 99,999…) **omitida** — comparação com valor exato.
+- [x] R$ 500,00: 5x (R$ 100,00) `confirmada`; 6x (R$ 83,33) `a_confirmar`.
+- [x] Limite de 12x: nenhuma opção acima de 12x é gerada, mesmo com parcela ≥ R$ 100 (ex.: R$ 19.567,00 ⇒ máximo 12x de R$ 1.630,58; `installment_options` nunca devolve n > 12).
+- [x] Pagamento combinado (estritamente acima de R$ 2.000,00): R$ 1.999,99 ⇒ `nao_permitido`; R$ 2.000,00 ⇒ `a_confirmar` + limitação explícita `MANUAL_OMISSO` (P12); R$ 2.000,01 ⇒ `permitido`.
+- [x] Duas promoções ativas (sintético) ⇒ `promo is None`, `final_price = list_price`, `pix_price is None`, limitação `MANUAL_OMISSO` (P15).
+- [x] Nenhum mínimo de R$ 50 é aplicado em lugar nenhum (teste explícito).
+- [x] Todos os valores com `Decimal`; exibição com `ROUND_HALF_UP` em 2 casas; formatação brasileira correta (`R$ 2.089,05`, `R$ 11.499,00`).
 **Commit.** `feat(domain): cálculo de preço promocional, PIX e parcelamento`
 
 ## T05 — Domínio: horários e frete
@@ -135,14 +135,14 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Pré-requisito.** Tratamentos de DATA_ANALYSIS §4.2 — aprovados em 2026-11-01.
 **Escopo.** `domain/store_hours.py` (`store_status(now)`), `domain/shipping.py` (`shipping_estimate(city, order_value)`).
 **Critérios de aceite.**
-- [ ] Seg 10:00 ⇒ aberto; seg 18:00 ⇒ fechado (fechamento exclusivo); sáb 12:59 ⇒ aberto; sáb 13:00 ⇒ fechado; dom ⇒ fechado com `next_opening` = seg 09:00.
-- [ ] Sex 19:00 ⇒ `next_opening` = sáb 09:00.
-- [ ] Usa o timezone recebido; não depende do relógio da máquina.
-- [ ] `store_status` sempre traz limitações sobre feriados (não conhecidos pelo sistema) e datas especiais com horário estendido (seção 2); campo chama-se `is_open_regular_hours`.
-- [ ] Campo Grande (com/sem acento, caixa, sufixo "- MS") + R$ 500,01 ⇒ `gratis`; R$ 499,99 ⇒ `taxa_fixa` R$ 35,00; prazo "1 a 3 dias úteis".
-- [ ] Campo Grande + R$ 500,00 exatos ⇒ `nao_disponivel`, `fee is None`, limitação P5.
-- [ ] Outra cidade (ex.: Dourados) ⇒ `region = "nao_confirmada"`, `fee is None`, prazos PAC/SEDEX/Jadlog, limitações P8 (municípios não definidos) e "valor calculado por CEP", nota literal sobre frete especial (P13) — sem classificar o produto.
-- [ ] Cidade não informada ⇒ `nao_confirmada` + limitação pedindo a cidade.
+- [x] Seg 10:00 ⇒ aberto; seg 18:00 ⇒ fechado (fechamento exclusivo); sáb 12:59 ⇒ aberto; sáb 13:00 ⇒ fechado; dom ⇒ fechado com `next_opening` = seg 09:00.
+- [x] Sex 19:00 ⇒ `next_opening` = sáb 09:00.
+- [x] Usa o timezone recebido; não depende do relógio da máquina.
+- [x] `store_status` sempre traz limitações sobre feriados (não conhecidos pelo sistema) e datas especiais com horário estendido (seção 2); campo chama-se `is_open_regular_hours`.
+- [x] Campo Grande (com/sem acento, caixa, sufixo "- MS") + R$ 500,01 ⇒ `gratis`; R$ 499,99 ⇒ `taxa_fixa` R$ 35,00; prazo "1 a 3 dias úteis".
+- [x] Campo Grande + R$ 500,00 exatos ⇒ `nao_disponivel`, `fee is None`, limitação P5.
+- [x] Outra cidade (ex.: Dourados) ⇒ `region = "nao_confirmada"`, `fee is None`, prazos PAC/SEDEX/Jadlog, limitações P8 (municípios não definidos) e "valor calculado por CEP", nota literal sobre frete especial (P13) — sem classificar o produto.
+- [x] Cidade não informada ⇒ `nao_confirmada` + limitação pedindo a cidade.
 **Commit.** `feat(domain): horário de funcionamento e regras de frete`
 
 ## T06 — Extração do PDF de políticas
