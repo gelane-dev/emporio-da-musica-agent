@@ -103,7 +103,7 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 - [ ] `search(only_available=True)` nunca retorna `discontinued`, `coming_soon` ou estoque 0.
 - [ ] `find_by_name("takamine gd20")`, `"Takamine GD-20"` e `"takamine gd 20"` ⇒ #95 com maior score.
 - [ ] `find_by_name("violao yamaha")` retorna múltiplos candidatos (para o caso `AMBIGUOUS`).
-- [ ] `active_promotions(121)` ⇒ [20%]; `active_promotions(95)` ⇒ []; `latest_inactive_promotion(95)` ⇒ 12% "Oferta Especial".
+- [ ] `active_promotions(121)` ⇒ [20%]; `active_promotions(95)` ⇒ []; `inactive_promotions(95)` ⇒ [12% "Oferta Especial"]; `inactive_promotions(96)` ⇒ as 2 encerradas (sem datas nos dados, nenhuma é tratada como "a mais recente").
 - [ ] Produto com várias promoções ativas (dado sintético) ⇒ `active_promotions` devolve **todas**, sem escolher nenhuma (P15).
 - [ ] `conflicts(142)` ⇒ 2 conflitos; `conflicts(95)` ⇒ [].
 - [ ] `similar(#96)` ⇒ violões disponíveis em faixa de preço próxima, sem o próprio #96.
@@ -185,7 +185,7 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 - [ ] `ToolResult.to_llm()` serializa `limitacoes` sempre que houver.
 - [ ] `buscar_produtos(categoria="Violões", preco_max=1000)` ⇒ 12 produtos, ordenáveis por preço; sem rótulos de estoque inventados (só `disponivel: bool`).
 - [ ] `buscar_produtos(categoria="Teclados e Pianos")` ⇒ #142 com `informacoes_conflitantes = true`.
-- [ ] `detalhar_produto(nome="Takamine GD20")` ⇒ preço R$ 2.199,00, PIX R$ 2.089,05, `promocao_expirada` 12%, sem limitações.
+- [ ] `detalhar_produto(nome="Takamine GD20")` ⇒ preço R$ 2.199,00, PIX R$ 2.089,05, `promocoes_encerradas` = [12% "Oferta Especial"], sem limitações.
 - [ ] `detalhar_produto(produto_id=142)` ⇒ `conflitos` com marca (Korg × Roland) e teclas (61 × 88); `descricao` e `especificacoes.keys` **ausentes** de `produto`; limitação `DADO_CONFLITANTE`.
 - [ ] `detalhar_produto(produto_id=121)` ⇒ promoção 20% com preço original; 5x marcado "a confirmar" + limitação.
 - [ ] `detalhar_produto(produto_id=96)` ⇒ indisponível + `alternativas_sugeridas` não vazias.

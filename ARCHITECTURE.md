@@ -213,7 +213,7 @@ class CatalogRepository:
     def find_by_name(self, query: str, limit: int = 3) -> list[tuple[Product, float]]  # fuzzy score 0–100
     def categories(self) -> list[tuple[Category, int]]                                # (categoria, nº disponíveis)
     def active_promotions(self, product_id: int) -> list[Promotion]                   # TODAS as ativas; não escolhe (P15)
-    def latest_inactive_promotion(self, product_id: int) -> Promotion | None          # p/ "promo expirada" (maior promotion_id)
+    def inactive_promotions(self, product_id: int) -> list[Promotion]                 # encerradas; sem datas ⇒ não há "mais recente"
     def conflicts(self, product_id: int) -> list[ProductConflict]
     def similar(self, product: Product, limit: int = 3) -> list[Product]              # sugestão: mesma categoria, disponível, preço próximo
 
@@ -326,7 +326,7 @@ class ToolRegistry:
 | Tool | Argumentos | `data` em caso de sucesso | Limitações típicas |
 |---|---|---|---|
 | `buscar_produtos` | `texto?: str`, `categoria?: enum(nomes)`, `preco_min?: float`, `preco_max?: float`, `apenas_disponiveis: bool = true`, `ordenar?: enum`, `limite: int = 8 (≤15)` | `{total_encontrado, produtos: [ {id, nome, categoria, preco_formatado, promocao?: {percentual, preco_formatado}, disponivel: bool, status, informacoes_conflitantes: bool} ]}` | Promoções múltiplas (P15) |
-| `detalhar_produto` | `produto_id?: int`, `nome?: str` (um dos dois) | `{produto: {id, nome_cadastrado, categoria, status, disponivel, quantidade_estoque, descricao?, especificacoes}, conflitos: [{tipo, campos, valores, observacao}], preco: PriceQuote formatado, promocao_expirada?: {descricao, percentual}, alternativas_sugeridas?: [...]}`. Campos envolvidos em conflito **saem** de `produto` e aparecem só em `conflitos`. `AMBIGUOUS` com candidatos se fuzzy < limiar | `DADO_CONFLITANTE` (Q1/Q2), parcelas a confirmar (P3/P4), `coming_soon` (Q6), P12, P15 |
+| `detalhar_produto` | `produto_id?: int`, `nome?: str` (um dos dois) | `{produto: {id, nome_cadastrado, categoria, status, disponivel, quantidade_estoque, descricao?, especificacoes}, conflitos: [{tipo, campos, valores, observacao}], preco: PriceQuote formatado, promocoes_encerradas?: [{descricao, percentual}], alternativas_sugeridas?: [...]}`. Campos envolvidos em conflito **saem** de `produto` e aparecem só em `conflitos`. `AMBIGUOUS` com candidatos se fuzzy < limiar | `DADO_CONFLITANTE` (Q1/Q2), parcelas a confirmar (P3/P4), `coming_soon` (Q6), P12, P15 |
 | `listar_categorias` | — | `[ {nome, descricao, produtos_disponiveis} ]` | — |
 | `consultar_pedido` | `pedido_id: int` **e** (`email` **ou** `telefone`) | `{pedido_id, primeiro_nome_cliente, data_pedido, status, status_descricao, valor_total_registrado, forma_pagamento_descricao, itens: [{nome, quantidade}], codigo_rastreio?, previsao_entrega_estimada?, observacoes?}` | Canal de compra não registrado (P6); data real de recebimento não registrada (P7) |
 | `consultar_politica` | `topico: PolicyTopic` | `{topico, secoes: [{titulo, fonte, texto}]}` | Divergências conhecidas do tópico (ex.: P3/P4 em `pagamento`) |
