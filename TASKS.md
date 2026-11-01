@@ -224,24 +224,31 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 
 ## T11 — Agent loop + Session
 **Objetivo.** Orquestrar LLM ⇄ tools com histórico.
-**Escopo.** `agent/session.py`, `agent/agent.py` (ARCHITECTURE §3 e §5.7).
-**Critérios de aceite (com `FakeLLM`).**
-- [ ] Resposta direta (sem tool) ⇒ 1 chamada ao LLM, `tool_calls` vazio.
-- [ ] Tool call ⇒ tool executada, resultado anexado com `tool_call_id` correto, 2ª chamada retorna texto.
-- [ ] Múltiplas tool calls numa mesma resposta são todas executadas e devolvidas.
-- [ ] Tool inexistente pedida pelo LLM ⇒ `ToolResult` de erro devolvido ao LLM (sem crash).
-- [ ] Atingir `max_tool_iterations` ⇒ resposta de fallback educada e log WARNING.
-- [ ] `LLMError` ⇒ mensagem amigável ("tive um problema técnico…"), sessão continua utilizável.
-- [ ] `window()` nunca separa uma tool call do seu resultado.
-- [ ] `Session.to_markdown()` gera transcript com marcação das tools usadas.
+**Contrato.** ARCHITECTURE §5.7.2.
+**Escopo.** `agent/session.py`, `agent/agent.py`.
+**Critérios de aceite (com `FakeLLM` e o registry real).**
+- [ ] Resposta direta (sem tool) ⇒ 1 chamada ao LLM, `tool_calls` vazio, `stop="end_turn"`.
+- [ ] Tool call ⇒ tool executada, resultado anexado com `tool_call_id` correto e `is_error` coerente, 2ª chamada retorna texto.
+- [ ] Várias tool calls numa mesma resposta são todas executadas, na ordem, e devolvidas.
+- [ ] Tool inexistente pedida pelo LLM ⇒ resultado de erro devolvido ao LLM (sem crash).
+- [ ] `max_tool_iterations` atingido ⇒ `FALLBACK_MAX_ITERATIONS`, `stop="max_iterations"`, log WARNING.
+- [ ] `LLMError` ⇒ `FALLBACK_LLM_ERROR`, `stop="llm_error"`, mensagem técnica fora do texto ao cliente; próxima `respond` funciona.
+- [ ] `refusal`, `max_tokens` e texto vazio tratados conforme o contrato.
+- [ ] `system` estável igual em todas as chamadas; `system_dynamic` reflete o `clock`; `provider_content` das respostas preservado no histórico (append-only).
+- [ ] `window()` nunca separa tool call de resultado nem começa fora de uma mensagem `user`; com poucos turnos devolve o histórico inteiro.
+- [ ] `Session.to_markdown()` com falas e linhas de ferramenta (ok/erro), sem `provider_content`.
+- [ ] Logs não contêm e-mail/telefone passados ao `consultar_pedido`.
 **Commit.** `feat(agent): loop de tool use e gerenciamento de sessão`
 
-## T12 — Encaminhamento a humano *(opcional)*
+## T12 — Encaminhamento a humano
 **Objetivo.** Cumprir "registrar reclamação e encaminhar" (política 7.3).
-**Escopo.** `tools/handoff_tools.py`: grava JSONL em `runtime/handoffs.jsonl` e retorna protocolo + prazo de 24h úteis.
+**Contrato.** ARCHITECTURE §5.5.2.
+**Escopo.** `tools/handoff_tools.py`; parâmetro `runtime_dir` em `build_tool_registry`.
 **Critérios de aceite.**
-- [ ] Gera protocolo único; arquivo criado se não existir; não grava telefone/e-mail.
-- [ ] Prompt orienta uso em reclamações e dúvidas não cobertas pela política.
+- [ ] Gera protocolo único no formato do contrato; cria pasta/arquivo; uma linha JSON por chamada.
+- [ ] Mascara e-mails e números longos no `resumo` antes de gravar.
+- [ ] `prazo_retorno` "24 horas úteis" só para `reclamacao`; demais motivos ⇒ `null` + limitação.
+- [ ] `build_tool_registry` com `runtime_dir` ⇒ 8 ferramentas; sem ⇒ 7 (testes da T09 intactos).
 **Commit.** `feat(tools): registro de reclamações e encaminhamento para atendente`
 
 ## T13 — CLI
@@ -331,4 +338,5 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 | RK13 | Não determinismo do LLM nos exemplos/cenários | Alta | Baixo | Sonnet 5.5 não aceita `temperature` (D16); critérios de aceite por presença de fatos e por ferramentas chamadas, não texto exato |
 | RK14 | Prompt injection | Média | Médio | Defesa na camada de tools (não depende do prompt); cenário 11 |
 | RK15 | Escopo crescer (UI, RAG vetorial, WhatsApp) e atrasar entrega | Média | Alto | Opcionais marcados; caminho crítico priorizado |
+| RK17 | Truncar histórico invalida blocos de raciocínio (a API verifica edição de turnos anteriores) | Baixa | Médio | Histórico append-only; janela padrão de 50 turnos (só corta conversas muito longas); validar na T14 |
 | RK16 | Excesso de ressalvas torna o atendimento pouco útil | Média | Médio | Limitações só quando a resposta depende do ponto ambíguo; prompt pede ressalva curta + caminho de confirmação; cenários avaliam utilidade |

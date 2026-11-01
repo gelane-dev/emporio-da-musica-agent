@@ -17,7 +17,7 @@ Variáveis suportadas (todas opcionais):
   (``2026-03-25`` ou ``2026-03-25T10:30``). Sem fuso explícito, é interpretada
   no fuso da loja; só data equivale a 00:00. Ausente ou vazia ⇒ hora real.
 - ``MAX_TOOL_ITERATIONS``: limite de chamadas de ferramenta por mensagem (padrão ``6``).
-- ``MAX_HISTORY_TURNS``: turnos de histórico enviados ao modelo (padrão ``20``).
+- ``MAX_HISTORY_TURNS``: turnos de histórico enviados ao modelo (padrão ``50``; ver RK17).
 
 A chave de API não faz parte de ``Settings``: é lida pelo adaptador do
 provedor (T08), para que cada provedor use sua própria variável.
@@ -55,7 +55,7 @@ class Settings(BaseModel):
     timezone: str = STORE_TIMEZONE
     reference_datetime: datetime | None = None
     max_tool_iterations: int = Field(default=6, gt=0)
-    max_history_turns: int = Field(default=20, gt=0)
+    max_history_turns: int = Field(default=50, gt=0)
 
     @field_validator("llm_provider", "llm_model")
     @classmethod
