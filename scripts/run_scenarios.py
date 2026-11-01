@@ -109,10 +109,14 @@ SCENARIOS: tuple[Scenario, ...] = (
         # Não pode declarar elegibilidade.
         must_not_contain=(
             "voce tem direito",
-            "esta dentro do prazo",
+            "voce esta dentro do prazo",
+            "seu pedido esta dentro do prazo",
+            "esta fora do prazo",
+            "ja passou o prazo",
             "esta no prazo",
             "devolucao aprovada",
             "devolucao esta aprovada",
+            "sua devolucao foi aceita",
             "pode devolver sem problema",
         ),
         mandatory=True,
@@ -205,9 +209,17 @@ def has_emoji(text: str) -> bool:
     return any(m.group() not in _ALLOWED for m in _EMOJI_RE.finditer(text))
 
 
+_DASHES = dict.fromkeys([*range(0x2010, 0x2016), 0x2212], "-")
+_SPACES = dict.fromkeys([0x00A0, 0x202F, 0x2009], " ")
+
+
 def _norm(text: str) -> str:
+    """Minúsculas, sem acento, tipografia unificada (traços, espaços especiais, "20 %" ⇒ "20%")."""
+    text = text.translate(_DASHES).translate(_SPACES)
     decomposed = unicodedata.normalize("NFKD", text)
-    return "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
+    plain = "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
+    plain = re.sub(r"[ ]+%", "%", plain)
+    return re.sub(r"[ ]{2,}", " ", plain)
 
 
 def evaluate(scenario: Scenario, replies: list[AgentReply]) -> ScenarioResult:
@@ -266,7 +278,9 @@ def _repetition_ok(scenarios: Sequence[Scenario], results: Sequence[ScenarioResu
     by_id = {r.scenario_id: r for r in results}
     passed = sum(1 for r in results if r.passed) + (1 if _emoji_ok(results) else 0)
     mandatory_ok = all(by_id[s.id].passed for s in scenarios if s.mandatory and s.id in by_id)
-    return passed >= MIN_PASSING_CHECKS and mandatory_ok
+    # Com --only (subconjunto) todas as checagens selecionadas devem passar.
+    required = MIN_PASSING_CHECKS if len(scenarios) >= len(SCENARIOS) else len(scenarios) + 1
+    return passed >= required and mandatory_ok
 
 
 def _format_table(scenarios: Sequence[Scenario], results: Sequence[ScenarioResult]) -> str:

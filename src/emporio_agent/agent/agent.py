@@ -11,6 +11,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from emporio_agent import config
+from emporio_agent.agent.output_guard import sanitize_reply
 from emporio_agent.agent.prompts import build_dynamic_context, build_system_prompt
 from emporio_agent.agent.session import Session
 from emporio_agent.config import Settings
@@ -92,18 +93,21 @@ class Agent:
                 return self._fallback(session, FALLBACK_LLM_ERROR, records, "llm_error")
 
             logger.info("LLM usage=%s stop_reason=%s", response.usage, response.stop_reason)
-            session.add(response.to_message())
+            message = response.to_message()
+            if not response.tool_calls:
+                message = message.model_copy(update={"content": sanitize_reply(message.content or "")})
+            session.add(message)
 
             if not response.tool_calls:
-                text = (response.text or "").strip()
+                text = message.content.strip()
                 if response.stop_reason == "refusal":
                     if text:
-                        return AgentReply(text=response.text or text, tool_calls=records, stop="refusal")
+                        return AgentReply(text=message.content, tool_calls=records, stop="refusal")
                     return self._fallback(session, FALLBACK_REFUSAL, records, "refusal", replace_last=True)
                 if not text:
                     return self._fallback(session, FALLBACK_EMPTY, records, "end_turn", replace_last=True)
                 stop: AgentStop = "max_tokens" if response.stop_reason == "max_tokens" else "end_turn"
-                return AgentReply(text=response.text or text, tool_calls=records, stop=stop)
+                return AgentReply(text=message.content, tool_calls=records, stop=stop)
 
             if rounds >= settings.max_tool_iterations:
                 logger.warning("max_tool_iterations (%d) atingido sem resposta final", settings.max_tool_iterations)

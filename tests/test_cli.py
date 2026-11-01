@@ -395,8 +395,8 @@ def test_build_agent_sem_chave_levanta_llm_error(tmp_path):
 
 def test_main_sem_credencial_retorna_2_sem_traceback(tmp_path, monkeypatch):
     cli = import_cli()
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    for name in ("GROQ_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
+        monkeypatch.setenv(name, "")  # vazio = ausente; o ambiente vence o .env real
     out = io.StringIO()
     err = io.StringIO()
     console = Console(file=out, width=120, color_system=None)
@@ -409,11 +409,11 @@ def test_main_sem_credencial_retorna_2_sem_traceback(tmp_path, monkeypatch):
 
 def test_subprocesso_sem_chave_codigo_2_cita_env_sem_traceback(tmp_path):
     env = os.environ.copy()
-    env["ANTHROPIC_API_KEY"] = ""
+    for name in ("GROQ_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
+        env[name] = ""
     env["PYTHONPATH"] = str(REPO_ROOT / "src")
     env["PYTHONIOENCODING"] = "utf-8"
     env.pop("LLM_PROVIDER", None)
-    env.pop("ANTHROPIC_AUTH_TOKEN", None)
     proc = subprocess.run(
         [sys.executable, "-m", "emporio_agent"],
         input="",

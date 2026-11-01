@@ -271,11 +271,13 @@ def test_main_global_emoji_check_fails_run(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "chave-falsa-de-teste")
     answer = "Ficamos na Rua 14 de Maio 😀"
 
-    def fake_build_agent(settings, *args, **kwargs):
-        llm = FakeLLM([fake_tool_calls(("informacoes_loja", {})), fake_text(answer)] * 3)
-        return build_agent(settings, llm=llm)
+    class StubAgent:
+        """Contorna a proteção de saída: a checagem global é a rede de segurança."""
 
-    monkeypatch.setattr(mod, "build_agent", fake_build_agent)
+        def respond(self, session, message):
+            return reply(answer, "informacoes_loja")
+
+    monkeypatch.setattr(mod, "build_agent", lambda settings, *args, **kwargs: StubAgent())
     report = tmp_path / "relatorio.md"
     code = mod.main(["--only", "1", "--repeat", "1", "--report", str(report)])
     out = capsys.readouterr().out
@@ -371,7 +373,7 @@ def test_run_scenarios_new_session_per_scenario():
 
 def test_main_without_credential_returns_2_without_traceback():
     assert SCRIPT.exists(), "scripts/run_scenarios.py ausente"
-    env = {**os.environ, "ANTHROPIC_API_KEY": ""}
+    env = {**os.environ, "ANTHROPIC_API_KEY": "", "GROQ_API_KEY": "", "OPENAI_API_KEY": ""}
     proc = subprocess.run(
         [sys.executable, str(SCRIPT), "--only", "2", "--repeat", "1"],
         capture_output=True,
@@ -440,3 +442,90 @@ def test_pause_between_repetitions_of_single_scenario(monkeypatch):
 def test_pause_zero_never_sleeps(monkeypatch):
     sleeps = _run_main_with_sleep_spy(monkeypatch, ["--only", "1,2", "--repeat", "2", "--pause", "0"])
     assert sleeps == []
+
+
+# ---------------------------------------------------------------- normalização do avaliador (T14, execução real)
+
+def test_norm_unifies_typographic_hyphens_and_spaces():
+    mod = load_script()
+    assert mod._norm("(67) 3341\u20114444") == mod._norm("(67) 3341-4444")
+    for dash in "\u2010\u2012\u2013\u2014\u2015\u2212":
+        assert mod._norm(f"a{dash}b") == "a-b"
+    assert mod._norm("a\u00a0b\u202fc\u2009d") == "a b c d"
+
+
+def test_norm_percent_and_space_collapse():
+    mod = load_script()
+    assert mod._norm("20 % de desconto") == "20% de desconto"
+    assert mod._norm("20\u202f% de   desconto") == "20% de desconto"
+
+
+def test_evaluate_matches_phone_with_non_breaking_hyphen():
+    mod = load_script()
+    sc = scenario(mod, must_contain=(("(67) 3341-4444",),))
+    assert mod.evaluate(sc, [reply("Ligue para (67) 3341\u20114444.")]).passed is True
+
+
+def test_evaluate_matches_percent_with_space_before():
+    mod = load_script()
+    sc = scenario(mod, must_contain=(("20% de desconto",),))
+    assert mod.evaluate(sc, [reply("Você tem 20 % de desconto.")]).passed is True
+
+
+def test_scenario_5_neutral_phrase_is_not_a_verdict():
+    mod = load_script()
+    s5 = by_id(mod)[5]
+    neutral = reply("Com essas informações consigo verificar se ainda está dentro do prazo.", "consultar_pedido", "consultar_politica")
+    text = "7 dias recebimento estimativa. " + neutral.text
+    result = mod.evaluate(s5, [reply(text, "consultar_pedido", "consultar_politica")])
+    assert result.passed is True, result.failures
+
+
+@pytest.mark.parametrize(
+    "verdict",
+    [
+        "Você está dentro do prazo.",
+        "Seu pedido está dentro do prazo.",
+        "O pedido está fora do prazo.",
+        "Já passou o prazo.",
+        "Devolução aprovada!",
+        "Sua devolução foi aceita.",
+    ],
+)
+def test_scenario_5_verdict_phrases_fail(verdict):
+    mod = load_script()
+    s5 = by_id(mod)[5]
+    text = f"7 dias recebimento estimativa. {verdict}"
+    result = mod.evaluate(s5, [reply(text, "consultar_pedido", "consultar_politica")])
+    assert result.passed is False
+
+
+# ---------------------------------------------------------------- critério da repetição com --only
+
+def test_repetition_ok_with_only_all_selected_checks_pass():
+    mod = load_script()
+    s3 = by_id(mod)[3]
+    results = [mod.ScenarioResult(3, True, (), (), ("Olá",))]
+    assert mod._repetition_ok((s3,), results) is True  # 2/2 (cenário + emojis)
+
+
+def test_repetition_ok_with_only_fails_when_selected_scenario_fails():
+    mod = load_script()
+    s3 = by_id(mod)[3]
+    results = [mod.ScenarioResult(3, False, ("x",), (), ("Olá",))]
+    assert mod._repetition_ok((s3,), results) is False
+
+
+def test_repetition_ok_with_only_fails_on_emoji():
+    mod = load_script()
+    s3 = by_id(mod)[3]
+    results = [mod.ScenarioResult(3, True, (), (), ("Olá 😊",))]
+    assert mod._repetition_ok((s3,), results) is False
+
+
+def test_repetition_ok_full_set_keeps_13_of_14_threshold():
+    mod = load_script()
+    results = [mod.ScenarioResult(s.id, s.id != 1, (), (), ("ok",)) for s in mod.SCENARIOS]
+    assert mod._repetition_ok(mod.SCENARIOS, results) is True  # 12 + emojis = 13
+    results = [mod.ScenarioResult(s.id, s.id > 2, (), (), ("ok",)) for s in mod.SCENARIOS]
+    assert mod._repetition_ok(mod.SCENARIOS, results) is False
