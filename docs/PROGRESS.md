@@ -7,22 +7,22 @@
 
 | Tarefa | Status | Commit | Observações |
 |---|---|---|---|
-| T01 Setup | concluída | `047c0fc` | 11 testes |
-| T02 Loader e modelos | concluída | `6d84b83` | conflitos de produto detectados: #135–137, #139, #140, #142–144 |
-| T03 Repositórios | concluída | `3e0cf27` | `inactive_promotions` substitui `latest_inactive_promotion` (sem datas) |
-| T04 Preços/PIX/parcelas | concluída | `295e130` | limite 12x absoluto; combinado só > R$ 2.000,00 |
-| T05 Horários e frete | concluída | `e24798c` | contrato [[ARCHITECTURE#5.3.1 Contrato detalhado da T05 (horários e frete)]]; Backend + QA (Sonnet) em paralelo via Orca |
-| T06 Extração do PDF | concluída | `053352e` | contrato [[ARCHITECTURE#5.4.1 Contrato detalhado da T06 (extração do PDF → `knowledge/policies.md`)]]; IA/RAG + QA (Sonnet) via Orca |
-| T07 PolicyStore | concluída | `00c85b3` | [[ARCHITECTURE#5.4.2 Contrato detalhado da T07 (`PolicyStore`)]] |
-| T08 Adaptador LLM | concluída (smoke real pendente de credencial) | `35485ec` | [[ARCHITECTURE#5.6.1 Contrato detalhado da T08]]; D16 |
-| T08b Adaptador Groq | concluída (smoke real pendente da chave) | `dbe2ea9` | D17; [[ARCHITECTURE#5.6.2 Contrato do adaptador Groq (T08b — provedor padrão desde 2026-11-01, D17)]] |
-| T09 Ferramentas | concluída | `8594164` | [[ARCHITECTURE#5.5.1 Contrato detalhado da T09 (ferramentas)]] |
-| T10 Prompt | concluída | `db61a89` | [[ARCHITECTURE#5.7.1 Contrato detalhado da T10 (prompt de sistema)]] |
-| T11 Loop do agente | concluída | `f7e1088` | [[ARCHITECTURE#5.7.2 Contrato detalhado da T11 (loop do agente e sessão)]] |
-| T12 Encaminhamento | concluída | `585ac91` |
-| T13 CLI | concluída | `453a1cb` |
-| T14 Cenários E2E | 10 de 13 cenários aprovados em execuções reais; 5, 9, 10 pendentes de cota (relatório [[docs/E2E_RESULTS]]) | `9df578b`, `3f1f29d`, `d84ca0c` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
-| T16 README | em inglês e atualizado para Groq (resultados e exemplos pendentes de T14/T15) | (commit `docs: README em inglês`) | `5e82722` rascunho PT | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
+| T01 Setup | concluída | `b629367` | 11 testes |
+| T02 Loader e modelos | concluída | `5f1d536` | conflitos de produto detectados: #135–137, #139, #140, #142–144 |
+| T03 Repositórios | concluída | `6a0a2df` | `inactive_promotions` substitui `latest_inactive_promotion` (sem datas) |
+| T04 Preços/PIX/parcelas | concluída | `dc6bdbb` | limite 12x absoluto; combinado só > R$ 2.000,00 |
+| T05 Horários e frete | concluída | `72b24c6` | contrato [[ARCHITECTURE#5.3.1 Contrato detalhado da T05 (horários e frete)]]; Backend + QA (Sonnet) em paralelo via Orca |
+| T06 Extração do PDF | concluída | `084ce88` | contrato [[ARCHITECTURE#5.4.1 Contrato detalhado da T06 (extração do PDF → `knowledge/policies.md`)]]; IA/RAG + QA (Sonnet) via Orca |
+| T07 PolicyStore | concluída | `b2de4d1` | [[ARCHITECTURE#5.4.2 Contrato detalhado da T07 (`PolicyStore`)]] |
+| T08 Adaptador LLM | concluída (smoke real pendente de credencial) | `a22cdab` | [[ARCHITECTURE#5.6.1 Contrato detalhado da T08]]; D16 |
+| T08b Adaptador Groq | concluída (smoke real pendente da chave) | `60644c9` | D17; [[ARCHITECTURE#5.6.2 Contrato do adaptador Groq (T08b — provedor padrão desde 2026-11-01, D17)]] |
+| T09 Ferramentas | concluída | `d7828ec` | [[ARCHITECTURE#5.5.1 Contrato detalhado da T09 (ferramentas)]] |
+| T10 Prompt | concluída | `9ab4b5c` | [[ARCHITECTURE#5.7.1 Contrato detalhado da T10 (prompt de sistema)]] |
+| T11 Loop do agente | concluída | `1166fb1` | [[ARCHITECTURE#5.7.2 Contrato detalhado da T11 (loop do agente e sessão)]] |
+| T12 Encaminhamento | concluída | `fa858b9` |
+| T13 CLI | concluída | `80f487f` |
+| T14 Cenários E2E | 10 de 13 cenários aprovados em execuções reais; 5, 9, 10 pendentes de cota (relatório [[docs/E2E_RESULTS]]) | `b80958e`, `1a0779f`, `4ac2216` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
+| T16 README | em inglês e atualizado para Groq (resultados e exemplos pendentes de T14/T15) | (commit `docs: README em inglês`) | `20c9785` rascunho PT | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
 | T15, T17 | pendentes | — T14/T15 exigem credencial da API (ver pendências) |
 
 Suíte atual: 968 testes passando + 2 smokes reais pulados (Anthropic e Groq) após a T08b.
@@ -62,8 +62,8 @@ Lições:
 
 | Execução | Resultado | Causa das falhas | Ação |
 |---|---|---|---|
-| 1 (pausa 10 s) | 9/14 e 11/14 | agente não consultava pedido; emoji; falsos negativos do avaliador (hífen U+2011, "20 %") | `3f1f29d` (prompt, guard de saída, avaliador, isolamento de credenciais nos testes) |
-| 2 (pausa 10 s) | 11/14 e 9/14 | produto inventado após busca vazia; devolução sem política; 429 por 8K tokens/min | `d84ca0c` (grounding nas tools e prompt, paciência com 429, pausa 60 s) |
+| 1 (pausa 10 s) | 9/14 e 11/14 | agente não consultava pedido; emoji; falsos negativos do avaliador (hífen U+2011, "20 %") | `1a0779f` (prompt, guard de saída, avaliador, isolamento de credenciais nos testes) |
+| 2 (pausa 10 s) | 11/14 e 9/14 | produto inventado após busca vazia; devolução sem política; 429 por 8K tokens/min | `4ac2216` (grounding nas tools e prompt, paciência com 429, pausa 60 s) |
 | 3 (pausa 60 s) | 4/14 (inválida) | **cota diária esgotada**: 200K tokens/dia por modelo, janela móvel de 24 h (mensagem 429 da Groq); nenhum cenário avaliou o agente | decisão do usuário: sem novas baterias completas; só os testes essenciais pendentes (cenários 5, 10, 9) quando a cota renovar — ver [[docs/E2E_RESULTS]] |
 
 Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateria completa (13 × 2) consome perto de 100–200 mil tokens, ou seja, a cota diária inteira.
@@ -75,7 +75,8 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 - Tamanho do `.git`: 3 MB; maiores arquivos: PDFs de `data/`.
 - Histórico: commits incrementais (sem squash/force-push), autor `gelane-dev`.
 - `gh` não instalado; publicação depende de instalação/autenticação ou de um repositório vazio criado pelo usuário.
-- `data/desafio_tecnico_ai_eng_artefact.pdf` (enunciado) removido do versionamento por decisão do usuário (preservado localmente, no `.gitignore`). Atenção: commits anteriores ainda o contêm no histórico.
+- `data/desafio_tecnico_ai_eng_artefact.pdf` (enunciado) removido do versionamento por decisão do usuário (preservado localmente, no `.gitignore`).
+- **Histórico reescrito em 01/11/2026 (autorizado pelo usuário, antes de qualquer publicação):** o PDF foi removido de todos os commits (`git filter-branch --index-filter`), referências de backup e reflog expurgadas, `git gc --prune=now`; verificado que nenhum commit ou objeto contém o PDF e `git fsck` limpo. Todos os hashes mudaram; as referências desta documentação foram atualizadas (38 commits mapeados um a um pela mensagem).
 - Remoto configurado (sem push): `origin` = https://github.com/gelane-dev/emporio-da-musica-agent.git
 - Publicação só após aprovação explícita do usuário.
 
