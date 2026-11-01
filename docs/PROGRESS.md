@@ -21,7 +21,7 @@
 | T12 Encaminhamento | concluída | `585ac91` |
 | T13 CLI | concluída | `453a1cb` |
 | T14 Cenários E2E | preparação concluída; **execução real bloqueada pela credencial** | `9df578b` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
-| T16 README | rascunho concluído | (commit `docs: rascunho do README`) | seções de resultados E2E e exemplos pendentes de T14/T15 | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
+| T16 README | rascunho concluído | `5e82722` | seções de resultados E2E e exemplos pendentes de T14/T15 | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
 | T15, T17 | pendentes | — T14/T15 exigem credencial da API (ver pendências) |
 
 Suíte atual: 905 testes passando + 1 smoke real pulado (após a preparação da T14).
@@ -51,6 +51,10 @@ Lições:
 - `orchestration send` só garante enfileiramento: mudança de contrato durante a execução precisa ser confirmada no `worker_done` (o QA da T06 não leu a mensagem).
 - Reuso do mesmo terminal após `worker_done` falhou ("not running a recognized agent"); funciona iniciar novo Sonnet no **mesmo worktree**.
 - `autocrlf=true`: arquivos gerados com `--check` precisam de `.gitattributes` (`eol=lf`).
+
+## Limpeza
+
+2026-11-01: os 18 worktrees/branches temporários das T05–T16 foram removidos após verificação (sem alterações pendentes; conteúdo integrado por squash nos commits de cada tarefa).
 
 ## Pendências abertas
 
