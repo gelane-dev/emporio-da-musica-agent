@@ -256,13 +256,13 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Contrato.** ARCHITECTURE §5.8.1.
 **Escopo.** `cli.py` (`build_agent`, `greeting`, `main`) e `__main__.py`.
 **Critérios de aceite.**
-- [ ] `python -m emporio_agent` abre conversa; saudação local indica se a loja está aberta e, se fechada, a próxima abertura.
-- [ ] Sem credencial (ou provedor inválido) ⇒ mensagem clara, código 2, sem traceback.
-- [ ] `--debug` mostra nome/args/status/duração de cada tool call, ocultando e-mail/telefone do `consultar_pedido`.
-- [ ] `/salvar` grava transcript `.md` em `runtime/transcripts/` e informa o caminho; `--save` grava ao encerrar; `/nova` e `/ajuda` funcionam.
-- [ ] Ctrl+C / EOF encerram sem traceback (código 0).
-- [ ] Acentuação correta no terminal do Windows (PowerShell e Git Bash).
-- [ ] `build_agent` monta as 8 ferramentas com os dados reais (teste com `FakeLLM`).
+- [x] `python -m emporio_agent` abre conversa; saudação local indica se a loja está aberta e, se fechada, a próxima abertura.
+- [x] Sem credencial (ou provedor inválido) ⇒ mensagem clara, código 2, sem traceback.
+- [x] `--debug` mostra nome/args/status/duração de cada tool call, ocultando e-mail/telefone do `consultar_pedido`.
+- [x] `/salvar` grava transcript `.md` em `runtime/transcripts/` e informa o caminho; `--save` grava ao encerrar; `/nova` e `/ajuda` funcionam.
+- [x] Ctrl+C / EOF encerram sem traceback (código 0).
+- [x] Acentuação correta no terminal do Windows (PowerShell e Git Bash).
+- [x] `build_agent` monta as 8 ferramentas com os dados reais (teste com `FakeLLM`).
 **Commit.** `feat(cli): interface de linha de comando para conversar com o agente`
 
 ## T14 — Cenários E2E e ajuste de prompt

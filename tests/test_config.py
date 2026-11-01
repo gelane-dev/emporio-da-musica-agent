@@ -90,7 +90,7 @@ def test_naive_reference_datetime_rejected():
 
 def test_main_module_runs():
     result = subprocess.run(
-        [sys.executable, "-m", "emporio_agent"],
+        [sys.executable, "-m", "emporio_agent", "--version"],
         capture_output=True,
         text=True,
         encoding="utf-8",
