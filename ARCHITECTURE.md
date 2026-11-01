@@ -253,7 +253,7 @@ class PriceQuote(BaseModel):
     combined_payment: Literal["permitido", "nao_permitido", "a_confirmar"]   # > 2000 (estrito) | < 2000 | == 2000 + limitação (P12)
     limitations: list[Limitation]
 
-def quote(price: Decimal, active_promotions: list[Promotion]) -> PriceQuote
+def quote(price: Decimal, active_promotions: list[ActivePromotion]) -> PriceQuote   # ActivePromotion: Protocol estrutural (domain não importa data)
 def installment_options(amount: Decimal) -> list[InstallmentOption]
 ```
 Classificação de parcelas (`v = amount / n`, arredondado a 2 casas):
