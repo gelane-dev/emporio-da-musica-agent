@@ -267,7 +267,11 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 
 ## T14 — Cenários E2E e ajuste de prompt
 **Objetivo.** Validar o comportamento real e calibrar o prompt.
-**Escopo.** `scripts/run_scenarios.py` com casos declarativos `{mensagens, tools_esperadas, deve_conter, nao_deve_conter}`; relatório no terminal.
+**Contrato.** ARCHITECTURE §5.9.1.
+**Escopo.** `scripts/run_scenarios.py` com casos declarativos; relatório no terminal (e opcional em Markdown); `tests/test_run_scenarios.py` (lógica de avaliação com `FakeLLM`). Execução real exige credencial.
+**Preparação (sem credencial, 2026-11-01).**
+- [ ] Script e 13 cenários declarados conforme o contrato; avaliação testada com `FakeLLM`; sem credencial ⇒ código 2.
+- [ ] Ajustes de texto já identificados: "da Empório da Música" (feminino, como no manual) na CLI; prompt sem "em conferência".
 **Cenários mínimos.**
 1. Violões até R$ 1000 ⇒ `buscar_produtos`; lista sem #96/#113.
 2. Endereço ⇒ `informacoes_loja`; contém "14 de Maio".
