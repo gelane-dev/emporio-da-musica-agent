@@ -87,6 +87,21 @@ Itens marcados com ⚠️ **APROVAR** dependem de escolha sua antes do desenvolv
 
 **Status.** Tratamentos de DATA_ANALYSIS §4.2 **aprovados em 2026-11-01**, com dois ajustes: limite máximo de 12x sempre respeitado; pagamento combinado somente acima de R$ 2.000,00 (exatamente R$ 2.000,00 ⇒ limitação explícita).
 
+## D16 — Parâmetros de chamada ao modelo (2026-11-01, antes da T08)
+
+**Contexto.** Regras atuais da API para o Claude Sonnet 5.5 (`claude-sonnet-5-5`, modelo aprovado em D5), conferidas na documentação da API antes de escrever o adaptador.
+
+**Decisão.**
+- Sem `temperature`/`top_p`/`top_k` (o modelo rejeita valores não padrão com 400). A variabilidade é tratada nos critérios de aceite (fatos, não texto exato — RK13).
+- Sem `tool_choice` forçado (400); `auto` + instruções no prompt.
+- Raciocínio adaptativo padrão (sem parâmetro `thinking`); profundidade por `output_config.effort`, padrão **`low`** (recomendação para chat), configurável em `LLM_EFFORT`.
+- `max_tokens` padrão 16000 (com raciocínio adaptativo, 1024 truncaria respostas), configurável.
+- Blocos brutos do provedor (raciocínio, fallback) reenviados sem alteração no histórico (`Message.provider_content`).
+- Fallback de recusa no servidor ligado por padrão (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`), desligável em `LLM_REFUSAL_FALLBACK=false`. A validação real acontece na T14 (exige credencial).
+- Cache de prompt só no prefixo estável do sistema; data/hora vão num bloco separado após o ponto de cache.
+
+**Consequência.** Contrato em ARCHITECTURE §5.6.1.
+
 ## D5 — Modelo e provedor ⚠️ APROVAR
 
 **Recomendação.** **Anthropic Claude via API**, modelo `claude-sonnet-5-5` como padrão (bom equilíbrio custo/qualidade em tool use e português), `claude-haiku-5-5` como opção econômica para testes. SDK oficial `anthropic`.

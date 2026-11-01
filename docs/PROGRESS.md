@@ -12,8 +12,10 @@
 | T03 Repositórios | concluída | `3e0cf27` | `inactive_promotions` substitui `latest_inactive_promotion` (sem datas) |
 | T04 Preços/PIX/parcelas | concluída | `295e130` | limite 12x absoluto; combinado só > R$ 2.000,00 |
 | T05 Horários e frete | concluída | `e24798c` | contrato [[ARCHITECTURE#5.3.1 Contrato detalhado da T05 (horários e frete)]]; Backend + QA (Sonnet) em paralelo via Orca |
-| T06 Extração do PDF | concluída | (ver git log: `feat(policies)`) | contrato [[ARCHITECTURE#5.4.1 Contrato detalhado da T06 (extração do PDF → `knowledge/policies.md`)]]; IA/RAG + QA (Sonnet) via Orca |
-| T07–T17 | pendentes | — | — |
+| T06 Extração do PDF | concluída | `053352e` | contrato [[ARCHITECTURE#5.4.1 Contrato detalhado da T06 (extração do PDF → `knowledge/policies.md`)]]; IA/RAG + QA (Sonnet) via Orca |
+| T07 PolicyStore | em andamento | — | [[ARCHITECTURE#5.4.2 Contrato detalhado da T07 (`PolicyStore`)]] |
+| T08 Adaptador LLM | em andamento | — | [[ARCHITECTURE#5.6.1 Contrato detalhado da T08]]; D16 |
+| T09–T17 | pendentes | — | T14/T15 exigem credencial da API (ver pendências) |
 
 Suíte atual: 499 testes passando (após a T06).
 
@@ -41,6 +43,7 @@ Lições:
 ## Pendências abertas
 
 - Nenhuma decisão de negócio pendente.
+- **Credencial da API ausente** (sem `ANTHROPIC_API_KEY`, sem `.env`, sem CLI `ant`): T07–T13 seguem com `FakeLLM`; T14 (cenários reais) e T15 (conversas de exemplo) dependem do usuário fornecer a chave em `.env`.
 - `tests/test_build_policies.py`: fixture de classe definida como método de instância gera `PytestRemovedIn10Warning` (sem efeito hoje) — ajustar quando houver nova rodada de QA.
 - Encoding de saída no Git Bash (RK11) — tratar na T13.
 

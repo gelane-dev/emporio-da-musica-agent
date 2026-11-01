@@ -164,23 +164,31 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 
 ## T07 — PolicyStore
 **Objetivo.** Acesso por tópico às seções de política.
-**Escopo.** `policies/store.py` (ARCHITECTURE §5.4).
+**Contrato.** ARCHITECTURE §5.4.2.
+**Escopo.** `policies/store.py`.
 **Critérios de aceite.**
-- [ ] `get("trocas_devolucoes")` contém "7 (sete) dias" e "30 (trinta) dias".
-- [ ] `get("pagamento")` contém "5% de desconto" e as faixas de parcelamento.
+- [ ] Com o `knowledge/policies.md` versionado: 11 seções; `get("sobre_loja")` ⇒ títulos `["Capa", "1. Sobre a Empório da Música"]`; `get("atendimento")` ⇒ `["7. Atendimento via WhatsApp", "10. Disposições Finais"]`; `source` "…, capa" e "…, seção N".
+- [ ] A Capa preserva `contato@emporiodamusica.com.br`; a seção 1 preserva `contato@empóriodamusica.com.br` (P2).
+- [ ] `get("trocas_devolucoes")` contém "7 (sete) dias" e "30 (trinta) dias"; `get("pagamento")` contém "5% de desconto", a tabela e as faixas da 3.1.
+- [ ] `text` sem marcador, sem a linha `## ` e sem linhas em branco nas pontas; Markdown (### , tabelas, **) preservado.
 - [ ] Tópico inexistente ⇒ `KeyError` (a tool converte em `INVALID_ARGUMENT`).
-- [ ] Arquivo sem algum tópico obrigatório ⇒ erro na inicialização com o nome do tópico faltante.
+- [ ] Arquivo sem algum tópico ⇒ `PolicyStoreError` listando os ausentes; marcador com tópico desconhecido ⇒ `PolicyStoreError`; arquivo inexistente ⇒ `PolicyStoreError`.
+- [ ] O arquivo não é modificado pela leitura.
 **Commit.** `feat(policies): PolicyStore com recuperação por tópico`
 
 ## T08 — Adaptador LLM
 **Objetivo.** Isolar o provedor atrás de `LLMClient`.
-**Escopo.** `llm/base.py` (tipos neutros), `llm/anthropic_client.py` (conversão de mensagens/tool calls/tool results, retry simples), `tests/fakes.py` com `FakeLLM` roteirizável.
+**Contrato.** ARCHITECTURE §5.6.1; decisões D5/D16.
+**Escopo.** `llm/base.py`, `llm/anthropic_client.py`, `llm/factory.py`, acréscimos em `config.py` e `.env.example`, `tests/fakes.py`.
 **Critérios de aceite.**
-- [ ] Conversão ida e volta `Message` ⇄ formato do provedor coberta por teste unitário (sem rede).
-- [ ] Resposta com tool calls ⇒ `LLMResponse.tool_calls` preenchido com `id`, `name`, `arguments`.
-- [ ] Sem `ANTHROPIC_API_KEY` ⇒ erro claro na inicialização, com instrução de configurar o `.env`.
-- [ ] Smoke test manual (marcado `@pytest.mark.llm`, pulado por padrão) responde a "olá".
-- [ ] `FakeLLM` permite roteirizar sequência de respostas (tool call → texto).
+- [ ] Conversão `Message` ⇒ formato Anthropic coberta por teste unitário (sem rede): texto, `provider_content` reenviado intacto, tool_use, e várias mensagens `tool` agrupadas em **um** `user` com `tool_result` (incl. `is_error`).
+- [ ] `from_anthropic_response` com `anthropic.types.Message` real (texto + tool_use + bloco não textual): `text`, `tool_calls` (`arguments` dict), `provider_content` completo, `stop_reason` mapeado (`pause_turn` ⇒ `other`).
+- [ ] Requisição montada sem `temperature`, sem `tool_choice`, sem `thinking`; com `output_config.effort`, cache só no bloco estável do sistema; caminho beta com fallback quando `refusal_fallback=True` (verificado com cliente SDK falso injetado).
+- [ ] Exceções do SDK mapeadas para `LLMError.kind` conforme o contrato; mensagens sem a chave.
+- [ ] `create_llm_client` sem chave ⇒ `LLMError(kind="auth")` com instrução do `.env`; provedor desconhecido ⇒ `kind="config"`.
+- [ ] `Settings`: `llm_effort` (padrão `low`), `llm_refusal_fallback` (padrão `True`), `llm_max_tokens` padrão 16000; `read_env` reaproveitado por `load_settings`; testes da T01 continuam verdes.
+- [ ] Smoke test real (marcado `@pytest.mark.llm`, pulado por padrão) responde a "olá".
+- [ ] `FakeLLM` roteirizável (respostas e exceções) e registra as chamadas.
 **Commit.** `feat(llm): interface LLMClient e adaptador Anthropic`
 
 ## T09 — Tools + registry
@@ -327,7 +335,7 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 | RK10 | Custo/latência/limite de API durante testes | Média | Baixo | Modelo econômico em dev; testes unitários sem LLM; retry simples |
 | RK11 | Encoding no Windows (nomes de arquivo com acento/espaço, terminal) | Média | Médio | `pathlib`, `encoding="utf-8"` explícito, `sys.stdout.reconfigure`; testar em PowerShell |
 | RK12 | Histórico cresce e estoura contexto/custo | Baixa | Baixo | Janela de turnos (`max_history_turns`) |
-| RK13 | Não determinismo do LLM nos exemplos/cenários | Alta | Baixo | `temperature` baixa; critérios de aceite por presença de fatos, não texto exato |
+| RK13 | Não determinismo do LLM nos exemplos/cenários | Alta | Baixo | Sonnet 5.5 não aceita `temperature` (D16); critérios de aceite por presença de fatos e por ferramentas chamadas, não texto exato |
 | RK14 | Prompt injection | Média | Médio | Defesa na camada de tools (não depende do prompt); cenário 11 |
 | RK15 | Escopo crescer (UI, RAG vetorial, WhatsApp) e atrasar entrega | Média | Alto | Opcionais marcados; caminho crítico priorizado |
 | RK16 | Excesso de ressalvas torna o atendimento pouco útil | Média | Médio | Limitações só quando a resposta depende do ponto ambíguo; prompt pede ressalva curta + caminho de confirmação; cenários avaliam utilidade |

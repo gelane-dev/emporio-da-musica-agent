@@ -434,6 +434,38 @@ Tabelas Markdown (cabeçalho literal, células literais; células quebradas em v
 
 Referência medida pelo coordenador em 2026-11-01: `len(W_pdf) == 1651`; cabeçalho e rodapé presentes em todas as páginas 2–8.
 
+#### 5.4.2 Contrato detalhado da T07 (`PolicyStore`)
+
+Lê o `knowledge/policies.md` gerado na T06 (§5.4.1). Pacote `emporio_agent.policies` (só depende de pydantic e stdlib).
+
+```python
+POLICY_TOPICS: tuple[str, ...] = ("sobre_loja", "horarios", "pagamento", "trocas_devolucoes",
+                                  "frete_entrega", "promocoes", "atendimento", "garantia", "privacidade")
+PolicyTopic = Literal[...mesmos 9...]
+
+class PolicyStoreError(Exception): ...          # arquivo ausente/malformado; mensagem cita arquivo e motivo
+
+class PolicySection(BaseModel, frozen=True):
+    topic: PolicyTopic
+    title: str      # texto do "## " sem o prefixo: "Capa", "1. Sobre a Empório da Música", "10. Disposições Finais"
+    source: str     # "Manual de Políticas v2.1, capa" | "Manual de Políticas v2.1, seção <N>" (N = número inicial do título)
+    text: str       # corpo do bloco (após a linha "## "), Markdown preservado (### , listas, tabelas, **),
+                    # sem o marcador e sem linhas em branco no início/fim
+
+class PolicyStore:
+    @classmethod
+    def from_markdown(cls, path: Path) -> "PolicyStore"
+    def get(self, topic: str) -> list[PolicySection]   # ordem do documento; topic fora de POLICY_TOPICS ⇒ KeyError
+    def topics(self) -> list[str]                       # ordem de POLICY_TOPICS
+    def sections(self) -> list[PolicySection]           # todos os blocos, ordem do documento
+```
+Regras de leitura:
+- Bloco = do marcador `<!-- topic: X -->` até o próximo marcador ou o fim do arquivo; a primeira linha não vazia após o marcador deve começar com `## ` (senão `PolicyStoreError`).
+- Conteúdo antes do primeiro marcador (H1 e nota de extração) é ignorado.
+- **Tópico com vários blocos**: `get` devolve todos, na ordem (`sobre_loja` ⇒ `["Capa", "1. Sobre a Empório da Música"]`; `atendimento` ⇒ `["7. Atendimento via WhatsApp", "10. Disposições Finais"]`). A **Capa** é mantida porque contém a grafia de e-mail sem acento e o telefone (DATA_ANALYSIS P1/P2) — não é descartada nem fundida.
+- `PolicyStoreError` se: arquivo não existe; marcador com tópico desconhecido; algum dos 9 tópicos ausente (mensagem lista os ausentes).
+- Somente leitura; nunca escreve no arquivo. Não reinterpreta nem corrige o texto.
+
 ### 5.5 `tools/` — contrato com o LLM
 ```python
 class ToolError(BaseModel):
@@ -478,19 +510,96 @@ Regras transversais das tools:
 - Mensagens de erro dizem ao LLM **o que fazer** (ex.: `VERIFICATION_FAILED: "Os dados não conferem. Peça ao cliente o e-mail ou telefone usado na compra; não revele dados do pedido."`).
 
 ### 5.6 `llm/` — adaptador
+
+Formato **neutro** (independente de provedor) + um adaptador por provedor (TECHNICAL_DECISIONS D5/D16). Trocar de provedor = novo adaptador + `LLM_PROVIDER`; nada fora de `llm/` muda.
+
+#### 5.6.1 Contrato detalhado da T08
+
+**`llm/base.py`**
 ```python
-class ToolCall(BaseModel):    id: str; name: str; arguments: dict
-class Message(BaseModel):     role: Literal["user", "assistant", "tool"]
-                              content: str | None; tool_calls: list[ToolCall] = []
-                              tool_call_id: str | None = None   # quando role="tool"
-class LLMResponse(BaseModel): text: str | None; tool_calls: list[ToolCall]
-                              stop_reason: str; usage: dict[str, int]
+class ToolSpec(BaseModel, frozen=True):   name: str; description: str; input_schema: dict
+class ToolCall(BaseModel, frozen=True):   id: str; name: str; arguments: dict
+
+class Message(BaseModel):
+    role: Literal["user", "assistant", "tool"]
+    content: str | None = None
+    tool_calls: list[ToolCall] = []          # role="assistant"
+    tool_call_id: str | None = None          # role="tool"
+    is_error: bool = False                   # role="tool": resultado de erro
+    provider_content: list[dict] | None = None
+    # role="assistant": blocos BRUTOS do provedor (thinking, fallback, tool_use…) para
+    # reenviar SEM alteração no próximo request (exigência da API: blocos de raciocínio
+    # precisam voltar intactos). O agente nunca edita este campo.
+
+StopReason = Literal["end_turn", "tool_use", "max_tokens", "refusal", "other"]
+
+class LLMResponse(BaseModel):
+    text: str | None                          # concatenação dos blocos de texto; None se não houver
+    tool_calls: list[ToolCall]
+    stop_reason: StopReason
+    raw_stop_reason: str | None
+    usage: dict[str, int]                     # input_tokens, output_tokens, cache_* quando houver
+    provider_content: list[dict] | None
+    def to_message(self) -> Message           # assistant com text, tool_calls e provider_content
+
+LLMErrorKind = Literal["config", "auth", "rate_limit", "connection", "bad_request", "server", "api"]
+class LLMError(Exception):
+    kind: LLMErrorKind; message: str          # message em português, acionável (ex.: como configurar o .env)
 
 class LLMClient(Protocol):
-    def complete(self, *, system: str, messages: list[Message],
+    def complete(self, *, system: str, system_dynamic: str | None, messages: list[Message],
                  tools: list[ToolSpec], max_tokens: int) -> LLMResponse
+    # system: parte ESTÁVEL do prompt (cacheável); system_dynamic: parte volátil (data/hora)
 ```
-O formato `Message` é **neutro**; cada adaptador converte para o formato do provedor. Erros de rede/limite viram `LLMError` (retry com backoff simples no adaptador, 2 tentativas).
+
+**`llm/anthropic_client.py`** — SDK oficial `anthropic` (instalado: 2.3.0).
+```python
+class AnthropicClient:   # implementa LLMClient
+    def __init__(self, *, model: str, effort: str, refusal_fallback: bool,
+                 api_key: str | None = None, client: "anthropic.Anthropic | None" = None,
+                 max_retries: int = 2): ...
+def to_anthropic_messages(messages: list[Message]) -> list[dict]
+def from_anthropic_response(response) -> LLMResponse     # response: anthropic.types.Message (ou beta)
+```
+Requisição (`complete`):
+- `system=[{"type":"text","text":system,"cache_control":{"type":"ephemeral"}}]` + `{"type":"text","text":system_dynamic}` quando houver (cache só no prefixo estável).
+- `tools=[{"name","description","input_schema"}]`; **sem `tool_choice`** (o padrão `auto`; forçar ferramenta retorna 400 no Sonnet 5.5).
+- `output_config={"effort": effort}`; **sem `thinking`** (adaptativo por padrão) e **sem `temperature`/`top_p`/`top_k`** (rejeitados pelo modelo).
+- `refusal_fallback=True` ⇒ `client.beta.messages.create(..., betas=["server-side-fallback-2026-07-01"], fallbacks="default")`; se o SDK instalado não aceitar `fallbacks` como argumento, enviar por `extra_body={"fallbacks": "default"}`. `False` ⇒ `client.messages.create(...)`.
+- Retries de rede/429/5xx ficam a cargo do SDK (`max_retries`).
+
+Conversão `to_anthropic_messages`:
+- `user` ⇒ `{"role":"user","content": content}`.
+- `assistant` ⇒ `{"role":"assistant","content": provider_content}` se presente; senão blocos `text` (se houver) + `tool_use` (`id`,`name`,`input`).
+- Mensagens `tool` **consecutivas** ⇒ **uma única** mensagem `user` com todos os blocos `{"type":"tool_result","tool_use_id","content","is_error"}`.
+
+Conversão `from_anthropic_response`:
+- `text` = textos dos blocos `text` unidos por `"\n"`; `tool_calls` = blocos `tool_use` (`input` como dict); demais blocos (thinking, fallback…) só vão para `provider_content`.
+- `provider_content` = `[b.model_dump(mode="json", exclude_none=True) for b in response.content]`.
+- `stop_reason`: `end_turn|tool_use|max_tokens|refusal` mapeados 1:1; qualquer outro (`pause_turn`, `stop_sequence`) ⇒ `"other"`; `raw_stop_reason` guarda o original.
+
+Erros (exceções do SDK ⇒ `LLMError`): `AuthenticationError`/`PermissionDeniedError` ⇒ `auth`; `RateLimitError` ⇒ `rate_limit`; `APIConnectionError` (inclui timeout) ⇒ `connection`; `BadRequestError` ⇒ `bad_request`; `APIStatusError` ≥ 500 ⇒ `server`; outros ⇒ `api`. Nunca incluir a chave nas mensagens/logs.
+
+**`llm/factory.py`**
+```python
+def create_llm_client(settings: Settings, env: Mapping[str, str] | None = None) -> LLMClient
+```
+- `env` padrão: `config.read_env()` (`.env` + ambiente, mesma precedência de `load_settings`).
+- `llm_provider == "anthropic"` ⇒ `AnthropicClient(model=settings.llm_model, effort=settings.llm_effort, refusal_fallback=settings.llm_refusal_fallback, api_key=env["ANTHROPIC_API_KEY"])`.
+- Sem `ANTHROPIC_API_KEY` e sem `ANTHROPIC_AUTH_TOKEN` ⇒ `LLMError(kind="auth")` com instrução: copiar `.env.example` para `.env` e preencher a chave.
+- Provedor desconhecido ⇒ `LLMError(kind="config")` citando os suportados.
+
+**`config.py` (acréscimos)** — `read_env(env_file=None, environ=None) -> dict[str, str]` (fatoração da mescla já usada por `load_settings`, que passa a chamá-la) e campos novos em `Settings`: `llm_effort: Literal["low","medium","high","xhigh","max"] = "low"` (`LLM_EFFORT`), `llm_refusal_fallback: bool = True` (`LLM_REFUSAL_FALLBACK`, aceita `true/false/1/0`); `llm_max_tokens` passa a ter padrão `16000`. `.env.example` documenta as variáveis novas.
+
+**`tests/fakes.py`** (entregue com a T08, usado pelas T10/T11)
+```python
+class FakeLLM:   # implementa LLMClient
+    def __init__(self, responses: list[LLMResponse | Exception]): ...
+    calls: list[dict]            # kwargs de cada complete(), com cópia profunda de messages
+    def complete(...) -> LLMResponse   # devolve/lança o próximo item; AssertionError se acabar
+def fake_text(text: str) -> LLMResponse
+def fake_tool_calls(*calls: tuple[str, dict], ids: list[str] | None = None) -> LLMResponse
+```
 
 ### 5.7 `agent/`
 ```python
