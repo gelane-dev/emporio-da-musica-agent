@@ -41,7 +41,7 @@ FALLBACK_LLM_ERROR = (
 AgentStop = Literal["end_turn", "max_tokens", "refusal", "max_iterations", "llm_error"]
 
 # Ferramentas cujos argumentos contêm dados pessoais: nunca vão para o log.
-_SENSITIVE_TOOLS = frozenset({"consultar_pedido"})
+_SENSITIVE_TOOLS = frozenset({"consultar_pedido", "encaminhar_atendente"})
 
 
 class ToolCallRecord(BaseModel):

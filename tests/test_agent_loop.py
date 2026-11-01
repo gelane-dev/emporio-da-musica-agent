@@ -496,6 +496,32 @@ def test_logs_nao_contem_email_nem_telefone_do_consultar_pedido(registry, settin
         assert segredo not in texto
 
 
+def test_logs_info_nao_contem_dados_do_resumo_de_encaminhar_atendente(
+    store_data, policies, settings, caplog, tmp_path
+):
+    registry_h = build_tool_registry(
+        CatalogRepository(store_data),
+        OrderRepository(store_data),
+        policies,
+        lambda: SUNDAY,
+        runtime_dir=tmp_path,
+    )
+    resumo = "Cliente lucas.mendes@jmail.com, telefone (67) 99812-3456, quer falar com humano."
+    llm = FakeLLM(
+        [
+            fake_tool_calls(("encaminhar_atendente", {"motivo": "reclamacao", "resumo": resumo}), ids=["h1"]),
+            fake_text("ok"),
+        ]
+    )
+    with caplog.at_level(logging.INFO):
+        make_agent(llm, registry_h, settings).respond(new_session(), "quero um atendente")
+    texto = _todos_os_logs(caplog)
+    assert caplog.records, "o agente deveria registrar logs INFO"
+    assert "encaminhar_atendente" in texto
+    for segredo in ("lucas.mendes@jmail.com", "99812-3456", "998123456", "99812"):
+        assert segredo not in texto
+
+
 def test_logs_info_registram_nome_da_tool(registry, settings, caplog):
     llm = FakeLLM([fake_tool_calls(("listar_categorias", {}), ids=["l1"]), fake_text("ok")])
     with caplog.at_level(logging.INFO):
