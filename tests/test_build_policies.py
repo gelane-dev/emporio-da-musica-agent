@@ -796,7 +796,8 @@ POLICY_PHRASES = [
 
 class TestNoPolicyTextInScript:
     @pytest.fixture(scope="class")
-    def script_text(self) -> str:
+    @classmethod
+    def script_text(cls) -> str:
         assert SCRIPT_PATH.is_file(), f"scripts/build_policies.py não existe ({SCRIPT_PATH})"
         return SCRIPT_PATH.read_text(encoding="utf-8")
 
