@@ -68,6 +68,23 @@ Lições:
 
 Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateria completa (13 × 2) consome perto de 100–200 mil tokens, ou seja, a cota diária inteira.
 
+## Preparação da T17 (revisão de entrega, 01/11/2026 — sem publicação)
+
+- Segredos: nenhuma chave real no histórico completo (`gsk_…`, `sk-ant-…`); única atribuição é valor fictício de teste.
+- Não versionados (confirmado): `.env`, `venv/`, `runtime/`, `frontend/` (fora do escopo, decisão do usuário; mantida intacta no disco), `node_modules`.
+- Tamanho do `.git`: 3 MB; maiores arquivos: PDFs de `data/`.
+- Histórico: commits incrementais (sem squash/force-push), autor `gelane-dev`.
+- `gh` não instalado; publicação depende de instalação/autenticação ou de um repositório vazio criado pelo usuário.
+- **Decisão pendente do usuário antes da publicação:** `data/desafio_tecnico_ai_eng_artefact.pdf` (enunciado do desafio) está versionado junto com os dados; não é necessário para executar o projeto.
+- Publicação só após aprovação explícita do usuário.
+
+## Retomada quando a cota da Groq renovar (prevista para 02/11 a partir de ~17h30)
+
+1. Testes pendentes da T14 (prioridade A de [[docs/E2E_RESULTS]]): cenários 5 e 10 (2 repetições) e 9 (1 repetição).
+2. T15: 3 conversas reais gravadas com `--save` (catálogo; preço/parcelamento/promoção; devolução não trivial), sem edição de conteúdo.
+3. T16: README final com resultados e exemplos reais.
+4. T17: revisão final e aprovação do usuário para publicar.
+
 ## Pendências abertas
 
 - Nenhuma decisão de negócio pendente.
