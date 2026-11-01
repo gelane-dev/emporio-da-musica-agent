@@ -58,6 +58,16 @@ Lições:
 
 2026-11-01: os 18 worktrees/branches temporários das T05–T16 foram removidos após verificação (sem alterações pendentes; conteúdo integrado por squash nos commits de cada tarefa).
 
+## Execuções reais da T14 (Groq, openai/gpt-oss-120b)
+
+| Execução | Resultado | Causa das falhas | Ação |
+|---|---|---|---|
+| 1 (pausa 10 s) | 9/14 e 11/14 | agente não consultava pedido; emoji; falsos negativos do avaliador (hífen U+2011, "20 %") | `3f1f29d` (prompt, guard de saída, avaliador, isolamento de credenciais nos testes) |
+| 2 (pausa 10 s) | 11/14 e 9/14 | produto inventado após busca vazia; devolução sem política; 429 por 8K tokens/min | `d84ca0c` (grounding nas tools e prompt, paciência com 429, pausa 60 s) |
+| 3 (pausa 60 s) | 4/14 (inválida) | **cota diária esgotada**: 200K tokens/dia por modelo, janela móvel de 24 h (mensagem 429 da Groq); nenhum cenário avaliou o agente | aguardando decisão do usuário |
+
+Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateria completa (13 × 2) consome perto de 100–200 mil tokens, ou seja, a cota diária inteira.
+
 ## Pendências abertas
 
 - Nenhuma decisão de negócio pendente.
