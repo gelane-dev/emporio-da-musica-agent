@@ -14,8 +14,10 @@
 | T05 Horários e frete | concluída | `e24798c` | contrato [[ARCHITECTURE#5.3.1 Contrato detalhado da T05 (horários e frete)]]; Backend + QA (Sonnet) em paralelo via Orca |
 | T06 Extração do PDF | concluída | `053352e` | contrato [[ARCHITECTURE#5.4.1 Contrato detalhado da T06 (extração do PDF → `knowledge/policies.md`)]]; IA/RAG + QA (Sonnet) via Orca |
 | T07 PolicyStore | concluída | `00c85b3` | [[ARCHITECTURE#5.4.2 Contrato detalhado da T07 (`PolicyStore`)]] |
-| T08 Adaptador LLM | concluída (smoke real pendente de credencial) | (commit `feat(llm)`) | [[ARCHITECTURE#5.6.1 Contrato detalhado da T08]]; D16 |
-| T09–T17 | pendentes | — | T14/T15 exigem credencial da API (ver pendências) |
+| T08 Adaptador LLM | concluída (smoke real pendente de credencial) | `35485ec` | [[ARCHITECTURE#5.6.1 Contrato detalhado da T08]]; D16 |
+| T09 Ferramentas | em andamento | — | [[ARCHITECTURE#5.5.1 Contrato detalhado da T09 (ferramentas)]] |
+| T10 Prompt | em andamento | — | [[ARCHITECTURE#5.7.1 Contrato detalhado da T10 (prompt de sistema)]] |
+| T11–T17 | pendentes | — T14/T15 exigem credencial da API (ver pendências) |
 
 Suíte atual: 608 testes passando + 1 smoke real pulado (após a T08).
 

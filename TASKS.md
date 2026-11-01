@@ -193,40 +193,33 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 
 ## T09 — Tools + registry
 **Objetivo.** Expor dados, domínio e políticas ao LLM com contratos estáveis, repassando conflitos e limitações.
-**Escopo.** `tools/base.py`, `catalog_tools.py`, `order_tools.py`, `policy_tools.py` conforme tabela de ARCHITECTURE §5.5 (`buscar_produtos`, `detalhar_produto`, `listar_categorias`, `consultar_pedido`, `consultar_politica`, `informacoes_loja`).
+**Contrato.** ARCHITECTURE §5.5.1 (7 ferramentas; `estimar_frete` acrescentada em 2026-11-01 para expor o domínio da T05, conforme D4).
+**Escopo.** `tools/base.py`, `tools/limitations.py`, `tools/catalog_tools.py`, `tools/order_tools.py`, `tools/policy_tools.py`, `tools/__init__.py` (`build_tool_registry`).
 **Critérios de aceite.**
-- [ ] `registry.specs()` gera JSON Schema válido para cada tool (descrições em PT, enums de categoria/tópico).
-- [ ] `execute()` nunca lança exceção: argumento inválido ⇒ `INVALID_ARGUMENT`; erro inesperado ⇒ `INTERNAL_ERROR` (logado).
-- [ ] `ToolResult.to_llm()` serializa `limitacoes` sempre que houver.
-- [ ] `buscar_produtos(categoria="Violões", preco_max=1000)` ⇒ 12 produtos, ordenáveis por preço; sem rótulos de estoque inventados (só `disponivel: bool`).
-- [ ] `buscar_produtos(categoria="Teclados e Pianos")` ⇒ #142 com `informacoes_conflitantes = true`.
-- [ ] `detalhar_produto(nome="Takamine GD20")` ⇒ preço R$ 2.199,00, PIX R$ 2.089,05, `promocoes_encerradas` = [12% "Oferta Especial"], sem limitações.
-- [ ] `detalhar_produto(produto_id=142)` ⇒ `conflitos` com marca (Korg × Roland) e teclas (61 × 88); `descricao` e `especificacoes.keys` **ausentes** de `produto`; limitação `DADO_CONFLITANTE`.
-- [ ] `detalhar_produto(produto_id=121)` ⇒ promoção 20% com preço original; 5x marcado "a confirmar" + limitação.
-- [ ] `detalhar_produto(produto_id=96)` ⇒ indisponível + `alternativas_sugeridas` não vazias.
-- [ ] `detalhar_produto(produto_id=113)` ⇒ descontinuado + alternativas; `#130` ⇒ "em breve" + limitação (disponibilidade para compra não confirmada).
-- [ ] `consultar_pedido(19, email="pedro.oliveira@jmail.com")` ⇒ cancelado + observação; com e-mail errado ⇒ `VERIFICATION_FAILED` sem nenhum dado do pedido.
-- [ ] `consultar_pedido(8, telefone="67 99654-7821")` ⇒ status "enviado" + rastreio `BRJL5544332BR` + previsão rotulada como estimativa.
-- [ ] Sem número de pedido ou sem e-mail/telefone ⇒ `INVALID_ARGUMENT` (o schema não aceita nome como identificador).
-- [ ] E-mail compartilhado (`bruno.martins@jmail.com`, clientes #11 e #43) só libera pedidos do cliente dono do pedido consultado.
-- [ ] Pedido entregue (#4) ⇒ limitações P6 (canal não registrado) e P7 (recebimento não registrado); **nenhum** campo de elegibilidade ou de "dias desde a entrega".
-- [ ] `status_descricao` é tradução literal do status; `valor_total_registrado` do #3 = R$ 3.450,00 (não recalculado).
-- [ ] Nenhum resultado de tool contém e-mail, telefone ou `customer_id` de cliente (teste varre o JSON).
-- [ ] `consultar_politica("pagamento")` ⇒ texto literal + limitações P3/P4/P12; `consultar_politica("trocas_devolucoes")` ⇒ limitações P6/P7/P14 (troca por preferência sem referência de data); `consultar_politica("frete_entrega")` ⇒ limitações P5/P8/P13.
-- [ ] `informacoes_loja` devolve os dois números (3341-4444 e 3321-4500) e as duas grafias de e-mail, cada um com sua origem, mais limitações P1/P2; com `now` fixo de domingo ⇒ `aberto_agora_horario_regular = false` e próxima abertura segunda 09:00.
+- [ ] `registry.specs()` gera JSON Schema válido para as 7 tools (descrições em PT dizendo quando usar cada uma); `execute()` nunca lança (`INVALID_ARGUMENT` para nome/argumento inválido, `INTERNAL_ERROR` logado para exceção).
+- [ ] `to_llm()` em JSON PT (`ok`, `dados`, `erro`, `limitacoes`), sem limitações duplicadas; dinheiro só como texto formatado.
+- [ ] `buscar_produtos(categoria="Violões", preco_max=1000)` ⇒ 12 produtos; ordenação por preço; categoria inválida ⇒ `INVALID_ARGUMENT` com categorias válidas; #142 com `informacoes_conflitantes = true`.
+- [ ] `detalhar_produto(nome="Takamine GD20")` ⇒ R$ 2.199,00, PIX R$ 2.089,05, 12x confirmadas, `promocoes_encerradas` = [12% "Oferta Especial"], sem limitações; `nome="violao yamaha"` ⇒ `AMBIGUOUS` com candidatos.
+- [ ] `detalhar_produto(produto_id=142)` ⇒ `conflitos` (marca e teclas), sem `descricao` e sem `especificacoes.keys`, limitação `DADO_CONFLITANTE`.
+- [ ] `detalhar_produto(produto_id=121)` ⇒ promoção 20% com preço original, PIX nulo, 5x "a_confirmar" + limitação P3.
+- [ ] `#96` ⇒ indisponível + alternativas; `#113` ⇒ descontinuado, `preco` nulo + alternativas; `#130` ⇒ em breve + limitação.
+- [ ] `consultar_pedido(19, email="pedro.oliveira@jmail.com")` ⇒ cancelado + observação; e-mail errado **e** pedido inexistente ⇒ o mesmo `VERIFICATION_FAILED` sem dados; sem e-mail/telefone ⇒ `INVALID_ARGUMENT`; argumento de nome rejeitado.
+- [ ] `consultar_pedido(8, telefone="67 99654-7821")` ⇒ "enviado", rastreio `BRJL5544332BR`, previsão estimada, limitações P6/P7; `#3` ⇒ `valor_total_registrado` R$ 3.450,00; e-mail compartilhado de #11/#43 só libera o pedido do dono.
+- [ ] `consultar_politica`: seções completas do tópico (inclui Capa em `sobre_loja`) e limitações por tópico conforme o contrato (P3/P4/P12, P6/P7/P14, P5/P8/P13, P1/P2).
+- [ ] `informacoes_loja`: endereço, os dois números e as duas grafias de e-mail com fonte, horários — tudo extraído do `PolicyStore`; com `clock` fixo em domingo ⇒ fechada e próxima abertura segunda 09:00; limitações P1/P2/feriados/datas especiais.
+- [ ] `estimar_frete("Campo Grande", 600)` ⇒ grátis; `("Dourados", 600)` ⇒ região não confirmada + P8 e valor por CEP.
+- [ ] Nenhum resultado contém e-mail, telefone ou `customer_id` de cliente (varredura do JSON).
 **Commit.** `feat(tools): ferramentas de catálogo, pedidos, políticas e informações da loja`
 
 ## T10 — Prompt de sistema / persona
 **Objetivo.** Persona e regras de conduta alinhadas à política 7 e 10 e às diretrizes aprovadas.
-**Escopo.** `agent/prompts.py` (`build_system_prompt(now, store_status)`) com as seções listadas em ARCHITECTURE §5.7. Persona aprovada: **Mel**, assistente virtual da Empório da Música; **sem emojis**.
+**Contrato.** ARCHITECTURE §5.7.1 (prompt estável + contexto dinâmico, por causa do cache — D16).
+**Escopo.** `agent/prompts.py`. Persona aprovada: **Mel**; **sem emojis**.
 **Critérios de aceite.**
-- [ ] Inclui: tom (informal/profissional), escopo (só instrumentos; acessórios redirecionados), grounding (preço/estoque/prazo só via tool), transparência de promoções (original + promo + %), PIX não cumulativo, verificação de pedidos, situações especiais 7.3, fora do expediente, data/hora de referência, escalonamento à gerência/atendente em dúvida.
-- [ ] Regras de limitação: repassar ao cliente as `limitacoes` recebidas das tools sem completá-las com suposições; não apresentar campos em `conflitos` como fato; não declarar elegibilidade de troca/devolução; opções "a confirmar" sempre apresentadas como tal.
-- [ ] Identificação: nunca por nome ou e-mail isolados; sempre número do pedido + e-mail ou telefone.
-- [ ] Instrução explícita de não usar emojis.
-- [ ] Não inclui dados de produtos nem texto integral das políticas (vêm das tools).
-- [ ] Teste de snapshot: prompt com `now` fixo é determinístico.
-- [ ] Tamanho < ~1.500 tokens.
+- [ ] Todos os itens obrigatórios de §5.7.1 presentes (verificados por termos-chave).
+- [ ] `build_system_prompt` determinístico, sem data/hora, só cita ferramentas presentes; nome desconhecido ⇒ `ValueError`.
+- [ ] Não inclui dados de produtos, preços (`R$`) nem texto do manual; ≤ 7.000 caracteres.
+- [ ] `build_dynamic_context` com `now` fixo: dia da semana, data, hora, situação da loja e próxima abertura em português; ressalva de feriados.
 **Commit.** `feat(agent): prompt de sistema com persona e regras de atendimento`
 
 ## T11 — Agent loop + Session
