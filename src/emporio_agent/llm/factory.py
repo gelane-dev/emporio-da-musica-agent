@@ -7,11 +7,22 @@ from collections.abc import Mapping
 from emporio_agent.config import Settings, read_env
 from emporio_agent.llm.base import LLMClient, LLMError
 
-SUPPORTED_PROVIDERS = ("anthropic",)
+SUPPORTED_PROVIDERS = ("anthropic", "groq")
 
 
 def create_llm_client(settings: Settings, env: Mapping[str, str] | None = None) -> LLMClient:
     env = read_env() if env is None else env
+    if settings.llm_provider == "groq":
+        from emporio_agent.llm.groq_client import GroqClient
+
+        groq_key = env.get("GROQ_API_KEY", "").strip()
+        if not groq_key:
+            raise LLMError(
+                "auth",
+                "Chave da API não configurada. Copie .env.example para .env e preencha "
+                "GROQ_API_KEY.",
+            )
+        return GroqClient(model=settings.llm_model, effort=settings.llm_effort, api_key=groq_key)
     if settings.llm_provider == "anthropic":
         import anthropic
 

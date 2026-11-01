@@ -196,12 +196,12 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Contrato.** ARCHITECTURE §5.6.2.
 **Escopo.** `llm/groq_client.py`, `llm/factory.py`, `config.py` (padrões), `.env.example`, `requirements.txt` (`groq==1.7.0`), `scripts/run_scenarios.py` (`--pause`); testes novos e ajuste dos testes que fixavam os padrões antigos.
 **Critérios de aceite.**
-- [ ] Conversões `to_groq_messages`/`to_groq_tools`/`from_groq_response` cobertas por testes com objetos reais do SDK `groq` (sem rede): system estável + dinâmico, tool calls com `arguments` em JSON, mensagens `tool`, mapeamento de `finish_reason`, JSON de argumentos inválido.
-- [ ] Requisição com `tool_choice="auto"`, `max_completion_tokens`, `reasoning_effort` só para `gpt-oss` (com mapeamento `xhigh|max`⇒`high`), `include_reasoning=False` só para `gpt-oss`; sem `temperature`.
-- [ ] `tool_use_failed` repetido uma vez e depois `LLMError(bad_request)`; demais exceções mapeadas sem texto da API nem a chave.
-- [ ] `create_llm_client`: `groq` sem `GROQ_API_KEY` ⇒ `LLMError(auth)` com instrução; `anthropic` inalterado; provedor desconhecido ⇒ `config`.
-- [ ] Padrões: provedor `groq`, modelo `openai/gpt-oss-120b`, `max_tokens` 4096; suíte inteira verde (testes da T01/T08 que fixavam os padrões antigos ajustados).
-- [ ] Smoke test real Groq (`@pytest.mark.llm`) escrito; executado quando a chave existir.
+- [x] Conversões `to_groq_messages`/`to_groq_tools`/`from_groq_response` cobertas por testes com objetos reais do SDK `groq` (sem rede): system estável + dinâmico, tool calls com `arguments` em JSON, mensagens `tool`, mapeamento de `finish_reason`, JSON de argumentos inválido.
+- [x] Requisição com `tool_choice="auto"`, `max_completion_tokens`, `reasoning_effort` só para `gpt-oss` (com mapeamento `xhigh|max`⇒`high`), `include_reasoning=False` só para `gpt-oss`; sem `temperature`.
+- [x] `tool_use_failed` repetido uma vez e depois `LLMError(bad_request)`; demais exceções mapeadas sem texto da API nem a chave.
+- [x] `create_llm_client`: `groq` sem `GROQ_API_KEY` ⇒ `LLMError(auth)` com instrução; `anthropic` inalterado; provedor desconhecido ⇒ `config`.
+- [x] Padrões: provedor `groq`, modelo `openai/gpt-oss-120b`, `max_tokens` 4096; suíte inteira verde (testes da T01/T08 que fixavam os padrões antigos ajustados).
+- [ ] Smoke test real Groq (`@pytest.mark.llm`) escrito; **execução pendente da `GROQ_API_KEY`**.
 **Commit.** `feat(llm): adaptador Groq como provedor padrão`
 
 ## T09 — Tools + registry

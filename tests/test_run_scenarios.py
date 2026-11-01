@@ -402,3 +402,41 @@ def test_main_report_writes_markdown(tmp_path, monkeypatch):
     text = report.read_text(encoding="utf-8")
     assert answer in text
     assert "2" in text
+
+
+# ---------------------------------------------------------------- --pause (T08b)
+
+def _run_main_with_sleep_spy(monkeypatch, argv):
+    import time
+
+    mod = load_script()
+    sleeps: list[float] = []
+    monkeypatch.setattr(time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    def fake_build_agent(settings, *args, **kwargs):
+        return build_agent(settings, llm=FakeLLM([fake_text("Resposta.")] * 20))
+
+    monkeypatch.setattr(mod, "build_agent", fake_build_agent)
+    mod.main(argv)
+    return sleeps
+
+
+def test_pause_sleeps_between_scenarios_and_repetitions_never_after_last(monkeypatch):
+    # 2 cenários x 2 repetições = 4 execuções ⇒ 3 pausas (nunca após a última).
+    sleeps = _run_main_with_sleep_spy(monkeypatch, ["--only", "1,2", "--repeat", "2", "--pause", "7"])
+    assert sleeps == [7, 7, 7]
+
+
+def test_pause_not_called_for_single_scenario_single_repetition(monkeypatch):
+    sleeps = _run_main_with_sleep_spy(monkeypatch, ["--only", "1", "--repeat", "1", "--pause", "7"])
+    assert sleeps == []
+
+
+def test_pause_between_repetitions_of_single_scenario(monkeypatch):
+    sleeps = _run_main_with_sleep_spy(monkeypatch, ["--only", "1", "--repeat", "2", "--pause", "3"])
+    assert sleeps == [3]
+
+
+def test_pause_zero_never_sleeps(monkeypatch):
+    sleeps = _run_main_with_sleep_spy(monkeypatch, ["--only", "1,2", "--repeat", "2", "--pause", "0"])
+    assert sleeps == []

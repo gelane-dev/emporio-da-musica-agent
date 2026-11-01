@@ -372,14 +372,14 @@ def test_sdk_exceptions_mapped_to_llm_error(make_error, kind, fallback):
 
 def test_factory_without_key_raises_auth_mentioning_env():
     with pytest.raises(LLMError) as exc:
-        create_llm_client(Settings(), env={})
+        create_llm_client(Settings(llm_provider="anthropic"), env={})
     assert exc.value.kind == "auth"
     assert ".env" in exc.value.message
 
 
 def test_factory_blank_key_raises_auth():
     with pytest.raises(LLMError) as exc:
-        create_llm_client(Settings(), env={"ANTHROPIC_API_KEY": "  "})
+        create_llm_client(Settings(llm_provider="anthropic"), env={"ANTHROPIC_API_KEY": "  "})
     assert exc.value.kind == "auth"
 
 
@@ -391,7 +391,7 @@ def test_factory_unknown_provider_raises_config():
 
 
 def test_factory_builds_anthropic_client():
-    client = create_llm_client(Settings(), env={"ANTHROPIC_API_KEY": SECRET})
+    client = create_llm_client(Settings(llm_provider="anthropic"), env={"ANTHROPIC_API_KEY": SECRET})
     assert isinstance(client, AnthropicClient)
 
 
@@ -401,12 +401,12 @@ def test_settings_new_defaults():
     s = Settings()
     assert s.llm_effort == "low"
     assert s.llm_refusal_fallback is True
-    assert s.llm_max_tokens == 16000
+    assert s.llm_max_tokens == 4096
 
 
 def test_load_settings_defaults_without_env(tmp_path):
     s = load_settings(env_file=tmp_path / "nao_existe.env", environ={})
-    assert (s.llm_effort, s.llm_refusal_fallback, s.llm_max_tokens) == ("low", True, 16000)
+    assert (s.llm_effort, s.llm_refusal_fallback, s.llm_max_tokens) == ("low", True, 4096)
 
 
 def test_load_settings_reads_effort_and_max_tokens(tmp_path):
@@ -525,7 +525,7 @@ def test_real_smoke_responds_to_ola():
     env = read_env()
     if not (env.get("ANTHROPIC_API_KEY") or "").strip():
         pytest.skip("ANTHROPIC_API_KEY ausente no .env/ambiente")
-    client = create_llm_client(load_settings(), env)
+    client = create_llm_client(load_settings().model_copy(update={"llm_provider": "anthropic", "llm_model": "claude-sonnet-5-5"}), env)
     response = client.complete(
         system="Você é um atendente de loja de instrumentos musicais. Responda em português, em uma frase curta.",
         system_dynamic=None,

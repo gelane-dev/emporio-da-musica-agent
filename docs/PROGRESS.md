@@ -15,7 +15,7 @@
 | T06 Extração do PDF | concluída | `053352e` | contrato [[ARCHITECTURE#5.4.1 Contrato detalhado da T06 (extração do PDF → `knowledge/policies.md`)]]; IA/RAG + QA (Sonnet) via Orca |
 | T07 PolicyStore | concluída | `00c85b3` | [[ARCHITECTURE#5.4.2 Contrato detalhado da T07 (`PolicyStore`)]] |
 | T08 Adaptador LLM | concluída (smoke real pendente de credencial) | `35485ec` | [[ARCHITECTURE#5.6.1 Contrato detalhado da T08]]; D16 |
-| T08b Adaptador Groq | em andamento | — | D17; [[ARCHITECTURE#5.6.2 Contrato do adaptador Groq (T08b — provedor padrão desde 2026-11-01, D17)]] |
+| T08b Adaptador Groq | concluída (smoke real pendente da chave) | (commit `feat(llm): adaptador Groq`) | D17; [[ARCHITECTURE#5.6.2 Contrato do adaptador Groq (T08b — provedor padrão desde 2026-11-01, D17)]] |
 | T09 Ferramentas | concluída | `8594164` | [[ARCHITECTURE#5.5.1 Contrato detalhado da T09 (ferramentas)]] |
 | T10 Prompt | concluída | `db61a89` | [[ARCHITECTURE#5.7.1 Contrato detalhado da T10 (prompt de sistema)]] |
 | T11 Loop do agente | concluída | `f7e1088` | [[ARCHITECTURE#5.7.2 Contrato detalhado da T11 (loop do agente e sessão)]] |
@@ -25,7 +25,7 @@
 | T16 README | rascunho concluído | `5e82722` | seções de resultados E2E e exemplos pendentes de T14/T15 | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
 | T15, T17 | pendentes | — T14/T15 exigem credencial da API (ver pendências) |
 
-Suíte atual: 905 testes passando + 1 smoke real pulado (após a preparação da T14).
+Suíte atual: 968 testes passando + 2 smokes reais pulados (Anthropic e Groq) após a T08b.
 
 ## Decisões recentes (resumo; detalhes nos documentos citados)
 
@@ -39,6 +39,7 @@ Suíte atual: 905 testes passando + 1 smoke real pulado (após a preparação da
 |---|---|---|---|---|
 | T05 | `run_a5ecc3d46e82` | Backend (impl.), QA (testes TDD a partir do contrato) — Sonnet | `gelane-dev/t05-backend`, `gelane-dev/t05-qa` | integração por squash sem conflitos; implementação e testes independentes concordaram na 1ª execução |
 
+| T08b (Groq) | `run_bb5ce514aa0a` | IA/RAG (adaptador), QA (testes) — Sonnet; +2 correções | `t08b-ia-rag`, `w6-qa` | 1ª tentativa parou no limite de uso de 5h da conta (sem produzir nada; provado pela transcrição) ⇒ `worker-stop`/`worker-abandon` + `--retry-of`; integração achou captura antecipada de `time.sleep` (script) e objetos de teste com validação estrita (testes) |
 | T14 (preparação) + README | `run_c7d7988248ee` | IA/RAG (script de cenários + ajustes de texto), QA (testes; +1 correção), Docs (rascunho do README) — Sonnet | `t14-ia-rag`, `w5-qa`, `t16-docs` | ambiguidade do contrato (emoji dentro ou fora do `evaluate`) resolvida a favor da checagem global |
 | T13 | `run_140a77ff0235` | Backend (CLI), QA (testes) — Sonnet | `t13-backend`, `w4-qa` | Backend perguntou (ask) antes de alterar teste da T01; aprovado `--version`; 33 testes do QA passaram na 1ª integração |
 | T11+T12 | `run_2d70073736b9` | IA/RAG (T11), Backend (T12), QA (testes) — Sonnet | `t11-ia-rag`, `t12-backend`, `w3-qa` | integração sem correções: 96 testes do QA passaram na 1ª execução |

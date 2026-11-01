@@ -6,9 +6,9 @@ prioridade sobre o ``.env``.
 
 Variáveis suportadas (todas opcionais):
 
-- ``LLM_PROVIDER``: provedor do modelo (padrão ``anthropic``).
-- ``LLM_MODEL``: identificador do modelo (padrão ``claude-sonnet-5-5``).
-- ``LLM_MAX_TOKENS``: máximo de tokens por resposta (padrão ``16000``).
+- ``LLM_PROVIDER``: provedor do modelo (padrão ``groq``).
+- ``LLM_MODEL``: identificador do modelo (padrão ``openai/gpt-oss-120b``).
+- ``LLM_MAX_TOKENS``: máximo de tokens por resposta (padrão ``4096``).
 - ``LLM_EFFORT``: profundidade do raciocínio: ``low``, ``medium``, ``high``,
   ``xhigh`` ou ``max`` (padrão ``low``).
 - ``LLM_REFUSAL_FALLBACK``: ``true``/``false``/``1``/``0`` — fallback de recusa no
@@ -47,9 +47,9 @@ class Settings(BaseModel):
     data_dir: Path = REPO_ROOT / "data"
     policies_path: Path = REPO_ROOT / "knowledge" / "policies.md"
     runtime_dir: Path = REPO_ROOT / "runtime"
-    llm_provider: str = "anthropic"
-    llm_model: str = "claude-sonnet-5-5"
-    llm_max_tokens: int = Field(default=16000, gt=0)
+    llm_provider: str = "groq"
+    llm_model: str = "openai/gpt-oss-120b"
+    llm_max_tokens: int = Field(default=4096, gt=0)
     llm_effort: Literal["low", "medium", "high", "xhigh", "max"] = "low"
     llm_refusal_fallback: bool = True
     timezone: str = STORE_TIMEZONE

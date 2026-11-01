@@ -20,8 +20,8 @@ MISSING_ENV_FILE = Path("nao-existe.env")
 
 def test_defaults_without_env():
     settings = load_settings(env_file=MISSING_ENV_FILE, environ={})
-    assert settings.llm_provider == "anthropic"
-    assert settings.llm_model == "claude-sonnet-5-5"
+    assert settings.llm_provider == "groq"
+    assert settings.llm_model == "openai/gpt-oss-120b"
     assert settings.reference_datetime is None
     assert settings.data_dir == REPO_ROOT / "data"
     assert settings.timezone == "America/Campo_Grande"

@@ -7,7 +7,7 @@ ser revisado manualmente. Exige credencial da API; sem ela, termina com código 
 Uso::
 
     python scripts/run_scenarios.py [--only 5,9] [--repeat 2] \
-        [--reference-date 2026-03-25T10:00] [--report relatorio.md]
+        [--reference-date 2026-03-25T10:00] [--report relatorio.md] [--pause 20]
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import argparse
 import logging
 import re
 import sys
+import time
 import unicodedata
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -35,6 +36,7 @@ EXIT_INIT_ERROR = 2
 
 DEFAULT_REFERENCE_DATE = "2026-03-25T10:00"
 DEFAULT_REPEAT = 2
+DEFAULT_PAUSE = 20.0  # segundos entre cenários/repetições (limite de tokens/min da Groq)
 TOTAL_CHECKS = 14  # 13 cenários + ausência de emojis (cenário 14)
 MIN_PASSING_CHECKS = 13
 
@@ -241,10 +243,14 @@ def run_scenarios(
     scenarios: Sequence[Scenario],
     make_agent: Callable[[], Agent],
     make_session: Callable[[], Session],
+    pause: float = 0.0,
+    sleep: Callable[[float], None] | None = None,
 ) -> list[ScenarioResult]:
-    """Executa cada cenário com agente e sessão novos."""
+    """Executa cada cenário com agente e sessão novos (``pause`` s entre cenários, nunca após o último)."""
     results: list[ScenarioResult] = []
-    for scenario in scenarios:
+    for index, scenario in enumerate(scenarios):
+        if index > 0 and pause > 0:
+            (sleep or time.sleep)(pause)
         agent = make_agent()
         session = make_session()
         replies = [agent.respond(session, message) for message in scenario.messages]
@@ -339,6 +345,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--reference-date", default=DEFAULT_REFERENCE_DATE, help=f"data/hora ISO (padrão {DEFAULT_REFERENCE_DATE})"
     )
+    parser.add_argument(
+        "--pause",
+        type=float,
+        default=DEFAULT_PAUSE,
+        metavar="SEGUNDOS",
+        help=f"pausa entre cenários e entre repetições (padrão {DEFAULT_PAUSE:g})",
+    )
     parser.add_argument("--report", type=Path, help="grava relatório Markdown neste caminho")
     args = parser.parse_args(argv)
 
@@ -355,6 +368,9 @@ def main(argv: list[str] | None = None) -> int:
         scenarios = tuple(s for s in SCENARIOS if s.id in only)
     if args.repeat < 1:
         print("--repeat deve ser >= 1", file=sys.stderr)
+        return EXIT_INIT_ERROR
+    if args.pause < 0:
+        print("--pause deve ser >= 0", file=sys.stderr)
         return EXIT_INIT_ERROR
 
     try:
@@ -373,10 +389,13 @@ def main(argv: list[str] | None = None) -> int:
     runs: list[list[ScenarioResult]] = []
     all_ok = True
     for repetition in range(1, args.repeat + 1):
+        if repetition > 1 and args.pause > 0:
+            time.sleep(args.pause)
         results = run_scenarios(
             scenarios,
             lambda: build_agent(settings),
             lambda: Session(started_at=now(settings)),
+            pause=args.pause,
         )
         runs.append(results)
         ok = _repetition_ok(scenarios, results)
