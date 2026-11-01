@@ -501,6 +501,8 @@ class ToolRegistry:
 | `informacoes_loja` | — | `{nome, endereco, contatos: [{tipo, valor, rotulo_no_manual, fonte}], horarios: [...], aberto_agora_horario_regular, proxima_abertura?, data_hora_referencia}` | P1, P2, feriados/datas especiais |
 | `encaminhar_atendente` *(opcional)* | `motivo: enum(reclamacao, caso_complexo, pedido_cliente)`, `resumo: str`, `pedido_id?: int` | `{protocolo, prazo_retorno: "24 horas úteis"}` | — |
 
+Grounding em resultados vazios (T14, 2026-11-01; na execução real o modelo inventou um saxofone "indisponível" após uma busca vazia): `buscar_produtos` sem resultados inclui em `dados` o campo `"mensagem": "Nenhum produto do catálogo atual corresponde a esta busca. Não cite nem sugira produtos que não tenham vindo de uma ferramenta; ofereça as categorias disponíveis (listar_categorias)."`; o `NOT_FOUND` de `detalhar_produto` traz a mesma orientação; a limitação P7 de `consultar_pedido` orienta: para troca/devolução, consultar `consultar_politica("trocas_devolucoes")` e informar o prazo e a previsão como estimativa antes de pedir canal/data de recebimento.
+
 Regras transversais das tools:
 - **Identificação de cliente**: nunca por nome ou e-mail isolados. `consultar_pedido` exige o número do pedido **e** e-mail ou telefone, conferidos contra o cliente **daquele** pedido.
 - Nunca retornam e-mail/telefone de cliente nem `customer_id`.
@@ -677,13 +679,13 @@ Conversões:
 
 Erros (exceções do SDK ⇒ `LLMError`, mensagens fixas, nunca texto bruto da API nem a chave): `AuthenticationError`/`PermissionDeniedError` ⇒ `auth` (cita `GROQ_API_KEY` no `.env`); `RateLimitError` ⇒ `rate_limit`; `APIConnectionError`/`APITimeoutError` ⇒ `connection`; `BadRequestError` ⇒ `bad_request` (só request id seguro); `APIStatusError` ≥ 500 ⇒ `server`; outros ⇒ `api`.
 - **`tool_use_failed`**: `BadRequestError` cujo corpo tem `error.code == "tool_use_failed"` (o modelo gerou uma chamada de ferramenta malformada) é **repetido** até `tool_use_failed_retries` vezes antes de virar `LLMError(bad_request)`; log WARNING sem o conteúdo gerado.
-- Retries de 429/5xx/rede: SDK (`max_retries=5`, respeita `retry-after`).
+- Retries de 429/5xx/rede: SDK (`max_retries=5`, respeita `retry-after`). **Paciência extra para 429 (T14, 2026-11-01):** se o SDK desistir com `RateLimitError` e o `retry-after` for ≤ 90 s, o adaptador aguarda esse tempo e repete, até 3 vezes (função de espera injetável), antes de virar `LLMError(rate_limit)`. Motivo medido: cada chamada custa ~2.400 tokens só de prompt + esquemas, e o limite é 8.000 tokens/min.
 
 **`llm/factory.py`**: `llm_provider == "groq"` ⇒ `GroqClient(model=settings.llm_model, effort=settings.llm_effort, api_key=env["GROQ_API_KEY"])`; sem `GROQ_API_KEY` ⇒ `LLMError(kind="auth")` com instrução do `.env`. `"anthropic"` continua suportado (inalterado). Provedor desconhecido ⇒ `config`, citando `anthropic` e `groq`.
 
 **`config.py`**: padrões passam a `llm_provider="groq"`, `llm_model="openai/gpt-oss-120b"`, `llm_max_tokens=4096` (limite de vazão por minuto da Groq; a resposta + raciocínio `low` cabem com folga). `llm_refusal_fallback` permanece, usado só pelo adaptador Anthropic. `.env.example` documenta `GROQ_API_KEY` (e mantém `ANTHROPIC_API_KEY` como alternativa comentada).
 
-**`scripts/run_scenarios.py`**: nova opção `--pause SEGUNDOS` (padrão 20) entre cenários, para respeitar o limite de tokens por minuto do plano da Groq.
+**`scripts/run_scenarios.py`**: opção `--pause SEGUNDOS` entre cenários, padrão **60** (medição da T14: um cenário consome 6 a 10 mil tokens; com 10 s de pausa a 2ª repetição estourou o limite de 8 mil tokens/min).
 
 ### 5.7 `agent/`
 ```python
