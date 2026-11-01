@@ -1,0 +1,2 @@
+# Arquivo gerado deve manter LF para que build_policies.py --check funcione em qualquer checkout
+knowledge/policies.md text eol=lf

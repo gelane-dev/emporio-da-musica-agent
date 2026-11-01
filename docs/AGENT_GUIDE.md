@@ -26,7 +26,8 @@ Estado e pendências: [[docs/PROGRESS]]. Não duplique conteúdo: cite a seção
 - Worktrees não têm `venv/`. Use o Python do repositório principal, a partir da raiz do seu worktree:
   `C:/Users/Dell/Desktop/emporio-da-musica-agent/venv/Scripts/python.exe -m pytest -q`
   (o `pyproject.toml` coloca o `src/` do seu worktree à frente do pacote instalado).
-- Rode a suíte completa antes de concluir; testes existentes não podem quebrar.
+- Rode a suíte completa antes de concluir (inclusive em correções pontuais); testes existentes não podem quebrar.
+- Antes do `worker_done`, rode `orca orchestration check` para ler mensagens do coordenador (mudanças de contrato podem chegar durante a execução).
 
 ## Entrega
 

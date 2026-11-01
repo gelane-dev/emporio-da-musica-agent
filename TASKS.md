@@ -151,15 +151,15 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Escopo.** `scripts/build_policies.py` com `pypdf` e o arquivo gerado `knowledge/policies.md`. **Revisão manual** do resultado contra o PDF. O texto permanece **fiel ao PDF** — divergências (P1 telefones, P2 e-mails, P3/P4 parcelamento) **não** são corrigidas, apenas listadas na nota de extração. `PolicyStore` é T07 (fora do escopo).
 **Execução.** Multiagente (Orca): IA/RAG implementa script + `.md`; QA escreve `tests/test_build_policies.py` de forma independente a partir do contrato.
 **Critérios de aceite.**
-- [ ] Script roda com `python scripts/build_policies.py`; é idempotente (duas execuções ⇒ bytes idênticos) e `--check` retorna 0 com o arquivo versionado e 1 se o arquivo divergir.
-- [ ] Fidelidade: `W_md == W_pdf` (§5.4.1) — nenhuma palavra omitida, alterada, reordenada ou acrescentada fora das áreas permitidas.
-- [ ] Os 11 blocos da §5.4.1, na ordem, com os marcadores de tópico e títulos `## ` literais; os 9 tópicos de `PolicyTopic` presentes (`sobre_loja` e `atendimento` com 2 blocos cada).
-- [ ] Subtítulos `### ` de 1.1 a 8.3 presentes com texto literal.
-- [ ] As 4 tabelas (1.2, 2, 3, 5.2) em Markdown com cabeçalho literal e o número de linhas especificado; células quebradas unidas.
-- [ ] Divergências preservadas: os dois telefones (3341-4444 e 3321-4500), as duas grafias de e-mail, "Parcela mínima de R$ 100,00" (tabela) e as faixas da 3.1; nota de extração cita P1, P2, P3/P4.
-- [ ] Cabeçalhos repetidos e "Página N" ausentes; capa e rodapé final presentes.
-- [ ] Script não contém texto de política digitado (somente literais de estrutura).
-- [ ] PDF original não alterado (hash) e a suíte anterior continua verde.
+- [x] Script roda com `python scripts/build_policies.py`; é idempotente (duas execuções ⇒ bytes idênticos) e `--check` retorna 0 com o arquivo versionado e 1 se o arquivo divergir.
+- [x] Fidelidade: `"".join(W_md) == "".join(W_pdf)` (§5.4.1) — nenhum conteúdo omitido, alterado, reordenado ou acrescentado fora das áreas permitidas; `len(W_pdf) == 1651`.
+- [x] Os 11 blocos da §5.4.1, na ordem, com os marcadores de tópico e títulos `## ` literais; os 9 tópicos de `PolicyTopic` presentes (`sobre_loja` e `atendimento` com 2 blocos cada).
+- [x] Subtítulos `### ` de 1.1 a 8.3 presentes com texto literal.
+- [x] As 4 tabelas (1.2, 2, 3, 5.2) em Markdown com cabeçalho literal e o número de linhas especificado; células quebradas unidas.
+- [x] Divergências preservadas: os dois telefones (3341-4444 e 3321-4500), as duas grafias de e-mail, "Parcela mínima de R$ 100,00" (tabela) e as faixas da 3.1; nota de extração cita P1, P2, P3/P4.
+- [x] Cabeçalhos repetidos e "Página N" ausentes; capa e rodapé final presentes.
+- [x] Script não contém texto de política digitado (somente literais de estrutura).
+- [x] PDF original não alterado (hash) e a suíte anterior continua verde.
 **Commit.** `feat(policies): conversão do manual de políticas para markdown segmentado`
 
 ## T07 — PolicyStore

@@ -413,7 +413,9 @@ Blocos, em ordem do documento (cada bloco = do marcador `<!-- topic: X -->` até
 | 10 | `privacidade` | `## 9. Privacidade e Proteção de Dados` | — |
 | 11 | `atendimento` | `## 10. Disposições Finais` | — |
 
-Subtítulos `### ` usam o texto literal (ex.: `### 4.1 Direito de Arrependimento (Compras Online)`). Listas com `•` viram `- `; a lista numerada da 7.2 mantém `1.` … `5.`; rótulos em negrito do PDF (ex.: `Cumulatividade:`) podem usar `**…**`.
+Subtítulos `### ` usam o texto literal (ex.: `### 4.1 Direito de Arrependimento (Compras Online)`). Listas com `•` viram `- `; a lista numerada da 7.2 mantém `1.` … `5.`.
+
+Estrutura derivada do próprio PDF (ajuste de 2026-11-01, após revisão): **fronteiras de parágrafo** pelo espaçamento vertical (≈19,4 pt entre parágrafos × ≈15,3 pt dentro) e **negrito** `**…**` somente onde a fonte do PDF é bold (`BaseFont` com `Bold`) — nunca por padrão de texto. Ex.: em 7.3, "Prazo de retorno: 24 horas úteis." pertence ao parágrafo de "**Reclamação:**" e não é negrito. `--check` com arquivo de saída inexistente retorna 1.
 
 Tabelas Markdown (cabeçalho literal, células literais; células quebradas em várias linhas no PDF são unidas com um espaço):
 
@@ -427,7 +429,8 @@ Tabelas Markdown (cabeçalho literal, células literais; células quebradas em v
 **Critério de fidelidade (verificável por teste)** — sequência de palavras:
 - `W_pdf`: para cada página (ordem 1→8), `page.extract_text()` no modo **padrão** do pypdf, `split()` em espaços; nas páginas 2–8 remover as 8 primeiras palavras se forem o cabeçalho e as 2 últimas se forem `Página <n>`; remover tokens `•`.
 - `W_md`: do `.md`, (1) remover comentários `<!-- … -->`; (2) remover as linhas: H1 (`# `), linhas iniciadas por `>`, separadores de tabela (`|---|…`), a linha `## Capa`; (3) remover marcadores no início da linha: `#`/`##`/`###` + espaço e `- `; (4) remover `**`; (5) trocar `|` por espaço; (6) `split()`.
-- **Exigência: `W_md == W_pdf`** (mesmas palavras, mesma ordem). Garante que nada foi omitido, alterado ou acrescentado fora das áreas permitidas.
+- **Exigência: `"".join(W_md) == "".join(W_pdf)`** (mesmos caracteres, mesma ordem, ignorando espaços). Garante que nada foi omitido, alterado ou acrescentado fora das áreas permitidas.
+- Por que caracteres e não palavras (ajuste de 2026-11-01, durante a execução): no modo padrão o pypdf separa o telefone da tabela 1.2 em `3341` `-` `4444` (kerning do PDF), enquanto o texto visível — e o modo layout e a capa — é `3341-4444`. O `.md` mantém o texto visível; a comparação sem espaços absorve esse artefato sem perder a detecção de omissões.
 
 Referência medida pelo coordenador em 2026-11-01: `len(W_pdf) == 1651`; cabeçalho e rodapé presentes em todas as páginas 2–8.
 
