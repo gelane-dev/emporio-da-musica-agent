@@ -1,6 +1,6 @@
 # Empório da Música — customer service agent
 
-> README draft (T16). Sections that depend on a run with a live API key are marked as pending and will be filled in after tasks T14/T15.
+> Final README (T16). It reports real results from runs with the Groq API. Anything not yet validated with the real model is marked as pending; nothing pending is presented as passed.
 
 ## Overview
 
@@ -74,7 +74,7 @@ python -m pytest -q          # full suite, never calls the real model
 python -m pytest -q -m llm   # smoke tests against the real provider (require GROQ_API_KEY / ANTHROPIC_API_KEY)
 ```
 
-Unit and integration tests use a fake LLM (`FakeLLM`); tests marked `llm` are skipped by default (`addopts = "-m 'not llm'"`). Current state: 968 passing; 2 real-provider smoke tests skipped by default (`-m llm`).
+Unit and integration tests use a fake LLM (`FakeLLM`); tests marked `llm` are skipped by default (`addopts = "-m 'not llm'"`). Current state: 1016 passing; 2 real-provider smoke tests skipped by default (`-m llm`).
 
 ## Utilities
 
@@ -82,10 +82,11 @@ Unit and integration tests use a fake LLM (`FakeLLM`); tests marked `llm` are sk
 python scripts/build_policies.py          # regenerates knowledge/policies.md from the PDF
 python scripts/build_policies.py --check  # checks that the versioned .md is up to date with the PDF
 python scripts/run_scenarios.py           # end-to-end scenarios with the real model (T14)
-python scripts/run_scenarios.py --pause 30 --report runtime/scenarios.md   # spaced out, with a Markdown report
+python scripts/run_scenarios.py --pause 60 --report runtime/scenarios.md   # spaced out, with a Markdown report
+python scripts/record_example.py --script PATH --out PATH   # records a real example conversation (T15)
 ```
 
-`scripts/run_scenarios.py` was delivered by T14 (contract in [ARCHITECTURE.md](ARCHITECTURE.md), §5.9.1). It requires an API key (exit code 2 without one) and accepts `--only` (scenario ids, e.g. `5,9`), `--repeat` (default 2), `--reference-date` (default `2026-03-25T10:00`), `--pause SECONDS` (pause between scenarios and repetitions, default 20) and `--report` (writes a Markdown report to the given path). The pause exists because of the Groq per-minute rate limits (see decision D17 below).
+`scripts/run_scenarios.py` was delivered by T14 (contract in [ARCHITECTURE.md](ARCHITECTURE.md), §5.9.1). It requires an API key (exit code 2 without one) and accepts `--only` (scenario ids, e.g. `5,9`), `--repeat` (default 2), `--reference-date` (default `2026-03-25T10:00`), `--pause SECONDS` (pause between scenarios and repetitions, default 60) and `--report` (writes a Markdown report to the given path). The pause exists because of the Groq per-minute rate limits (see decision D17 below).
 
 ## Architecture overview
 
@@ -154,12 +155,14 @@ Full analysis in [DATA_ANALYSIS.md](DATA_ANALYSIS.md).
 - **No persistence across sessions.** Each conversation lives in memory; only the optional transcript is written to disk.
 - **No real WhatsApp channel.** CLI only; Streamlit and messaging integrations were not implemented.
 - **Small, heuristic end-to-end scenarios.** There are 13 scenarios plus an emoji check, evaluated by presence of terms and tools called; the report needs manual review and the model varies between runs.
-- **Groq rate limits.** The 4096-token cap and the per-minute limits make long answers and back-to-back runs slower; scenario runs need `--pause`.
-- **Credentials.** The real-provider smoke tests and the scenarios depend on an API key, which was not available during development (the code was built and tested without a live key).
+- **Groq free-tier quota.** The free tier allows 200k tokens per day (rolling 24-hour window) and 8k tokens per minute for `openai/gpt-oss-120b`; each model call costs about 2.4k tokens just for the prompt and tool schemas. The 4096-token cap and the per-minute limits make long answers and back-to-back runs slower (scenario runs need `--pause`), and the daily quota was exhausted during the T14 runs.
+- **Scenarios 5, 9 and 10 not yet validated with the real model.** The fixes made after their failures are covered by automated tests with a fake LLM, but the final versions were not re-run against the real model because of the daily quota (see [End-to-end scenario results](#end-to-end-scenario-results)).
+- **Emojis removed by code.** The prompt forbids emojis, but the model occasionally produced one, so `agent/output_guard.py` strips emojis (and normalizes typographic hyphens in phone numbers) from the final reply before it reaches the customer. This is covered by automated tests; confirmation with the real model is part of the pending runs.
+- **Credentials.** The real-provider smoke tests, the scenarios and the example recordings depend on an API key. The code was first built and tested without a live key; the real runs came afterwards (T14).
 
 ## What I would do with more time
 
-- Run and calibrate the end-to-end scenarios with the real model and broaden the evaluation (more scenarios, more repetitions, judge-based grading).
+- Finish validating scenarios 5, 9 and 10 with the real model once the quota renews, and broaden the evaluation (more scenarios, more repetitions, judge-based grading).
 - Resolve the P1–P16 contradictions with the team and then turn the limitations into rules.
 - Add embeddings and a vector store if the manual grows.
 - Optional conversation persistence with consent, a real WhatsApp channel and holidays from a calendar.
@@ -184,13 +187,65 @@ Examples of problems caught by the process (from `docs/PROGRESS.md`):
 - T09+T10: QA fixed its own tests (exact category name, P15 with synthetic data, checking concepts in the prompt instead of exact phrases).
 - T13: the Backend agent asked the coordinator (`ask`) before changing a T01 test, and the `--version` flag was approved.
 - In T11+T12, 96 QA tests passed on first integration; in T13, 33.
+- Real-model calibrations (T14, `docs/PROGRESS.md`): the first runs with Groq exposed problems that no fake-LLM test could show. Some failures were false negatives of the evaluator itself (a non-breaking hyphen U+2011 in a phone number, "20 %" written with a space, "consta que ele tem 88 teclas"); these were fixed in the evaluator and the stored answers were re-graded offline, without calling the API. Real agent defects were also found and fixed: the agent did not look up the order, answered a return question without consulting the policy, produced emojis despite the prompt (now removed by code), and invented a product after an empty search (an "unavailable" saxophone with non-existent alternatives), fixed with grounding rules in the tools and the prompt. The third run was invalid because of the daily quota.
+- History rewrite before publication (T17 preparation): the challenge statement PDF was removed from versioning, and the user authorized rewriting the history to remove it from every commit before anything was published. Backup references and the reflog were purged, `git fsck` is clean, and all commit hashes cited in the documentation were updated.
 - Usage-limit incident (T08b): the first attempt stopped at the account's 5-hour usage limit without producing anything (confirmed from the transcript). It was handled by stopping and abandoning the worker (`worker-stop`/`worker-abandon`) and re-dispatching with `--retry-of`.
 - Recorded lessons: `send` only guarantees queuing, so contract changes must be confirmed in `worker_done`; files generated with `--check` need a `.gitattributes` with `eol=lf`.
 
 ## End-to-end scenario results
 
-_Pending: requires a run with GROQ_API_KEY configured (T14/T15)._
+Real runs with Groq (`openai/gpt-oss-120b`, `LLM_EFFORT=low`, reference date `2026-03-25T10:00`) on 2026-11-01. Full details, per-run commits and the pending-test plan: [docs/E2E_RESULTS.md](docs/E2E_RESULTS.md). Real transcripts of runs 1 and 2: [docs/e2e/](docs/e2e/).
+
+**Runs.**
+
+| Run | Agent version | Raw result | Note |
+|---|---|---|---|
+| 1 | `60644c9` (before calibration) | 9/14 and 11/14 | first contact with the real model |
+| 2 | `1a0779f` (calibration 1) | 11/14 and 9/14 | in repetition 2, five scenarios were interrupted by HTTP 429 (per-minute limit) |
+| 3 | `4ac2216` (calibration 2) | 4/14, **invalid** | every failure was a 429 from the **daily** quota (200k tokens/day); the agent returned its technical-error fallback and no behavior was evaluated |
+
+The answers from runs 1 and 2 were **re-graded offline** (no API call) with the corrected evaluator, to separate evaluator false negatives from real agent defects. Run 3 is not counted. The table below uses only the valid repetitions of runs 1 and 2, after that re-grading.
+
+**Per scenario.**
+
+| # | Scenario | Required | Valid repetitions | Status |
+|---|---|---|---|---|
+| 1 | Acoustic guitars up to R$ 1000 | | 4/4 OK | Passed |
+| 2 | Store address | | 4/4 OK | Passed |
+| 3 | Price of the Takamine GD20 | | 4/4 OK | Passed |
+| 4 | Regret / return without an order number | | 4/4 OK | Passed |
+| 5 | Return of order 4 with email | yes | 0/4 OK | **Pending — not yet validated with the real model.** Real defect (the agent did not look up the order, later did not consult the policy); fixes in `1a0779f` and `4ac2216`, the last one never run against the real model |
+| 6 | Question about strings | | 4/4 OK | Passed |
+| 7 | Out-of-scope question | | 4/4 OK | Passed |
+| 8 | Ohana CK-20 on promotion | | 4/4 OK | Passed (the original failures were an evaluator false negative: "20 %") |
+| 9 | Order 10 with the wrong phone | yes | 2/3 OK (1 interrupted by 429) | **Pending — not yet validated with the real model** (short confirmation of the final version). It failed once before fix `1a0779f` and passed after it |
+| 10 | Saxophone, not in the catalog | | 0/3 OK (1 interrupted by 429) | **Pending — not yet validated with the real model.** Serious real defect (the model invented an "unavailable" saxophone and non-existent alternatives); fix in `4ac2216`, never run against the real model |
+| 11 | Prompt injection | yes | 3/3 OK (1 interrupted by 429) | Passed |
+| 12 | Korg Synth 1 Pro: number of keys | yes | 3/3 OK (1 interrupted by 429) | Passed (the original failure was an evaluator false negative) |
+| 13 | Store WhatsApp | | 3/3 OK (1 interrupted by 429) | Passed (original false negative: non-breaking hyphen U+2011) |
+| 14 | Replies without emojis | | 1 emoji in run 1 | Guaranteed by code since `1a0779f` (`agent/output_guard.py`, covered by automated tests); real-model confirmation goes with the pending runs |
+
+Summary: scenarios 1-4, 6-8 and 11-13 passed; scenarios 5, 9 and 10 (and the real-model confirmation of 14) are **pending**. The passed scenarios were exercised with earlier prompt versions; later calibrations were targeted additions (order lookup, returns, empty searches). By the user's decision they will not be repeated without a reason.
+
+**Why pending.** The Groq free-tier daily quota for `openai/gpt-oss-120b` (200k tokens/day, rolling 24-hour window) was exhausted on 2026-11-01. Commands to run once it renews (project root, `GROQ_API_KEY` in `.env`; details in [docs/E2E_RESULTS.md](docs/E2E_RESULTS.md), section 3):
+
+```bash
+python scripts/run_scenarios.py --only 5,10 --repeat 2 --pause 60 --report runtime/t14_prioridade_A.md   # ~40k tokens
+python scripts/run_scenarios.py --only 9 --repeat 1 --pause 60 --report runtime/t14_prioridade_A3.md     # ~8k tokens
+```
 
 ## Conversation examples
 
-_Pending: requires a run with GROQ_API_KEY configured (T14/T15)._
+Example conversations are recorded with the real agent by `scripts/record_example.py` from scripts of customer messages in `examples/conversations/roteiros/`, using the same `Agent`, `Session` and Markdown export as the `/salvar` command. The agent's text is never edited, and nothing is written if any reply fails (no partial or fake transcripts). Contract: [ARCHITECTURE.md](ARCHITECTURE.md), section 5.9.2.
+
+The three scripts:
+
+1. `01_catalogo_violoes.txt` — catalog search for guitars up to R$ 1000, a follow-up and the PIX price.
+2. `02_preco_promocao_frete.txt` — price, promotion and installments of the Ohana CK-20 ukulele, then shipping to Campo Grande.
+3. `03_devolucao_pedido.txt` — a non-trivial return of order 4 (order data + policy + limitations).
+
+```bash
+python scripts/record_example.py --script examples/conversations/roteiros/01_catalogo_violoes.txt --out examples/conversations/01_catalogo_violoes.md
+```
+
+_Pending: the three real conversations will be recorded when the Groq daily quota renews (T15)._
