@@ -270,7 +270,7 @@ class StoreStatus(BaseModel):
     is_open_regular_hours: bool                # pelo horário regular da seção 2
     today_hours: str | None; next_opening: datetime | None
     limitations: list[Limitation]              # feriados não conhecidos; datas especiais com horário estendido
-def store_status(now: datetime) -> StoreStatus
+def store_status(now: datetime, timezone: str = "America/Campo_Grande") -> StoreStatus   # detalhes: §5.3.1
 
 class ShippingEstimate(BaseModel):
     region: Literal["metropolitana", "nao_confirmada"]   # só "Campo Grande" é confirmada (P8)
@@ -281,6 +281,69 @@ class ShippingEstimate(BaseModel):
     limitations: list[Limitation]              # P5 (R$ 500,00), P8 (outros municípios), valor por CEP
 def shipping_estimate(city: str | None, order_value: Decimal) -> ShippingEstimate
 ```
+#### 5.3.1 Contrato detalhado da T05 (horários e frete)
+
+Fonte única para quem implementa e para quem testa. Strings marcadas como *literais* reproduzem o manual e podem ser comparadas por igualdade; as `message` das limitações são livres (testar `code`, `source` e presença de termos-chave, não o texto inteiro).
+
+**`domain/store_hours.py`** — manual, seção 2.
+```python
+STORE_TIMEZONE_DEFAULT = "America/Campo_Grande"
+REGULAR_HOURS: dict[int, tuple[time, time]] = {          # chave = datetime.weekday(); domingo ausente
+    0: (time(9), time(18)), 1: ..., 2: ..., 3: ..., 4: (time(9), time(18)),
+    5: (time(9), time(13)),
+}
+LIMITATION_FERIADOS: Limitation          # DADO_NAO_REGISTRADO — o sistema não conhece feriados (loja fecha em feriados)
+LIMITATION_DATAS_ESPECIAIS: Limitation   # DADO_NAO_REGISTRADO — Black Friday, Aniversário, Natal podem ter horário estendido
+                                         # source de ambas: "Manual de Políticas v2.1, seção 2"
+
+class StoreStatus(BaseModel, frozen=True):
+    is_open_regular_hours: bool
+    today_hours: str | None              # literal "09:00 às 18:00" | "09:00 às 13:00" | None (domingo)
+    next_opening: datetime | None        # None quando aberto; senão a próxima abertura, no fuso da loja
+    limitations: list[Limitation]        # sempre [LIMITATION_FERIADOS, LIMITATION_DATAS_ESPECIAIS]
+
+def store_status(now: datetime, timezone: str = STORE_TIMEZONE_DEFAULT) -> StoreStatus
+```
+- `now` sem fuso ⇒ `ValueError`. `now` é convertido para `timezone` antes de qualquer cálculo; nunca chama `datetime.now()`.
+- Aberto no intervalo `[abertura, fechamento)`. `today_hours` refere-se ao dia local de `now`.
+- Antes das 09:00 de um dia útil ou sábado ⇒ `next_opening` = mesmo dia 09:00.
+
+**`domain/shipping.py`** — manual, seções 5.1 e 5.2.
+```python
+FREE_SHIPPING_THRESHOLD = Decimal("500.00")
+METRO_FIXED_FEE = Decimal("35.00")
+METRO_DEADLINE = "1 a 3 dias úteis"                                      # literal
+OTHER_CITIES_DEADLINES = (                                               # literais
+    "PAC (Correios): 5 a 12 dias úteis",
+    "SEDEX (Correios): 2 a 5 dias úteis",
+    "Jadlog (.package): 3 a 8 dias úteis",
+)
+NOTE_MOTOBOY = "Entrega realizada por motoboy próprio. O cliente será contactado por telefone antes da entrega."
+NOTE_SEGURO = "Todos os envios incluem seguro contra extravios e danos durante o transporte."
+NOTE_FRETE_ESPECIAL = ("Instrumentos de grande porte (baterias acústicas, pianos digitais, contrabaixos) "
+                       "podem exigir frete especial com cotação individual.")
+LIMITATION_P5: Limitation                 # MANUAL_OMISSO — exatamente R$ 500,00 não coberto (seção 5.1)
+LIMITATION_P8: Limitation                 # MANUAL_OMISSO — municípios da região metropolitana não definidos (5.1);
+                                          # a message resume a regra 5.1 (grátis acima de R$ 500,00; R$ 35,00 abaixo; 1 a 3 dias úteis)
+LIMITATION_VALOR_POR_CEP: Limitation      # DADO_NAO_REGISTRADO — valor calculado por CEP, peso e dimensões (5.2)
+LIMITATION_CIDADE_NAO_INFORMADA: Limitation  # DADO_NAO_REGISTRADO — pedir a cidade de entrega
+
+class ShippingEstimate(BaseModel, frozen=True): ...   # campos acima
+
+def is_campo_grande(city: str) -> bool    # domain.text.normalize(city) in {"campo grande", "campo grande ms"}
+def shipping_estimate(city: str | None, order_value: Decimal) -> ShippingEstimate
+```
+| Entrada | region | fee_status | fee | deadlines | notes | limitations |
+|---|---|---|---|---|---|---|
+| `order_value` não é `Decimal` finito > 0 | `ValueError` | | | | | |
+| cidade `None`/vazia | `nao_confirmada` | `nao_disponivel` | `None` | `[]` | `[]` | `[CIDADE_NAO_INFORMADA]` |
+| Campo Grande, valor > 500,00 | `metropolitana` | `gratis` | `Decimal("0.00")` | `[METRO_DEADLINE]` | `[NOTE_MOTOBOY]` | `[]` |
+| Campo Grande, valor < 500,00 | `metropolitana` | `taxa_fixa` | `Decimal("35.00")` | `[METRO_DEADLINE]` | `[NOTE_MOTOBOY]` | `[]` |
+| Campo Grande, valor = 500,00 | `metropolitana` | `nao_disponivel` | `None` | `[METRO_DEADLINE]` | `[NOTE_MOTOBOY]` | `[P5]` |
+| Outra cidade (qualquer valor) | `nao_confirmada` | `nao_disponivel` | `None` | `list(OTHER_CITIES_DEADLINES)` | `[NOTE_SEGURO, NOTE_FRETE_ESPECIAL]` | `[P8, VALOR_POR_CEP]` |
+
+`domain/` não importa `emporio_agent.data` nem `emporio_agent.config` (pode importar `domain.text` e `domain.limitations`).
+
 Dinheiro em `Decimal`; arredondamento de exibição em 2 casas com `ROUND_HALF_UP` (técnico, não regra de negócio).
 
 ### 5.4 `policies/store.py`

@@ -1,0 +1,4 @@
+{
+  "userIgnoreFilters": ["venv/", "data/", ".pytest_cache/", "src/", "tests/", "scripts/"],
+  "alwaysUpdateLinks": true
+}
