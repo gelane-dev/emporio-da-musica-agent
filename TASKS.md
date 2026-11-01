@@ -196,19 +196,19 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Contrato.** ARCHITECTURE §5.5.1 (7 ferramentas; `estimar_frete` acrescentada em 2026-11-01 para expor o domínio da T05, conforme D4).
 **Escopo.** `tools/base.py`, `tools/limitations.py`, `tools/catalog_tools.py`, `tools/order_tools.py`, `tools/policy_tools.py`, `tools/__init__.py` (`build_tool_registry`).
 **Critérios de aceite.**
-- [ ] `registry.specs()` gera JSON Schema válido para as 7 tools (descrições em PT dizendo quando usar cada uma); `execute()` nunca lança (`INVALID_ARGUMENT` para nome/argumento inválido, `INTERNAL_ERROR` logado para exceção).
-- [ ] `to_llm()` em JSON PT (`ok`, `dados`, `erro`, `limitacoes`), sem limitações duplicadas; dinheiro só como texto formatado.
-- [ ] `buscar_produtos(categoria="Violões", preco_max=1000)` ⇒ 12 produtos; ordenação por preço; categoria inválida ⇒ `INVALID_ARGUMENT` com categorias válidas; #142 com `informacoes_conflitantes = true`.
-- [ ] `detalhar_produto(nome="Takamine GD20")` ⇒ R$ 2.199,00, PIX R$ 2.089,05, 12x confirmadas, `promocoes_encerradas` = [12% "Oferta Especial"], sem limitações; `nome="violao yamaha"` ⇒ `AMBIGUOUS` com candidatos.
-- [ ] `detalhar_produto(produto_id=142)` ⇒ `conflitos` (marca e teclas), sem `descricao` e sem `especificacoes.keys`, limitação `DADO_CONFLITANTE`.
-- [ ] `detalhar_produto(produto_id=121)` ⇒ promoção 20% com preço original, PIX nulo, 5x "a_confirmar" + limitação P3.
-- [ ] `#96` ⇒ indisponível + alternativas; `#113` ⇒ descontinuado, `preco` nulo + alternativas; `#130` ⇒ em breve + limitação.
-- [ ] `consultar_pedido(19, email="pedro.oliveira@jmail.com")` ⇒ cancelado + observação; e-mail errado **e** pedido inexistente ⇒ o mesmo `VERIFICATION_FAILED` sem dados; sem e-mail/telefone ⇒ `INVALID_ARGUMENT`; argumento de nome rejeitado.
-- [ ] `consultar_pedido(8, telefone="67 99654-7821")` ⇒ "enviado", rastreio `BRJL5544332BR`, previsão estimada, limitações P6/P7; `#3` ⇒ `valor_total_registrado` R$ 3.450,00; e-mail compartilhado de #11/#43 só libera o pedido do dono.
-- [ ] `consultar_politica`: seções completas do tópico (inclui Capa em `sobre_loja`) e limitações por tópico conforme o contrato (P3/P4/P12, P6/P7/P14, P5/P8/P13, P1/P2).
-- [ ] `informacoes_loja`: endereço, os dois números e as duas grafias de e-mail com fonte, horários — tudo extraído do `PolicyStore`; com `clock` fixo em domingo ⇒ fechada e próxima abertura segunda 09:00; limitações P1/P2/feriados/datas especiais.
-- [ ] `estimar_frete("Campo Grande", 600)` ⇒ grátis; `("Dourados", 600)` ⇒ região não confirmada + P8 e valor por CEP.
-- [ ] Nenhum resultado contém e-mail, telefone ou `customer_id` de cliente (varredura do JSON).
+- [x] `registry.specs()` gera JSON Schema válido para as 7 tools (descrições em PT dizendo quando usar cada uma); `execute()` nunca lança (`INVALID_ARGUMENT` para nome/argumento inválido, `INTERNAL_ERROR` logado para exceção).
+- [x] `to_llm()` em JSON PT (`ok`, `dados`, `erro`, `limitacoes`), sem limitações duplicadas; dinheiro só como texto formatado.
+- [x] `buscar_produtos(categoria="Violões", preco_max=1000)` ⇒ 12 produtos; ordenação por preço; categoria inválida ⇒ `INVALID_ARGUMENT` com categorias válidas; #142 com `informacoes_conflitantes = true`.
+- [x] `detalhar_produto(nome="Takamine GD20")` ⇒ R$ 2.199,00, PIX R$ 2.089,05, 12x confirmadas, `promocoes_encerradas` = [12% "Oferta Especial"], sem limitações; `nome="violao yamaha"` ⇒ `AMBIGUOUS` com candidatos.
+- [x] `detalhar_produto(produto_id=142)` ⇒ `conflitos` (marca e teclas), sem `descricao` e sem `especificacoes.keys`, limitação `DADO_CONFLITANTE`.
+- [x] `detalhar_produto(produto_id=121)` ⇒ promoção 20% com preço original, PIX nulo, 5x "a_confirmar" + limitação P3.
+- [x] `#96` ⇒ indisponível + alternativas; `#113` ⇒ descontinuado, `preco` nulo + alternativas; `#130` ⇒ em breve + limitação.
+- [x] `consultar_pedido(19, email="pedro.oliveira@jmail.com")` ⇒ cancelado + observação; e-mail errado **e** pedido inexistente ⇒ o mesmo `VERIFICATION_FAILED` sem dados; sem e-mail/telefone ⇒ `INVALID_ARGUMENT`; argumento de nome rejeitado.
+- [x] `consultar_pedido(8, telefone="67 99654-7821")` ⇒ "enviado", rastreio `BRJL5544332BR`, previsão estimada, limitações P6/P7; `#3` ⇒ `valor_total_registrado` R$ 3.450,00; e-mail compartilhado de #11/#43 só libera o pedido do dono.
+- [x] `consultar_politica`: seções completas do tópico (inclui Capa em `sobre_loja`) e limitações por tópico conforme o contrato (P3/P4/P12, P6/P7/P14, P5/P8/P13, P1/P2).
+- [x] `informacoes_loja`: endereço, os dois números e as duas grafias de e-mail com fonte, horários — tudo extraído do `PolicyStore`; com `clock` fixo em domingo ⇒ fechada e próxima abertura segunda 09:00; limitações P1/P2/feriados/datas especiais.
+- [x] `estimar_frete("Campo Grande", 600)` ⇒ grátis; `("Dourados", 600)` ⇒ região não confirmada + P8 e valor por CEP.
+- [x] Nenhum resultado contém e-mail, telefone ou `customer_id` de cliente (varredura do JSON).
 **Commit.** `feat(tools): ferramentas de catálogo, pedidos, políticas e informações da loja`
 
 ## T10 — Prompt de sistema / persona
