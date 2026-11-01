@@ -2,7 +2,7 @@
 
 > Cada tarefa é pequena, testável isoladamente e termina em **um commit** (mensagem sugerida).
 > Contratos referenciados: `ARCHITECTURE.md §5`. Regras/suposições: `DATA_ANALYSIS.md`, `TECHNICAL_DECISIONS.md`.
-> Decisões D3, D5, D6, D9, D10 e D11 aprovadas em 2026-11-01. **Revisão de 2026-11-01:** critérios de T02–T05, T09, T10, T14–T16 atualizados conforme D15 (limitações explícitas). T04 e T05 dependem da aprovação dos tratamentos de DATA_ANALYSIS §4.2.
+> Decisões D3, D5, D6, D9, D10 e D11 aprovadas em 2026-11-01. **Revisão de 2026-11-01:** critérios de T02–T05, T09, T10, T14–T16 atualizados conforme D15 (limitações explícitas). Tratamentos de DATA_ANALYSIS §4.2 aprovados em 2026-11-01 (com os ajustes de limite de 12x e pagamento combinado estritamente acima de R$ 2.000,00).
 
 ## Grafo de dependências
 
@@ -113,7 +113,7 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 
 ## T04 — Domínio: preços, PIX e parcelamento
 **Objetivo.** Implementar **somente** as regras financeiras confirmadas (DATA_ANALYSIS §4.1) e devolver limitações para as contradições P3, P4, P12 e P15.
-**Pré-requisito.** Aprovação dos tratamentos de DATA_ANALYSIS §4.2.
+**Pré-requisito.** Tratamentos de DATA_ANALYSIS §4.2 — aprovados em 2026-11-01.
 **Escopo.** `domain/limitations.py` (`Limitation`), `domain/pricing.py`: `quote()`, `installment_options()`, formatação `R$ 1.234,56`. Classificação de parcelas conforme a tabela de ARCHITECTURE §5.3, usando o valor **exato** da parcela (sem arredondar antes de comparar).
 **Critérios de aceite.**
 - [ ] #95 (R$ 2.199, sem promo): PIX R$ 2.089,05; 1x–12x todas `confirmada`; `max_confirmed_installments = 12` (R$ 183,25); `combined_payment = "permitido"`; sem limitações.
@@ -123,7 +123,8 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 - [ ] R$ 1.200,00: 12x de R$ 100,00 `confirmada` ("parcela mínima de R$ 100" inclui o próprio valor).
 - [ ] R$ 1.199,99: 12x (R$ 99,999…) **omitida** — comparação com valor exato.
 - [ ] R$ 500,00: 5x (R$ 100,00) `confirmada`; 6x (R$ 83,33) `a_confirmar`.
-- [ ] Pagamento combinado: R$ 1.999,99 ⇒ `nao_permitido`; R$ 2.000,00 ⇒ `a_confirmar` + limitação `MANUAL_OMISSO` (P12); R$ 2.000,01 ⇒ `permitido`.
+- [ ] Limite de 12x: nenhuma opção acima de 12x é gerada, mesmo com parcela ≥ R$ 100 (ex.: R$ 19.567,00 ⇒ máximo 12x de R$ 1.630,58; `installment_options` nunca devolve n > 12).
+- [ ] Pagamento combinado (estritamente acima de R$ 2.000,00): R$ 1.999,99 ⇒ `nao_permitido`; R$ 2.000,00 ⇒ `a_confirmar` + limitação explícita `MANUAL_OMISSO` (P12); R$ 2.000,01 ⇒ `permitido`.
 - [ ] Duas promoções ativas (sintético) ⇒ `promo is None`, `final_price = list_price`, `pix_price is None`, limitação `MANUAL_OMISSO` (P15).
 - [ ] Nenhum mínimo de R$ 50 é aplicado em lugar nenhum (teste explícito).
 - [ ] Todos os valores com `Decimal`; exibição com `ROUND_HALF_UP` em 2 casas; formatação brasileira correta (`R$ 2.089,05`, `R$ 11.499,00`).
@@ -131,7 +132,7 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 
 ## T05 — Domínio: horários e frete
 **Objetivo.** "Estamos abertos?" e estimativa de frete, com limitações para P5, P8 e P13.
-**Pré-requisito.** Aprovação dos tratamentos de DATA_ANALYSIS §4.2.
+**Pré-requisito.** Tratamentos de DATA_ANALYSIS §4.2 — aprovados em 2026-11-01.
 **Escopo.** `domain/store_hours.py` (`store_status(now)`), `domain/shipping.py` (`shipping_estimate(city, order_value)`).
 **Critérios de aceite.**
 - [ ] Seg 10:00 ⇒ aberto; seg 18:00 ⇒ fechado (fechamento exclusivo); sáb 12:59 ⇒ aberto; sáb 13:00 ⇒ fechado; dom ⇒ fechado com `next_opening` = seg 09:00.
@@ -197,6 +198,7 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 - [ ] Pedido entregue (#4) ⇒ limitações P6 (canal não registrado) e P7 (recebimento não registrado); **nenhum** campo de elegibilidade ou de "dias desde a entrega".
 - [ ] `status_descricao` é tradução literal do status; `valor_total_registrado` do #3 = R$ 3.450,00 (não recalculado).
 - [ ] Nenhum resultado de tool contém e-mail, telefone ou `customer_id` de cliente (teste varre o JSON).
+- [ ] `consultar_politica("pagamento")` ⇒ texto literal + limitações P3/P4/P12; `consultar_politica("trocas_devolucoes")` ⇒ limitações P6/P7/P14 (troca por preferência sem referência de data); `consultar_politica("frete_entrega")` ⇒ limitações P5/P8/P13.
 - [ ] `informacoes_loja` devolve os dois números (3341-4444 e 3321-4500) e as duas grafias de e-mail, cada um com sua origem, mais limitações P1/P2; com `now` fixo de domingo ⇒ `aberto_agora_horario_regular = false` e próxima abertura segunda 09:00.
 **Commit.** `feat(tools): ferramentas de catálogo, pedidos, políticas e informações da loja`
 

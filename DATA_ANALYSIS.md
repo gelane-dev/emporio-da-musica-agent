@@ -162,9 +162,9 @@ Só entram aqui regras **sem contradição** no manual. Valores calculados em Py
 | PIX não se aplica sobre preço promocional; promoções não cumulativas | 6.2 | — |
 | Preço promocional exibido com preço original e percentual | 6.2 | — |
 | Promoção vigente = `is_active` no sistema | 7.3 ("verificar se ela encontra-se ativa no sistema") | O manual define o sistema como fonte; campanhas da seção 6.1 não indicam vigência |
-| Crédito: até 12x sem juros | 3 e 3.1 (concordam) | — |
-| Parcela ≥ R$ 100,00 é aceita em **qualquer** número de parcelas (1–12x) | 3 (mín. R$ 100) e 3.1 (mín. ≤ R$ 100 em todas as faixas) | Interseção das duas fontes: atende a todas as leituras. Ver P3/P4 para o restante |
-| Pagamento combinado permitido para compras **acima de** R$ 2.000,00 | 3.1 | Valor exatamente R$ 2.000,00 ⇒ limitação (P12) |
+| Crédito: até 12x sem juros — **limite máximo absoluto** | 3 e 3.1 (concordam) | Nenhuma opção acima de 12x é gerada, qualquer que seja o valor da parcela |
+| Dentro do limite de 1x a 12x, parcela ≥ R$ 100,00 é aceita | 3 (mín. R$ 100) e 3.1 (mín. ≤ R$ 100 em todas as faixas) | Interseção das duas fontes: atende a todas as leituras. **Não** amplia o limite de 12x. Ver P3/P4 para o restante |
+| Pagamento combinado permitido somente para compras **estritamente acima de** R$ 2.000,00 | 3.1 | Exatamente R$ 2.000,00 ⇒ limitação explícita (P12); abaixo ⇒ não permitido |
 | Frete na região metropolitana: grátis **acima de** R$ 500,00; R$ 35,00 **abaixo de** R$ 500,00; 1 a 3 dias úteis | 5.1 | Exatamente R$ 500,00 ⇒ limitação (P5) |
 | Campo Grande pertence à região metropolitana de Campo Grande | 5.1 (a região leva o nome do município-sede) | Demais municípios ⇒ limitação (P8) |
 | Outras cidades: PAC 5–12, SEDEX 2–5, Jadlog 3–8 dias úteis; valor por CEP, peso e dimensões | 5.2 | Agente **não** cota valor (sem dados) ⇒ limitação |
@@ -182,13 +182,13 @@ Só entram aqui regras **sem contradição** no manual. Valores calculados em Py
 
 Princípio: **quando o manual é contraditório ou omisso, a ferramenta devolve uma limitação explícita** (`Limitation`, ver ARCHITECTURE §5.5) e o agente informa o cliente e indica a confirmação com a equipe. Nenhuma interpretação é aplicada como regra.
 
-> Status: **proposto — aguardando aprovação antes da T04.**
+> Status: **aprovado em 2026-11-01**, com dois ajustes: (1) o limite máximo de 12x vale sempre, mesmo com parcela ≥ R$ 100; (2) pagamento combinado só para valores estritamente superiores a R$ 2.000,00, e exatamente R$ 2.000,00 devolve limitação explícita.
 
 | # | Contradição / lacuna | O que é confirmado | Tratamento (limitação) |
 |---|---|---|---|
 | P1 | Telefone: seção 1.2 "Telefone / WhatsApp (67) 3341-4444" × seção 7 "WhatsApp (67) 3321-4500" | Os dois números constam no manual | `informacoes_loja` devolve **os dois**, cada um com a seção de origem e o rótulo exato do manual, mais a limitação "o manual cita dois números de WhatsApp". O agente não afirma qual é o correto |
 | P2 | E-mail: capa `contato@emporiodamusica.com.br` × seção 1.2 `contato@empóriodamusica.com.br` | Ambas as grafias constam | Devolver as duas grafias com a origem e a limitação. O telefone (67) 3341-4444, idêntico na capa e na seção 1.2, é o contato sem divergência |
-| P3 | Tabela de pagamento: crédito "parcela mínima de R$ 100,00" × seção 3.1: 4x–6x com mínimo de R$ 80,00 | Parcelas ≥ R$ 100 (qualquer nº de vezes) | Opções com parcela ≥ R$ 100 são **confirmadas**. Opções 4x–6x com parcela entre R$ 80,00 e R$ 99,99 são devolvidas como **"a confirmar"**, com limitação citando as duas regras |
+| P3 | Tabela de pagamento: crédito "parcela mínima de R$ 100,00" × seção 3.1: 4x–6x com mínimo de R$ 80,00 | Parcelas ≥ R$ 100, até 12x | Opções de até 12x com parcela ≥ R$ 100 são **confirmadas**. Opções 4x–6x com parcela entre R$ 80,00 e R$ 99,99 são devolvidas como **"a confirmar"**, com limitação citando as duas regras |
 | P4 | Seção 3.1: até 3x "sem valor mínimo de parcela (exceto abaixo de R$ 50,00)" — autocontraditório; e conflita com o mínimo de R$ 100 da tabela | Parcelas ≥ R$ 100 | Opções 1x–3x com parcela < R$ 100 são **"a confirmar"**, com limitação citando o texto literal. Nenhum mínimo de R$ 50 é aplicado |
 | P5 | Frete metropolitano: "acima de R$ 500" grátis / "abaixo de R$ 500" taxa — exatamente R$ 500,00 não está coberto | Demais valores | Valor = R$ 500,00 ⇒ `fee=None` + limitação |
 | P6 | Arrependimento vale para compras **online**; pedidos não registram o canal | Regra de 7 dias | `consultar_pedido` devolve limitação "canal de compra não registrado"; o agente pergunta ao cliente e não conclui sozinho |
@@ -197,7 +197,7 @@ Princípio: **quando o manual é contraditório ou omisso, a ferramenta devolve 
 | P9 | Garantia conta do recebimento; troca por defeito conta da compra | Ambas literais | Sem conflito real: cada prazo é informado com sua referência de data |
 | P10 | "Registrar reclamação e encaminhar" | Fluxo do manual | T12 (opcional): registro local + protocolo |
 | P11 | Campanhas sazonais (6.1) × promoções inativas no CSV | Seção 7.3 manda verificar no sistema | Preço sempre pelo CSV (`is_active`); a seção 6.1 não é usada para afirmar descontos vigentes |
-| P12 | Pagamento combinado "acima de R$ 2.000,00" — exatamente R$ 2.000,00 não está coberto | Demais valores | Valor = R$ 2.000,00 ⇒ limitação |
+| P12 | Pagamento combinado "acima de R$ 2.000,00" — exatamente R$ 2.000,00 não está coberto | > R$ 2.000,00 permitido; < R$ 2.000,00 não permitido | Valor = R$ 2.000,00 ⇒ `a_confirmar` + limitação explícita |
 | P13 | "Contrabaixos" (frete especial) pode ser acústico (Cordas Orquestrais) ou elétrico (as descrições dos baixos usam "contrabaixo elétrico"); "pianos digitais" × teclados cadastrados como sintetizador | Texto literal | O agente repassa a frase do manual ("podem exigir frete especial com cotação individual") sem classificar o produto |
 | P14 | Troca por preferência: "até 7 dias" sem dizer se após compra ou recebimento | Prazo de 7 dias | Informar "até 7 dias" com limitação sobre a referência de data |
 | P15 | Mais de uma promoção ativa para o mesmo produto: não cumulativas, mas o manual não diz qual vale | Não cumulativas | Hoje nenhum produto tem duas ativas. Se ocorrer: exibir preço de tabela + limitação "há mais de uma promoção ativa; confirmar qual se aplica". Nenhuma é escolhida automaticamente |

@@ -85,7 +85,7 @@ Itens marcados com ⚠️ **APROVAR** dependem de escolha sua antes do desenvolv
 
 **Alternativa descartada.** Escolher uma interpretação "razoável" e documentá-la (abordagem da versão inicial deste plano) — rejeitada na aprovação: pode gerar informação incorreta ao cliente.
 
-**Status.** Tratamentos de DATA_ANALYSIS §4.2 **aguardando aprovação antes da T04**.
+**Status.** Tratamentos de DATA_ANALYSIS §4.2 **aprovados em 2026-11-01**, com dois ajustes: limite máximo de 12x sempre respeitado; pagamento combinado somente acima de R$ 2.000,00 (exatamente R$ 2.000,00 ⇒ limitação explícita).
 
 ## D5 — Modelo e provedor ⚠️ APROVAR
 

@@ -248,9 +248,9 @@ class PriceQuote(BaseModel):
     promo: PromoInfo | None                    # só se houver exatamente 1 promoção ativa
     final_price: Decimal                       # promo.price ou list_price
     pix_price: Decimal | None                  # None com promo (6.2) ou com promoções ambíguas (P15)
-    installments: list[InstallmentOption]      # 1..12; omite opções vedadas por TODAS as leituras do manual
-    max_confirmed_installments: int | None     # maior n com parcela ≥ R$ 100; None se nenhum
-    combined_payment: Literal["permitido", "nao_permitido", "a_confirmar"]   # > 2000 | < 2000 | == 2000 (P12)
+    installments: list[InstallmentOption]      # só n em 1..12 (limite do manual); omite opções vedadas por TODAS as leituras
+    max_confirmed_installments: int | None     # maior n ≤ 12 com parcela ≥ R$ 100; None se nenhum
+    combined_payment: Literal["permitido", "nao_permitido", "a_confirmar"]   # > 2000 (estrito) | < 2000 | == 2000 + limitação (P12)
     limitations: list[Limitation]
 
 def quote(price: Decimal, active_promotions: list[Promotion]) -> PriceQuote
@@ -263,6 +263,7 @@ Classificação de parcelas (`v = amount / n`, arredondado a 2 casas):
 | 1x–3x | confirmada | a_confirmar (P4) | a_confirmar (P4) |
 | 4x–6x | confirmada | a_confirmar (P3) | omitida (vedada pela tabela e pela 3.1) |
 | 7x–12x | confirmada | omitida (vedada pelas duas) | omitida |
+| 13x ou mais | **nunca gerada** (limite de 12x do manual, independentemente do valor) | — | — |
 
 ```python
 class StoreStatus(BaseModel):
