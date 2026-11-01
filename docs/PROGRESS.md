@@ -15,11 +15,11 @@
 | T06 Extração do PDF | concluída | `053352e` | contrato [[ARCHITECTURE#5.4.1 Contrato detalhado da T06 (extração do PDF → `knowledge/policies.md`)]]; IA/RAG + QA (Sonnet) via Orca |
 | T07 PolicyStore | concluída | `00c85b3` | [[ARCHITECTURE#5.4.2 Contrato detalhado da T07 (`PolicyStore`)]] |
 | T08 Adaptador LLM | concluída (smoke real pendente de credencial) | `35485ec` | [[ARCHITECTURE#5.6.1 Contrato detalhado da T08]]; D16 |
-| T09 Ferramentas | concluída | (commit `feat(tools)`) | [[ARCHITECTURE#5.5.1 Contrato detalhado da T09 (ferramentas)]] |
-| T10 Prompt | em andamento | — | [[ARCHITECTURE#5.7.1 Contrato detalhado da T10 (prompt de sistema)]] |
+| T09 Ferramentas | concluída | `8594164` | [[ARCHITECTURE#5.5.1 Contrato detalhado da T09 (ferramentas)]] |
+| T10 Prompt | concluída | (commit `feat(agent)`) | [[ARCHITECTURE#5.7.1 Contrato detalhado da T10 (prompt de sistema)]] |
 | T11–T17 | pendentes | — T14/T15 exigem credencial da API (ver pendências) |
 
-Suíte atual: 693 testes passando + 1 smoke real pulado (após a T09).
+Suíte atual: 730 testes passando + 1 smoke real pulado (após a T10).
 
 ## Decisões recentes (resumo; detalhes nos documentos citados)
 
@@ -33,6 +33,7 @@ Suíte atual: 693 testes passando + 1 smoke real pulado (após a T09).
 |---|---|---|---|---|
 | T05 | `run_a5ecc3d46e82` | Backend (impl.), QA (testes TDD a partir do contrato) — Sonnet | `gelane-dev/t05-backend`, `gelane-dev/t05-qa` | integração por squash sem conflitos; implementação e testes independentes concordaram na 1ª execução |
 
+| T09+T10 | `run_5532f4d9b606` | Backend (T09), IA/RAG (T10), QA (testes; +2 correções) — Sonnet | `t09-backend`, `t10-ia-rag`, `w2-qa` | testes do QA corrigidos: categoria com nome exato, P15 com dados sintéticos (sem skip) e verificação de conceitos no prompt em vez de frases exatas |
 | T07+T08 | `run_df55428d95e4` | Backend (T07), IA/RAG (T08 + 1 correção), QA (testes de ambas) — Sonnet, 3 em paralelo | `t07-backend`, `t08-ia-rag`, `w1-qa` | QA detectou vazamento potencial de texto da API (com a chave) na mensagem de `bad_request` → corrigido pelo IA/RAG |
 | T06 | `run_31a1ddbd85a8` | IA/RAG (script + .md; 2 dispatches), QA (testes de fidelidade; 3 dispatches) — Sonnet | `gelane-dev/t06-ia-rag`, `gelane-dev/t06-qa` | revisão do coordenador achou 4 desvios de estrutura (parágrafos, negrito por regex) → corrigidos pelo IA/RAG; QA corrigiu critério e falso positivo; integração 499 testes |
 
@@ -46,6 +47,7 @@ Lições:
 ## Pendências abertas
 
 - Nenhuma decisão de negócio pendente.
+- Prompt T10: trocar "diga que a informação está em conferência" por "o cadastro tem informações divergentes; a equipe pode confirmar" na calibração da T14 (sugere processo inexistente).
 - **Credencial da API ausente** (sem `ANTHROPIC_API_KEY`, sem `.env`, sem CLI `ant`): T07–T13 seguem com `FakeLLM`; T14 (cenários reais) e T15 (conversas de exemplo) dependem do usuário fornecer a chave em `.env`.
 - `tests/test_build_policies.py`: fixture de classe definida como método de instância gera `PytestRemovedIn10Warning` (sem efeito hoje) — ajustar quando houver nova rodada de QA.
 - Encoding de saída no Git Bash (RK11) — tratar na T13.

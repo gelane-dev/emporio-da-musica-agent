@@ -216,10 +216,10 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 **Contrato.** ARCHITECTURE §5.7.1 (prompt estável + contexto dinâmico, por causa do cache — D16).
 **Escopo.** `agent/prompts.py`. Persona aprovada: **Mel**; **sem emojis**.
 **Critérios de aceite.**
-- [ ] Todos os itens obrigatórios de §5.7.1 presentes (verificados por termos-chave).
-- [ ] `build_system_prompt` determinístico, sem data/hora, só cita ferramentas presentes; nome desconhecido ⇒ `ValueError`.
-- [ ] Não inclui dados de produtos, preços (`R$`) nem texto do manual; ≤ 7.000 caracteres.
-- [ ] `build_dynamic_context` com `now` fixo: dia da semana, data, hora, situação da loja e próxima abertura em português; ressalva de feriados.
+- [x] Todos os itens obrigatórios de §5.7.1 presentes (verificados por termos-chave).
+- [x] `build_system_prompt` determinístico, sem data/hora, só cita ferramentas presentes; nome desconhecido ⇒ `ValueError`.
+- [x] Não inclui dados de produtos, preços (`R$`) nem texto do manual; ≤ 7.000 caracteres.
+- [x] `build_dynamic_context` com `now` fixo: dia da semana, data, hora, situação da loja e próxima abertura em português; ressalva de feriados.
 **Commit.** `feat(agent): prompt de sistema com persona e regras de atendimento`
 
 ## T11 — Agent loop + Session
