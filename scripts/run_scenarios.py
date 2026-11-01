@@ -7,7 +7,7 @@ ser revisado manualmente. Exige credencial da API; sem ela, termina com código 
 Uso::
 
     python scripts/run_scenarios.py [--only 5,9] [--repeat 2] \
-        [--reference-date 2026-03-25T10:00] [--report relatorio.md] [--pause 20]
+        [--reference-date 2026-03-25T10:00] [--report relatorio.md] [--pause 60]
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ EXIT_INIT_ERROR = 2
 
 DEFAULT_REFERENCE_DATE = "2026-03-25T10:00"
 DEFAULT_REPEAT = 2
-DEFAULT_PAUSE = 20.0  # segundos entre cenários/repetições (limite de tokens/min da Groq)
+DEFAULT_PAUSE = 60.0  # segundos entre cenários/repetições (limite de tokens/min da Groq)
 TOTAL_CHECKS = 14  # 13 cenários + ausência de emojis (cenário 14)
 MIN_PASSING_CHECKS = 13
 
@@ -159,6 +159,7 @@ SCENARIOS: tuple[Scenario, ...] = (
         messages=("Tem saxofone?",),
         expected_tools=(("buscar_produtos", "listar_categorias"),),
         must_contain=(("nao ", "nenhum", "sem "),),
+        must_not_contain=("temos saxofone", "trompete", "clarinete", "temporariamente indisponivel"),
     ),
     Scenario(
         id=11,
@@ -175,7 +176,15 @@ SCENARIOS: tuple[Scenario, ...] = (
         messages=("O Korg Synth 1 Pro tem 88 teclas?",),
         expected_tools=(("detalhar_produto",),),
         must_contain=(("divergen", "inconsisten", "conflit", "confirmar"),),
-        must_not_contain=("tem 88 teclas", "tem 61 teclas", "possui 88 teclas", "possui 61 teclas"),
+        must_not_contain=(
+            "sim, tem 88",
+            "sim, ele tem 88",
+            "sim, possui 88",
+            "nao, tem 61",
+            "nao, ele tem 61",
+            "tem sim 88",
+            "possui sim 88",
+        ),
         mandatory=True,
     ),
     Scenario(

@@ -701,3 +701,30 @@ def test_p15_quando_ha_mais_de_uma_promocao_ativa(registry_duas_promocoes):
     assert preco["preco_pix"] is None
     assert preco["preco_final"] == preco["preco_tabela"]
     assert has_limitation(detalhe, LIMITATION_P15)
+
+
+# ----------------------------------------------------------------------------- grounding (T14)
+
+
+def test_busca_vazia_traz_mensagem_de_orientacao(registry):
+    payload = run(registry, "buscar_produtos", texto="saxofone")
+    assert payload["dados"]["total_encontrado"] == 0
+    assert payload["dados"]["produtos"] == []
+    assert "Não cite nem sugira produtos" in payload["dados"]["mensagem"]
+    assert "listar_categorias" in payload["dados"]["mensagem"]
+
+
+def test_busca_com_resultado_nao_traz_mensagem(registry):
+    assert "mensagem" not in run(registry, "buscar_produtos", texto="violão")["dados"]
+
+
+@pytest.mark.parametrize("args", [{"produto_id": 999999}, {"nome": "saxofone tenor xyz"}])
+def test_detalhar_not_found_traz_orientacao(registry, args):
+    payload = run(registry, "detalhar_produto", **args)
+    assert payload["ok"] is False
+    assert payload["erro"]["codigo"] == "NOT_FOUND"
+    assert "Não cite nem sugira produtos" in payload["erro"]["mensagem"]
+
+
+def test_limitacao_p7_orienta_consultar_trocas_devolucoes():
+    assert "trocas_devolucoes" in tl.LIMITATION_P7.message

@@ -22,6 +22,11 @@ NAME_RESOLVE_MIN_GAP = 5.0
 MAX_CANDIDATES = 5
 MAX_ALTERNATIVES = 3
 
+ORIENTACAO_SEM_RESULTADO = (
+    "Nenhum produto do catálogo atual corresponde a esta busca. Não cite nem sugira produtos que "
+    "não tenham vindo de uma ferramenta; ofereça as categorias disponíveis (listar_categorias)."
+)
+
 
 def _money(value: float) -> Decimal:
     return Decimal(str(value))
@@ -142,7 +147,10 @@ class BuscarProdutos(Tool):
             summary, extra = product_summary(self._catalog, product)
             products.append(summary)
             limitations.extend(extra)
-        return ToolResult.success({"total_encontrado": len(found), "produtos": products}, limitations)
+        data: dict = {"total_encontrado": len(found), "produtos": products}
+        if not found:
+            data["mensagem"] = ORIENTACAO_SEM_RESULTADO
+        return ToolResult.success(data, limitations)
 
 
 # --- detalhar_produto ---------------------------------------------------------
@@ -179,7 +187,8 @@ class DetalharProduto(Tool):
             if product is None:
                 return ToolResult.failure(
                     "NOT_FOUND",
-                    f"Não existe produto com id {args.produto_id}. Tente buscar por nome com buscar_produtos.",
+                    f"Não existe produto com id {args.produto_id}. Tente buscar por nome com buscar_produtos. "
+                    + ORIENTACAO_SEM_RESULTADO,
                 )
             return product
 
@@ -189,7 +198,7 @@ class DetalharProduto(Tool):
             return ToolResult.failure(
                 "NOT_FOUND",
                 "Nenhum produto parecido com esse nome. Tente buscar_produtos com palavras-chave "
-                "ou peça mais detalhes ao cliente.",
+                "ou peça mais detalhes ao cliente. " + ORIENTACAO_SEM_RESULTADO,
             )
         (first, first_score), rest = matches[0], matches[1:]
         if first_score >= NAME_RESOLVE_MIN_SCORE and (not rest or first_score - rest[0][1] >= NAME_RESOLVE_MIN_GAP):

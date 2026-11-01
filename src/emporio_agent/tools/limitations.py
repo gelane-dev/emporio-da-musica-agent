@@ -45,7 +45,10 @@ LIMITATION_P7 = Limitation(
     message=(
         "O sistema não registra a data real de recebimento do pedido, apenas a previsão de entrega, "
         "que é uma estimativa. Os prazos de arrependimento contam a partir do recebimento, então "
-        "não é possível confirmar se um prazo está dentro ou fora; encaminhe a confirmação à equipe."
+        "não é possível confirmar se um prazo está dentro ou fora. Para troca ou devolução, consulte "
+        "consultar_politica(\"trocas_devolucoes\") e informe o prazo e a previsão de entrega (como "
+        "estimativa) antes de pedir o canal de compra ou a data de recebimento; encaminhe a "
+        "confirmação à equipe."
     ),
     source=f"{MANUAL}, seção 4.1; orders.csv",
 )

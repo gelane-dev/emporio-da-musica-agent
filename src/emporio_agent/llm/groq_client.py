@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+from collections.abc import Callable
 from typing import Any
 
 import groq
@@ -162,6 +164,20 @@ def _map_error(exc: groq.APIError) -> LLMError:
     return LLMError("api", f"Erro inesperado da API: {type(exc).__name__}.")
 
 
+_MAX_RETRY_AFTER_SECONDS = 90.0
+
+
+def _retry_after_seconds(exc: groq.RateLimitError) -> float | None:
+    """Valor do cabeçalho ``retry-after`` (segundos), ou ``None`` se ausente/inválido."""
+    response = getattr(exc, "response", None)
+    raw = response.headers.get("retry-after") if response is not None else None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value >= 0 else None
+
+
 class GroqClient:
     """Implementa ``LLMClient`` sobre o SDK oficial da Groq."""
 
@@ -174,10 +190,14 @@ class GroqClient:
         client: groq.Groq | None = None,
         max_retries: int = 5,
         tool_use_failed_retries: int = 1,
+        rate_limit_retries: int = 3,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._model = model
         self._effort = effort
         self._tool_use_failed_retries = tool_use_failed_retries
+        self._rate_limit_retries = rate_limit_retries
+        self._sleep = sleep
         self._client = client or groq.Groq(api_key=api_key, max_retries=max_retries)
 
     def complete(
@@ -202,6 +222,7 @@ class GroqClient:
             kwargs["include_reasoning"] = False
 
         attempt = 0
+        rate_attempt = 0
         while True:
             try:
                 response = self._client.chat.completions.create(**kwargs)
@@ -213,6 +234,24 @@ class GroqClient:
                         attempt,
                         self._tool_use_failed_retries,
                     )
+                    continue
+                raise _map_error(exc) from None
+            except groq.RateLimitError as exc:
+                # O SDK já esgotou suas retries; espera extra só se o retry-after for curto.
+                wait = _retry_after_seconds(exc)
+                if (
+                    wait is not None
+                    and wait <= _MAX_RETRY_AFTER_SECONDS
+                    and rate_attempt < self._rate_limit_retries
+                ):
+                    rate_attempt += 1
+                    logger.warning(
+                        "Groq: limite de vazão (tentativa %d/%d); aguardando %.1f s.",
+                        rate_attempt,
+                        self._rate_limit_retries,
+                        wait,
+                    )
+                    self._sleep(wait)
                     continue
                 raise _map_error(exc) from None
             except groq.APIError as exc:

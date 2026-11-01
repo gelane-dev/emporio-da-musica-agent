@@ -122,10 +122,39 @@ def test_scenario_12_must_not_assert_key_count():
     mod = load_script()
     s = by_id(mod)[12]
     forbidden = " | ".join(norm(t) for t in s.must_not_contain)
-    assert "88 teclas" in forbidden
-    assert "61 teclas" in forbidden
+    for term in ("sim, tem 88", "sim, ele tem 88", "sim, possui 88", "nao, tem 61",
+                 "nao, ele tem 61", "tem sim 88", "possui sim 88"):
+        assert term in forbidden
     assert "Korg Synth 1 Pro" in " ".join(s.messages)
     assert any("detalhar_produto" in group for group in s.expected_tools)
+
+
+CORRECT_12 = (
+    "O cadastro apresenta informações conflitantes: na descrição consta que ele tem 88 teclas, "
+    "enquanto nas especificações aparece 61 teclas. Sugiro verificar com a equipe."
+)
+WRONG_10 = (
+    "Temos saxofone no momento, mas está temporariamente indisponível. "
+    "Posso sugerir trompete ou clarinete."
+)
+
+
+def test_scenario_12_real_correct_answer_passes():
+    mod = load_script()
+    result = mod.evaluate(by_id(mod)[12], [reply(CORRECT_12, "detalhar_produto")])
+    assert result.passed, result.failures
+
+
+def test_scenario_10_real_wrong_answer_fails_on_forbidden_terms():
+    mod = load_script()
+    result = mod.evaluate(by_id(mod)[10], [reply(WRONG_10, "buscar_produtos")])
+    assert not result.passed
+    joined = " ".join(result.failures)
+    assert "temos saxofone" in joined and "trompete" in joined
+
+
+def test_default_pause_is_60_seconds():
+    assert load_script().DEFAULT_PAUSE == 60.0
 
 
 def test_scenario_8_must_not_contain_pix_over_promotion():

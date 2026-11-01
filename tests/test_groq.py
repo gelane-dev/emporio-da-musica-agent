@@ -388,6 +388,46 @@ def test_bad_request_without_body_is_not_retried():
     assert len(fake.calls) == 1
 
 
+# --- paciência extra para 429 -------------------------------------------------
+
+def rate_limit_error(retry_after: str | None) -> groq.RateLimitError:
+    headers = {} if retry_after is None else {"retry-after": retry_after}
+    response = httpx.Response(
+        429, headers=headers, request=httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions")
+    )
+    return groq.RateLimitError(f"falha {API_TEXT}", response=response, body=None)
+
+
+def test_rate_limit_short_retry_after_waits_and_succeeds():
+    sleeps: list[float] = []
+    fake = FakeGroq(rate_limit_error("12"), completion("ok"))
+    out = complete(make_client(fake, sleep=sleeps.append))
+    assert out.text == "ok"
+    assert sleeps == [12.0]
+    assert len(fake.calls) == 2
+
+
+def test_rate_limit_retries_at_most_three_times():
+    sleeps: list[float] = []
+    fake = FakeGroq(rate_limit_error("90"))
+    with pytest.raises(LLMError) as exc:
+        complete(make_client(fake, sleep=sleeps.append))
+    assert exc.value.kind == "rate_limit"
+    assert sleeps == [90.0, 90.0, 90.0]
+    assert len(fake.calls) == 4
+
+
+@pytest.mark.parametrize("header", ["91", "600", None, "abc"])
+def test_rate_limit_long_or_missing_retry_after_does_not_wait(header):
+    sleeps: list[float] = []
+    fake = FakeGroq(rate_limit_error(header), completion("nunca"))
+    with pytest.raises(LLMError) as exc:
+        complete(make_client(fake, sleep=sleeps.append))
+    assert exc.value.kind == "rate_limit"
+    assert sleeps == []
+    assert len(fake.calls) == 1
+
+
 # --- exceções do SDK ----------------------------------------------------------
 
 @pytest.mark.parametrize("make_error,kind", [
