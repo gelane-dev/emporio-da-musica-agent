@@ -1,0 +1,5 @@
+Repetição 1/2: REPROVADA
+  Total: 4/14 checagens
+Repetição 2/2: REPROVADA
+  Total: 3/14 checagens
+(Execução 3 inválida: todas as falhas foram 429 por cota diária de tokens; ver docs/E2E_RESULTS.md)

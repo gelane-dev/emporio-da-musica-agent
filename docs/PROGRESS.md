@@ -21,7 +21,7 @@
 | T11 Loop do agente | concluída | `f7e1088` | [[ARCHITECTURE#5.7.2 Contrato detalhado da T11 (loop do agente e sessão)]] |
 | T12 Encaminhamento | concluída | `585ac91` |
 | T13 CLI | concluída | `453a1cb` |
-| T14 Cenários E2E | preparação concluída; **execução real bloqueada pela credencial** | `9df578b` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
+| T14 Cenários E2E | 10 de 13 cenários aprovados em execuções reais; 5, 9, 10 pendentes de cota (relatório [[docs/E2E_RESULTS]]) | `9df578b`, `3f1f29d`, `d84ca0c` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
 | T16 README | em inglês e atualizado para Groq (resultados e exemplos pendentes de T14/T15) | (commit `docs: README em inglês`) | `5e82722` rascunho PT | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
 | T15, T17 | pendentes | — T14/T15 exigem credencial da API (ver pendências) |
 
@@ -64,7 +64,7 @@ Lições:
 |---|---|---|---|
 | 1 (pausa 10 s) | 9/14 e 11/14 | agente não consultava pedido; emoji; falsos negativos do avaliador (hífen U+2011, "20 %") | `3f1f29d` (prompt, guard de saída, avaliador, isolamento de credenciais nos testes) |
 | 2 (pausa 10 s) | 11/14 e 9/14 | produto inventado após busca vazia; devolução sem política; 429 por 8K tokens/min | `d84ca0c` (grounding nas tools e prompt, paciência com 429, pausa 60 s) |
-| 3 (pausa 60 s) | 4/14 (inválida) | **cota diária esgotada**: 200K tokens/dia por modelo, janela móvel de 24 h (mensagem 429 da Groq); nenhum cenário avaliou o agente | aguardando decisão do usuário |
+| 3 (pausa 60 s) | 4/14 (inválida) | **cota diária esgotada**: 200K tokens/dia por modelo, janela móvel de 24 h (mensagem 429 da Groq); nenhum cenário avaliou o agente | decisão do usuário: sem novas baterias completas; só os testes essenciais pendentes (cenários 5, 10, 9) quando a cota renovar — ver [[docs/E2E_RESULTS]] |
 
 Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateria completa (13 × 2) consome perto de 100–200 mil tokens, ou seja, a cota diária inteira.
 

@@ -12,6 +12,7 @@ Protótipo em Python (desafio Artefact). Este arquivo é só um índice; o repos
 | Tarefas e critérios de aceite | `TASKS.md` |
 | Decisões técnicas e diretrizes aprovadas | `TECHNICAL_DECISIONS.md` |
 | Fatos sobre os dados e o manual, ambiguidades P1–P16 | `DATA_ANALYSIS.md` |
+| Resultados reais da T14 e testes pendentes (cota Groq) | `docs/E2E_RESULTS.md` |
 
 ## Regras essenciais
 
