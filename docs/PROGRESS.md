@@ -19,11 +19,12 @@
 | T09 Ferramentas | concluída | `d7828ec` | [[ARCHITECTURE#5.5.1 Contrato detalhado da T09 (ferramentas)]] |
 | T10 Prompt | concluída | `9ab4b5c` | [[ARCHITECTURE#5.7.1 Contrato detalhado da T10 (prompt de sistema)]] |
 | T11 Loop do agente | concluída | `1166fb1` | [[ARCHITECTURE#5.7.2 Contrato detalhado da T11 (loop do agente e sessão)]] |
-| T12 Encaminhamento | concluída | `fa858b9` |
-| T13 CLI | concluída | `80f487f` |
-| T14 Cenários E2E | 10 de 13 cenários aprovados em execuções reais; 5, 9, 10 pendentes de cota (relatório [[docs/E2E_RESULTS]]) | `b80958e`, `1a0779f`, `4ac2216` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
-| T16 README | em inglês e atualizado para Groq (resultados e exemplos pendentes de T14/T15) | (commit `docs: README em inglês`) | `20c9785` rascunho PT | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
-| T15, T17 | pendentes | — T14/T15 exigem credencial da API (ver pendências) |
+| T12 Encaminhamento | concluída | `fa858b9` | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
+| T13 CLI | concluída | `80f487f` | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] |
+| T14 Cenários E2E | 10 de 13 cenários aprovados em execuções reais; 5, 9, 10 ainda não validados (relatório [[docs/E2E_RESULTS]]) | `b80958e`, `1a0779f`, `4ac2216` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
+| T15 Conversas de exemplo | preparação concluída (gravador + 3 roteiros); conversas reais pendentes de cota | `01f50ba` | [[ARCHITECTURE#5.9.2 Contrato da T15 (gravação das conversas de exemplo)]] |
+| T16 README | em inglês com resultados reais da T14; exemplos pendentes da T15 | `f541806` | — |
+| T17 Entrega | revisão sem cota concluída; revisão final e publicação pendentes (aprovação do usuário) | — | ver "Preparação da T17" |
 
 Suíte atual: 1029 testes passando + 2 smokes reais pulados (Anthropic e Groq), sem avisos; verificada também em clone limpo e em ambiente virtual novo instalado só pelo `requirements.txt`.
 
