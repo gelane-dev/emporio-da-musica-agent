@@ -22,9 +22,9 @@
 | T12 Encaminhamento | concluída | `fa858b9` | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
 | T13 CLI | concluída | `80f487f` | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] |
 | T14 Cenários E2E | 10 de 13 cenários aprovados em execuções reais; 5, 9, 10 ainda não validados (relatório [[docs/E2E_RESULTS]]) | `b80958e`, `1a0779f`, `4ac2216` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
-| T15 Conversas de exemplo | preparação concluída (gravador + 3 roteiros); conversas reais pendentes de cota | `01f50ba` | [[ARCHITECTURE#5.9.2 Contrato da T15 (gravação das conversas de exemplo)]] |
-| T16 README | em inglês com resultados reais da T14; exemplos pendentes da T15 | `f541806` | — |
-| T17 Entrega | revisão sem cota concluída; revisão final e publicação pendentes (aprovação do usuário) | — | ver "Preparação da T17" |
+| T15 Conversas de exemplo | 3 conversas reais publicadas (C1 `low` com nota de revisão; C2 `low` correta; C3 `medium` correta); regravação da C1 em `medium` pendente | `01f50ba` | [[ARCHITECTURE#5.9.2 Contrato da T15 (gravação das conversas de exemplo)]] |
+| T16 README | final em inglês (exemplos reais, histórico da T14 em `low`, regressão `medium` pendente) | `f541806` | — |
+| T17 Entrega | preparada para publicação (histórico limpo, revisão de segurança, testes); **push aguardando autorização do usuário** | — | ver "Preparação da T17" |
 
 Suíte atual: 1029 testes passando + 2 smokes reais pulados (Anthropic e Groq), sem avisos; verificada também em clone limpo e em ambiente virtual novo instalado só pelo `requirements.txt`.
 
@@ -88,6 +88,12 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 2. T15: 3 conversas reais gravadas com `--save` (catálogo; preço/parcelamento/promoção; devolução não trivial), sem edição de conteúdo.
 3. T16: README final com resultados e exemplos reais.
 4. T17: revisão final e aprovação do usuário para publicar.
+
+## Reescrita do histórico para publicação (02/11/2026, autorizada pelo usuário)
+
+- Backup antes de alterar: bundle completo do repositório e cópia do `frontend/` (sem `node_modules`/`dist`) em `C:/Users/Dell/Desktop/emporio-da-musica-agent-backups/20261102-1849`.
+- `frontend/` e `.obsidian/` removidos do versionamento (mantidos no disco, no `.gitignore`); `frontend/` expurgado de todo o histórico (`git filter-branch --index-filter`, `--prune-empty`): 2 commits que só continham o frontend foram removidos; a mensagem do commit que ficou só com a alteração do `.gitignore` foi corrigida.
+- Verificado: nenhum commit/objeto com `frontend/` ou com o enunciado do desafio; `git fsck` limpo; referências de commit da documentação atualizadas.
 
 ## Pendências abertas
 
