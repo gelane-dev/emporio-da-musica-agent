@@ -115,13 +115,31 @@ def from_groq_response(response: Any) -> LLMResponse:
     )
 
 
-def _is_tool_use_failed(exc: groq.BadRequestError) -> bool:
+_RETRYABLE_CODES = frozenset({"tool_use_failed", "output_parse_failed"})
+_DEGENERATE_MIN_LINES = 5
+
+
+def is_degenerate(text: str | None) -> bool:
+    """``True`` se há ≥ 5 linhas não vazias só de pontuação, reticências, travessões, asteriscos,
+    espaços ou caracteres de largura zero (raciocínio vazando para o conteúdo)."""
+    if not text:
+        return False
+    junk = sum(
+        1 for line in text.splitlines() if line.strip() and not any(ch.isalnum() for ch in line)
+    )
+    return junk >= _DEGENERATE_MIN_LINES
+
+
+def _error_code(exc: groq.BadRequestError) -> str | None:
+    """``error.code`` do corpo do 400, só se for uma string curta e segura."""
     body = getattr(exc, "body", None)
     if isinstance(body, dict):
         error = body.get("error", body)
         if isinstance(error, dict):
-            return error.get("code") == "tool_use_failed"
-    return False
+            code = error.get("code")
+            if isinstance(code, str) and code and all(ch.isalnum() or ch in "_-." for ch in code[:64]):
+                return code[:64]
+    return None
 
 
 def _map_error(exc: groq.APIError) -> LLMError:
@@ -223,18 +241,23 @@ class GroqClient:
 
         attempt = 0
         rate_attempt = 0
+        degenerate_retried = False
         while True:
             try:
                 response = self._client.chat.completions.create(**kwargs)
             except groq.BadRequestError as exc:
-                if _is_tool_use_failed(exc) and attempt < self._tool_use_failed_retries:
+                code = _error_code(exc)
+                if code in _RETRYABLE_CODES and attempt < self._tool_use_failed_retries:
                     attempt += 1
                     logger.warning(
-                        "Groq: tool_use_failed (tentativa %d/%d); repetindo a requisição.",
+                        "Groq: erro de geração (%s) (tentativa %d/%d); repetindo a requisição.",
+                        code,
                         attempt,
                         self._tool_use_failed_retries,
                     )
                     continue
+                if code is not None:
+                    logger.warning("Groq: HTTP 400 (error.code=%s).", code)
                 raise _map_error(exc) from None
             except groq.RateLimitError as exc:
                 # O SDK já esgotou suas retries; espera extra só se o retry-after for curto.
@@ -256,4 +279,11 @@ class GroqClient:
                 raise _map_error(exc) from None
             except groq.APIError as exc:
                 raise _map_error(exc) from None
-            return from_groq_response(response)
+            result = from_groq_response(response)
+            if is_degenerate(result.text):
+                if not degenerate_retried:
+                    degenerate_retried = True
+                    logger.warning("Groq: resposta degenerada; repetindo a requisição uma vez.")
+                    continue
+                logger.warning("Groq: resposta degenerada também na repetição; usando a 2ª.")
+            return result

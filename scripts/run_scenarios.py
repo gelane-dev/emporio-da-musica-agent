@@ -231,10 +231,34 @@ def _norm(text: str) -> str:
     return re.sub(r"[ ]{2,}", " ", plain)
 
 
+LLM_ERROR_FAILURE = "erro operacional do LLM (não avaliado)"
+_NEGATION_BEFORE = re.compile(r"(?:^|\s)(?:nao|nem|nenhum)\s+$")
+
+
+def _has_affirmed(haystack: str, term: str) -> bool:
+    """True se ``term`` ocorre sem negação ("nao ", "nem ", "nenhum ") imediatamente antes, na mesma frase."""
+    start = haystack.find(term)
+    while start != -1:
+        prefix = re.split(r"[.!?;\n]", haystack[:start])[-1]
+        if not _NEGATION_BEFORE.search(prefix):
+            return True
+        start = haystack.find(term, start + 1)
+    return False
+
+
 def evaluate(scenario: Scenario, replies: list[AgentReply]) -> ScenarioResult:
     """Aplica as checagens do cenário às respostas (texto = respostas concatenadas)."""
     texts = tuple(r.text for r in replies)
     tools = tuple(call.name for r in replies for call in r.tool_calls)
+    if any(r.stop == "llm_error" for r in replies):
+        # Erro operacional nunca é aprovação: o fallback de erro não é avaliado.
+        return ScenarioResult(
+            scenario_id=scenario.id,
+            passed=False,
+            failures=(LLM_ERROR_FAILURE,),
+            tools_called=tools,
+            replies=texts,
+        )
     haystack = _norm("\n".join(texts))
     failures: list[str] = []
 
@@ -248,7 +272,7 @@ def evaluate(scenario: Scenario, replies: list[AgentReply]) -> ScenarioResult:
         if not any(_norm(term) in haystack for term in group):
             failures.append(f"termo esperado ausente (ao menos um de: {', '.join(group)})")
     for term in scenario.must_not_contain:
-        if _norm(term) in haystack:
+        if _has_affirmed(haystack, _norm(term)):
             failures.append(f"termo proibido presente: {term}")
 
     return ScenarioResult(

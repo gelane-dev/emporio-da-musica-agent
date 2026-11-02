@@ -153,6 +153,68 @@ def test_scenario_10_real_wrong_answer_fails_on_forbidden_terms():
     assert "temos saxofone" in joined and "trompete" in joined
 
 
+def _err_reply():
+    return AgentReply(
+        text="Desculpe, estou com um problema técnico. Tente novamente em instantes.",
+        tool_calls=[],
+        stop="llm_error",
+    )
+
+
+def test_llm_error_never_counts_as_pass_even_if_checks_would_pass():
+    mod = load_script()
+    sc = scenario(mod, must_not_contain=("xyz",))  # sem exigências: passaria
+    result = mod.evaluate(sc, [_err_reply()])
+    assert not result.passed
+    assert result.failures == ("erro operacional do LLM (não avaliado)",)
+
+
+def test_scenario_10_llm_error_fails():
+    mod = load_script()
+    result = mod.evaluate(by_id(mod)[10], [_err_reply()])
+    assert not result.passed
+    assert "erro operacional do LLM (não avaliado)" in result.failures
+
+
+def test_llm_error_in_any_turn_fails_and_report_and_table_show_reason():
+    mod = load_script()
+    sc = scenario(mod, messages=("oi", "e agora?"))
+    result = mod.evaluate(sc, [reply("Olá!"), _err_reply()])
+    assert not result.passed
+    assert "erro operacional do LLM (não avaliado)" in mod._format_table((sc,), [result])
+    report = mod._format_report((sc,), [[result]], "2026-03-25T10:00", "m")
+    assert "Falha: erro operacional do LLM (não avaliado)" in report
+
+
+def test_forbidden_term_respects_negation_real_case():
+    mod = load_script()
+    text = "No momento não temos saxofone no catálogo atual."
+    result = mod.evaluate(by_id(mod)[10], [reply(text, "buscar_produtos")])
+    assert not any("temos saxofone" in f for f in result.failures)
+
+
+@pytest.mark.parametrize("text", ["Nao temos saxofone.", "Nem temos saxofone, infelizmente.", "Nenhum temos saxofone"])
+def test_forbidden_term_negations_do_not_fail(text):
+    mod = load_script()
+    sc = scenario(mod, must_not_contain=("temos saxofone",))
+    assert mod.evaluate(sc, [reply(text)]).passed
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Sim, temos saxofone!",
+        "Não temos violão. Temos saxofone sim.",  # negação em outra frase
+        "Não temos violão e temos saxofone.",  # negação não imediatamente antes
+        "Nao temos saxofone. Mas temos saxofone no estoque.",  # segunda ocorrência afirmada
+    ],
+)
+def test_forbidden_term_affirmations_still_fail(text):
+    mod = load_script()
+    sc = scenario(mod, must_not_contain=("temos saxofone",))
+    assert not mod.evaluate(sc, [reply(text)]).passed
+
+
 def test_default_pause_is_60_seconds():
     assert load_script().DEFAULT_PAUSE == 60.0
 

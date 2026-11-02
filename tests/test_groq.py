@@ -24,6 +24,7 @@ from emporio_agent.llm.factory import create_llm_client
 from emporio_agent.llm.groq_client import (
     GroqClient,
     from_groq_response,
+    is_degenerate,
     to_groq_messages,
     to_groq_tools,
 )
@@ -543,3 +544,72 @@ def test_real_smoke_groq_responds_to_ola():
     assert response.stop_reason == "end_turn"
     assert response.text and response.text.strip()
     assert response.usage.get("output_tokens", 0) > 0
+
+
+# --- resposta degenerada e erros de geração (T14) -------------------------------
+
+REAL_DEGENERATE = (
+    "Oi! No momento não temos saxofone no catálogo atual. Porém **\u200b\u200b\u200b**  … \n\n"
+    "Desculpe…  … …… … …\n\n... \n\n\n\nSe **  **   ... … \u200b … ...\n\n\n\n... \n\n  …  … …\n\n"
+    "...\n\n—\n\nWe…\n\n**\n\n\u200b\n\n...\n"
+)
+
+
+def test_is_degenerate_real_excerpt():
+    assert is_degenerate(REAL_DEGENERATE)
+
+
+def test_is_degenerate_pure_junk_lines():
+    assert is_degenerate("\n".join(["…", "...", "—", "**", "\u200b"]))
+
+
+@pytest.mark.parametrize("text", [
+    None,
+    "",
+    "Olá! Temos violões a partir de R$ 500...",
+    "Veja:\n\n- Violão A\n- Violão B\n- Violão C\n- Violão D\n- Violão E\n- Violão F",
+    "1. Um\n2. Dois\n3. Três\n4. Quatro\n5. Cinco\n\n---\n\n**Total:** R$ 10,00",
+    "Hmm…\n...\n—\n**\nResposta útil aqui.",
+])
+def test_is_degenerate_false_for_normal_text(text):
+    assert not is_degenerate(text)
+
+
+def test_degenerate_response_is_retried_once():
+    fake = FakeGroq(completion(REAL_DEGENERATE), completion("resposta boa"))
+    out = complete(make_client(fake))
+    assert len(fake.calls) == 2
+    assert out.text == "resposta boa"
+
+
+def test_degenerate_twice_returns_second():
+    second = REAL_DEGENERATE + "\nsegunda"
+    fake = FakeGroq(completion(REAL_DEGENERATE), completion(second))
+    out = complete(make_client(fake))
+    assert len(fake.calls) == 2
+    assert out.text == second
+
+
+def test_normal_response_is_not_retried():
+    fake = FakeGroq(completion("tudo certo..."))
+    complete(make_client(fake))
+    assert len(fake.calls) == 1
+
+
+@pytest.mark.parametrize("code", ["tool_use_failed", "output_parse_failed"])
+def test_generation_error_codes_are_retried_once(code):
+    body = {"error": {"message": API_TEXT, "code": code}}
+    fake = FakeGroq(status_error(groq.BadRequestError, 400, body), completion("ok"))
+    assert complete(make_client(fake)).text == "ok"
+    assert len(fake.calls) == 2
+
+
+def test_bad_request_logs_only_error_code(caplog):
+    body = {"error": {"message": f"{API_TEXT} {SECRET}", "code": "model_decommissioned"}}
+    fake = FakeGroq(status_error(groq.BadRequestError, 400, body))
+    with caplog.at_level("WARNING", logger="emporio_agent.llm.groq_client"):
+        with pytest.raises(LLMError):
+            complete(make_client(fake))
+    assert "model_decommissioned" in caplog.text
+    assert API_TEXT not in caplog.text
+    assert SECRET not in caplog.text
