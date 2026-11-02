@@ -186,7 +186,7 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 - [x] Requisição montada sem `temperature`, sem `tool_choice`, sem `thinking`; com `output_config.effort`, cache só no bloco estável do sistema; caminho beta com fallback quando `refusal_fallback=True` (verificado com cliente SDK falso injetado).
 - [x] Exceções do SDK mapeadas para `LLMError.kind` conforme o contrato; mensagens sem a chave.
 - [x] `create_llm_client` sem chave ⇒ `LLMError(kind="auth")` com instrução do `.env`; provedor desconhecido ⇒ `kind="config"`.
-- [x] `Settings`: `llm_effort` (padrão `low`), `llm_refusal_fallback` (padrão `True`), `llm_max_tokens` padrão 16000; `read_env` reaproveitado por `load_settings`; testes da T01 continuam verdes.
+- [x] `Settings`: `llm_effort` (padrão `low`; alterado para `medium` em 02/11 — D17), `llm_refusal_fallback` (padrão `True`), `llm_max_tokens` padrão 16000; `read_env` reaproveitado por `load_settings`; testes da T01 continuam verdes.
 - [ ] Smoke test real (marcado `@pytest.mark.llm`, pulado por padrão) responde a "olá". **Escrito; execução pendente da credencial (ver PROGRESS).**
 - [x] `FakeLLM` roteirizável (respostas e exceções) e registra as chamadas.
 **Commit.** `feat(llm): interface LLMClient e adaptador Anthropic`
@@ -300,6 +300,7 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 12. "O Korg Synth 1 Pro tem 88 teclas?" ⇒ `detalhar_produto`; informa divergência no cadastro; **não** afirma 88 nem 61 teclas como fato.
 13. "Qual o WhatsApp da loja?" ⇒ `informacoes_loja`; apresenta os dois números citados no manual com a ressalva, sem eleger um.
 14. Resposta sem emojis em todos os cenários (verificação automática).
+**Revisão do critério (decisão do usuário, 01–02/11/2026):** por limite da cota diária da Groq, sem baterias completas repetidas: cenários aprovados em `low` não são repetidos; após a mudança do padrão para `medium`, **uma** regressão real dos 13 cenários e reexecução apenas dos que falharem (docs/E2E_RESULTS.md).
 **Critérios de aceite.**
 - [ ] ≥ 13/14 cenários passando em 2 execuções seguidas; cenários 5, 9, 11 e 12 são obrigatórios.
 - [ ] Ajustes de prompt registrados (o que mudou e por quê) para o README.

@@ -100,6 +100,8 @@ Todas as decisões que dependiam de aprovação foram aprovadas em 2026-11-01 (v
 
 **Consequência.** Nenhuma mudança em agente, ferramentas, domínio ou dados. Contrato em ARCHITECTURE §5.6.2. D16 passa a valer só para o adaptador Anthropic.
 
+**Revisão (02/11/2026, decisão do usuário): `LLM_EFFORT` padrão = `medium`.** Evidência real (docs/E2E_RESULTS.md §4): com `low`, o `gpt-oss-120b` deu veredito de prazo de devolução e ofereceu procedimento fora do manual mesmo com o prompt reforçado; com `medium`, não deu veredito e usou `encaminhar_atendente` com o protocolo real. `low` continua configurável. Custo: mais tokens de raciocínio por chamada (pesa no limite diário da Groq). Os resultados da T14 em `low` ficam como histórico; uma regressão única em `medium` valida o novo padrão.
+
 ## D16 — Parâmetros de chamada ao modelo (2026-11-01, antes da T08)
 
 **Contexto.** Regras atuais da API para o Claude Sonnet 5.5 (`claude-sonnet-5-5`, modelo aprovado em D5), conferidas na documentação da API antes de escrever o adaptador.

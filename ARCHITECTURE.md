@@ -644,7 +644,7 @@ def create_llm_client(settings: Settings, env: Mapping[str, str] | None = None) 
 - Sem `ANTHROPIC_API_KEY` e sem `ANTHROPIC_AUTH_TOKEN` ⇒ `LLMError(kind="auth")` com instrução: copiar `.env.example` para `.env` e preencher a chave.
 - Provedor desconhecido ⇒ `LLMError(kind="config")` citando os suportados.
 
-**`config.py` (acréscimos)** — `read_env(env_file=None, environ=None) -> dict[str, str]` (fatoração da mescla já usada por `load_settings`, que passa a chamá-la) e campos novos em `Settings`: `llm_effort: Literal["low","medium","high","xhigh","max"] = "low"` (`LLM_EFFORT`), `llm_refusal_fallback: bool = True` (`LLM_REFUSAL_FALLBACK`, aceita `true/false/1/0`); `llm_max_tokens` passa a ter padrão `16000`. `.env.example` documenta as variáveis novas.
+**`config.py` (acréscimos)** — `read_env(env_file=None, environ=None) -> dict[str, str]` (fatoração da mescla já usada por `load_settings`, que passa a chamá-la) e campos novos em `Settings`: `llm_effort: Literal["low","medium","high","xhigh","max"] = "low"` (`LLM_EFFORT`; **padrão alterado para `"medium"` em 02/11/2026 — D17**), `llm_refusal_fallback: bool = True` (`LLM_REFUSAL_FALLBACK`, aceita `true/false/1/0`); `llm_max_tokens` passa a ter padrão `16000`. `.env.example` documenta as variáveis novas.
 
 **`tests/fakes.py`** (entregue com a T08, usado pelas T10/T11)
 ```python
