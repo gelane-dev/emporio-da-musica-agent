@@ -30,8 +30,6 @@ Thumbs.db
 .obsidian/workspace*.json
 .obsidian/cache
 
-# Frontend experimental (fora do escopo desta entrega; mantido só no disco)
-frontend/
 
 # Enunciado do desafio: mantido só localmente (decisão do usuário)
 data/desafio_tecnico_ai_eng_artefact.pdf
