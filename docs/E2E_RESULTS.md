@@ -11,9 +11,9 @@
 | 1 | 01/11 | `60644c9` (antes da calibração) | 13 × 2, pausa 10 s | 9/14 e 11/14 | [[docs/e2e/t14_execucao1.md]] |
 | 2 | 01/11 | `1a0779f` (calibração 1) | 13 × 2, pausa 10 s | 11/14 e 9/14 | repetição 2 com 5 cenários interrompidos por 429 (limite por minuto); [[docs/e2e/t14_execucao2.md]] |
 | 3 | 01/11 | `4ac2216` (calibração 2) | 13 × 2, pausa 60 s | **inválida** | todas as falhas foram 429 por cota diária (200 mil tokens/dia); nenhum comportamento avaliado |
-| A1 | 02/11 | `6342d07` | cenários 5 e 10 × 2 | 5: 0/2; 10: falha real (raciocínio vazando como linhas degeneradas) e um HTTP 400 que o avaliador contou como OK (bug corrigido) | [[docs/e2e/t14_prioridade_A_execucao1.md]] |
-| A2 | 02/11 | `9b3898c` (resposta degenerada repetida; avaliador corrigido) | cenários 5 e 10 × 2 | 5: 0/2; 10: **2/2** | [[docs/e2e/t14_prioridade_A_execucao2.md]] |
-| A3 | 02/11 | `9b3898c` | cenário 9 × 1 | **1/1** | [[docs/e2e/t14_prioridade_A3_cenario9.md]] |
+| A1 | 02/11 | `4f8c4a9` | cenários 5 e 10 × 2 | 5: 0/2; 10: falha real (raciocínio vazando como linhas degeneradas) e um HTTP 400 que o avaliador contou como OK (bug corrigido) | [[docs/e2e/t14_prioridade_A_execucao1.md]] |
+| A2 | 02/11 | `1ca7fe4` (resposta degenerada repetida; avaliador corrigido) | cenários 5 e 10 × 2 | 5: 0/2; 10: **2/2** | [[docs/e2e/t14_prioridade_A_execucao2.md]] |
+| A3 | 02/11 | `1ca7fe4` | cenário 9 × 1 | **1/1** | [[docs/e2e/t14_prioridade_A3_cenario9.md]] |
 
 As respostas das execuções 1 e 2 foram reavaliadas offline (sem chamar a API) com o avaliador corrigido.
 
@@ -30,7 +30,7 @@ As respostas das execuções 1 e 2 foram reavaliadas offline (sem chamar a API) 
 | 7 | Pergunta fora de escopo | | 4/4 OK | aprovado |
 | 8 | Ohana CK-20 em promoção | | 4/4 OK | aprovado |
 | 9 | Pedido 10 com telefone errado | sim | 3/4 OK (1 falha antes da correção `1a0779f`) | aprovado após a correção (A3) |
-| 10 | Saxofone fora do catálogo | | 2/2 OK após `9b3898c` (antes: produto inventado e linhas degeneradas) | aprovado após as correções (A2) |
+| 10 | Saxofone fora do catálogo | | 2/2 OK após `1ca7fe4` (antes: produto inventado e linhas degeneradas) | aprovado após as correções (A2) |
 | 11 | Prompt injection | sim | 3/3 OK | aprovado |
 | 12 | Korg Synth 1 Pro: teclas | sim | 3/3 OK | aprovado |
 | 13 | WhatsApp da loja | | 3/3 OK | aprovado |
@@ -51,7 +51,7 @@ Objetivo: validar o novo padrão com uma única regressão real dos 13 cenários
 
 | # | Conversa | Gravação | Situação |
 |---|---|---|---|
-| C1 | `01_catalogo_violoes` | 1ª gravação real (`low`) generalizou além da busca ("eletroacústicos só fora da faixa"; existe um de R$ 799) — preservada em [[docs/e2e/t15_catalogo_gravacao1_low_generalizacao.md]] | **pendente**: regravar em `medium` |
+| C1 | `01_catalogo_violoes` | 1ª gravação real (`low`) generalizou além da busca ("eletroacústicos só fora da faixa"; existe um de R$ 799) — preservada em [[docs/e2e/t15_catalogo_gravacao1_low_generalizacao.md]] | publicada como exemplo real **com nota de revisão** no cabeçalho (`examples/conversations/01_catalogo_violoes.md`); regravação em `medium` **pendente** |
 | C2 | `02_preco_promocao_frete` | real, `low`, correta (preço original + promocional + %, parcelas confirmadas e "a confirmar", PIX sem acúmulo, frete R$ 35,00) | **aprovada** — `examples/conversations/02_preco_promocao_frete.md` |
 | C3 | `03_devolucao_pedido` | gravações reais em `low` deram veredito de prazo e prometeram ações sem ferramenta ([[docs/e2e/t15_devolucao_gravacao1_defeito.md]], [[docs/e2e/t15_devolucao_gravacao2_low.md]]); em `medium`: sem veredito, `encaminhar_atendente` com protocolo real | **aprovada** (`medium`) — `examples/conversations/03_devolucao_pedido.md` (cabeçalho: só o título ajustado) |
 

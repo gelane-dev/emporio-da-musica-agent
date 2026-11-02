@@ -3,7 +3,7 @@
 > Gravada em: 02/11/2026 18:15 (data real da gravação)  
 > Provedor/modelo: groq / openai/gpt-oss-120b (LLM_EFFORT=medium)  
 > Data de referência do agente: 25/03/2026 10:00  
-> Commit: 77a62cf  
+> Commit: 6e7ed75  
 > Conversa real, transcrita sem edição por scripts/record_example.py.
 
 # Conversa — Empório da Música
