@@ -518,7 +518,7 @@ def test_settings_defaults_are_groq():
     assert s.llm_provider == "groq"
     assert s.llm_model == GPT_OSS
     assert s.llm_max_tokens == 4096
-    assert s.llm_effort == "low"
+    assert s.llm_effort == "medium"
 
 
 def test_load_settings_defaults_without_env(tmp_path):

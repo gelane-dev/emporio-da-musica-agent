@@ -399,14 +399,14 @@ def test_factory_builds_anthropic_client():
 
 def test_settings_new_defaults():
     s = Settings()
-    assert s.llm_effort == "low"
+    assert s.llm_effort == "medium"
     assert s.llm_refusal_fallback is True
     assert s.llm_max_tokens == 4096
 
 
 def test_load_settings_defaults_without_env(tmp_path):
     s = load_settings(env_file=tmp_path / "nao_existe.env", environ={})
-    assert (s.llm_effort, s.llm_refusal_fallback, s.llm_max_tokens) == ("low", True, 4096)
+    assert (s.llm_effort, s.llm_refusal_fallback, s.llm_max_tokens) == ("medium", True, 4096)
 
 
 def test_load_settings_reads_effort_and_max_tokens(tmp_path):

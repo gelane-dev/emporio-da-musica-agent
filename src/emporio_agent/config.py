@@ -10,7 +10,7 @@ Variáveis suportadas (todas opcionais):
 - ``LLM_MODEL``: identificador do modelo (padrão ``openai/gpt-oss-120b``).
 - ``LLM_MAX_TOKENS``: máximo de tokens por resposta (padrão ``4096``).
 - ``LLM_EFFORT``: profundidade do raciocínio: ``low``, ``medium``, ``high``,
-  ``xhigh`` ou ``max`` (padrão ``low``).
+  ``xhigh`` ou ``max`` (padrão ``medium``).
 - ``LLM_REFUSAL_FALLBACK``: ``true``/``false``/``1``/``0`` — fallback de recusa no
   servidor (padrão ``true``).
 - ``REFERENCE_DATE``: data/hora controlada para testes e exemplos, em ISO 8601
@@ -50,7 +50,7 @@ class Settings(BaseModel):
     llm_provider: str = "groq"
     llm_model: str = "openai/gpt-oss-120b"
     llm_max_tokens: int = Field(default=4096, gt=0)
-    llm_effort: Literal["low", "medium", "high", "xhigh", "max"] = "low"
+    llm_effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
     llm_refusal_fallback: bool = True
     timezone: str = STORE_TIMEZONE
     reference_datetime: datetime | None = None
