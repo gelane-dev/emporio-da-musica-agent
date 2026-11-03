@@ -470,3 +470,26 @@ def test_openapi_documenta_413(tmp_path):
     paths = client.get("/openapi.json").json()["paths"]
     assert "413" in paths["/api/chat"]["post"]["responses"]
     assert "413" in paths["/api/sessions"]["post"]["responses"]
+
+
+# --- python -m emporio_agent.api: endereço configurável (usado pelo contêiner) ---
+
+from emporio_agent.api.__main__ import server_address  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    ("values", "expected"),
+    [
+        ({}, ("127.0.0.1", 8000)),
+        ({"API_HOST": "  ", "API_PORT": ""}, ("127.0.0.1", 8000)),
+        ({"API_HOST": "0.0.0.0", "API_PORT": "9000"}, ("0.0.0.0", 9000)),
+    ],
+)
+def test_server_address_usa_padrao_e_variaveis(values, expected):
+    assert server_address(values) == expected
+
+
+@pytest.mark.parametrize("port", ["abc", "0", "70000"])
+def test_server_address_rejeita_porta_invalida(port):
+    with pytest.raises(SystemExit, match="API_PORT inválida"):
+        server_address({"API_PORT": port})
