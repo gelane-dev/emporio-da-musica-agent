@@ -1,0 +1,235 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  padding: 20px 16px 16px;
+  overflow-y: auto;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--wine);
+  padding: 0 4px;
+}
+
+.brand h1 {
+  font-family: var(--serif);
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--wine);
+}
+
+.brand p {
+  margin-top: 2px;
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.new-chat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 999px;
+  background: var(--wine);
+  color: var(--paper);
+  font-size: 0.92rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(107, 28, 42, 0.15);
+  transition: background-color 0.18s ease, transform 0.15s ease;
+}
+
+.new-chat:hover {
+  background: var(--wine-deep);
+  transform: translateY(-1px);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+}
+
+.search input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  outline: none;
+  font-size: 0.88rem;
+}
+
+.search input::placeholder {
+  color: #9f8c8f;
+}
+
+.sidebar-block header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 0 4px;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.sidebar-view-all {
+  color: var(--wine);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  padding: 0;
+}
+
+.sidebar-view-all:hover {
+  text-decoration: underline;
+}
+
+.conversation-list,
+.category-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.conversation-list button,
+.category-list button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 14px;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.conversation-list button:hover,
+.category-list button:hover {
+  background: var(--beige);
+}
+
+.conversation-list button.is-active {
+  background: #ede2d4;
+  box-shadow: inset 3px 0 0 var(--wine);
+}
+
+.conversation-list__avatar {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--wine-mist);
+  color: var(--wine);
+  overflow: hidden;
+}
+
+.conversation-list__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.conversation-list__copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.conversation-list__copy strong {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversation-list__copy em,
+.conversation-empty {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversation-list__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.conversation-list time {
+  color: var(--muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.unread-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--wine);
+  box-shadow: 0 0 0 2px var(--paper);
+}
+
+.category-list button {
+  grid-template-columns: 32px 1fr auto;
+  background: #f7efe4;
+  border: 1px solid rgba(230, 217, 204, 0.6);
+  padding: 9px 12px;
+}
+
+.category-list button:hover {
+  background: #efe4d4;
+  border-color: var(--line);
+}
+
+.category-list__icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--wine);
+}
+
+.category-list__chevron {
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--wine);
+  font-size: 0.82rem;
+  padding: 8px 4px 4px;
+  line-height: 1.3;
+}
