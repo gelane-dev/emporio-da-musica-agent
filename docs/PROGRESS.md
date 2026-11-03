@@ -133,3 +133,9 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 ## Integridade dos dados originais
 
 Hashes SHA-256 de `data/` conferidos após cada tarefa (T01–T06): inalterados.
+
+## Finalização técnica (03/11/2026)
+
+- Concluído: testes do frontend (Vitest + Testing Library, 61 testes, fetch mockado); `API_HOST`/`API_PORT`; Docker (backend slim sem root, frontend nginx sem root com proxy de `/api` e limite por IP) e `compose.yaml`; CI no GitHub Actions (backend, frontend, imagens); README, `frontend/README.md`, `docs/AGENT_GUIDE.md` (padrões do projeto) e `CLAUDE.md` atualizados.
+- Validado localmente: pytest 1105 passed, 2 deselected; `npm test` 61/61, lint e build ok; imagens construídas, Compose saudável, proxy, 429 do limite e uma mensagem real pela Groq via nginx → API.
+- Pendente: conferir a primeira execução do CI no GitHub após o push; registrar a decisão (D20) em `TECHNICAL_DECISIONS.md`; o workflow não foi validado com `actionlint` (execução bloqueada localmente).

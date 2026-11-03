@@ -18,5 +18,6 @@ Protótipo em Python (desafio Artefact). Este arquivo é só um índice; o repos
 ## Regras essenciais
 
 - Nunca alterar `data/`. Não inventar regras: ambiguidade ⇒ `Limitation`.
-- Testes: `venv/Scripts/python.exe -m pytest -q` (a suíte deve continuar verde).
+- Testes: `venv/Scripts/python.exe -m pytest -q`; frontend: `cd frontend && npm test && npm run lint && npm run build` (tudo verde; o CI repete).
+- Docker: `docker compose up --build` (site em http://localhost:8080). Padrões de código, testes, Git e segurança: `docs/AGENT_GUIDE.md`.
 - Uma tarefa por vez; commit por tarefa, após validar os critérios em `TASKS.md`.

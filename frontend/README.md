@@ -23,7 +23,12 @@ O backend precisa de `GROQ_API_KEY` no `.env` da raiz. Sem a chave, `GET /api/he
 `degraded` e o chat mostra que o atendimento está indisponível. O CORS do backend libera
 `http://localhost:5173` e `http://127.0.0.1:5173` por padrão (`CORS_ORIGINS`).
 
-Outros scripts: `npm run lint` (oxlint), `npm run build` (gera `dist/`), `npm run preview`.
+Outros scripts: `npm test` (Vitest), `npm run test:watch`, `npm run lint` (oxlint), `npm run build` (gera `dist/`), `npm run preview`.
+
+Com Docker, o site e o backend sobem juntos pela raiz (`docker compose up --build`, site em
+`http://localhost:8080`): ver a seção *Running with Docker Compose* do `README.md` da raiz. A imagem
+deste diretório (`Dockerfile`) faz o build com Node e serve o `dist/` com nginx sem root; o nginx
+encaminha `/api/` ao backend (`nginx/default.conf.template`), com limite de requisições por IP.
 
 ## Modos
 
@@ -75,8 +80,12 @@ aparece com os asteriscos).
 
 ## Verificação e limitações
 
-- Verificado só localmente: `npm run lint` e `npm run build` sem erros. Não há testes
-  automatizados do frontend. A API é testada no backend (`tests/test_api.py`, com LLM falso).
+- Testes automatizados em `tests/` (Vitest + React Testing Library, jsdom): 61 testes de
+  serviços, hooks, componentes e da `ChatPage` integrada. Nenhum teste acessa a rede: o modo API é
+  ligado por arquivo (`vi.hoisted(() => vi.stubEnv('VITE_API_BASE_URL', ...))`, porque os módulos
+  leem a variável na importação) e o `fetch` é trocado por uma tabela de rotas (`tests/helpers.js`)
+  que falha em qualquer chamada não mapeada. `npm run lint` e `npm run build` sem erros; os três
+  rodam no CI (`.github/workflows/ci.yml`). A API é testada no backend (`tests/test_api.py`).
 - Integração real validada uma vez: navegador → frontend → API → agente → Anthropic
   `claude-sonnet-5-5` (03/11/2026, `docs/e2e/web_e2e_anthropic.md`). Com a Groq (provedor
   padrão) o caminho web **não** foi executado.
@@ -89,5 +98,6 @@ aparece com os asteriscos).
 
 ## Estrutura
 
-`components/` (chat, layout, produtos), `pages/`, `hooks/` (estado das conversas e do backend), `services/` (HTTP),
-`styles/`, `data/` (somente modo demonstrativo), `utils/`.
+`src/`: `components/` (chat, layout, produtos), `pages/`, `hooks/` (estado das conversas e do backend),
+`services/` (HTTP; único lugar com caminhos `/api`), `styles/`, `data/` (conteúdo do modo demonstrativo,
+sugestões e categorias), `utils/`. `tests/` espelha o `src/`. `nginx/` e `Dockerfile`: imagem de produção.

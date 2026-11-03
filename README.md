@@ -9,8 +9,10 @@ Text-based customer service agent for the fictional musical instrument store Emp
 - [Technologies](#technologies)
 - [Installation and configuration](#installation-and-configuration)
 - [Running](#running)
+- [Running with Docker Compose](#running-with-docker-compose)
 - [HTTP API](#http-api)
 - [Tests](#tests)
+- [Continuous integration](#continuous-integration)
 - [Utilities](#utilities)
 - [Architecture](#architecture)
 - [Folder structure](#folder-structure)
@@ -75,12 +77,14 @@ How a turn works: the customer message goes to the model together with the syste
 - FastAPI (HTTP API) served by uvicorn (ASGI server)
 - pytest (tests); httpx, only because FastAPI's `TestClient` needs it in the API tests
 - Frontend: React 19 and Vite 8 (`@vitejs/plugin-react`), oxlint for linting; plain CSS, no UI library, no router, no state library (state lives in one hook). Node.js 20+.
+- Frontend tests: Vitest with jsdom, React Testing Library and `user-event`
+- Delivery: Docker (backend on `python:3.13-slim`, frontend served by unprivileged nginx), Docker Compose, GitHub Actions
 
 Pinned versions are in [requirements.txt](requirements.txt) and [frontend/package.json](frontend/package.json) (exact versions in `frontend/package-lock.json`).
 
 ## Installation and configuration
 
-Requirements: Python 3.13 (`requires-python = ">=3.13"`) and a Groq API key (`GROQ_API_KEY`) to talk to the default model. Alternatively, an Anthropic key (`ANTHROPIC_API_KEY`) with `LLM_PROVIDER=anthropic`. The automated tests need no key.
+Requirements: Python 3.13 (`requires-python = ">=3.13"`), Node.js 20+ for the web chat, and a Groq API key (`GROQ_API_KEY`) to talk to the default model. Alternatively, an Anthropic key (`ANTHROPIC_API_KEY`) with `LLM_PROVIDER=anthropic`. The automated tests need no key. With Docker installed, Python and Node are not needed on the host: see [Running with Docker Compose](#running-with-docker-compose).
 
 ```bash
 python -m venv venv
@@ -106,6 +110,9 @@ Edit `.env` and fill in `GROQ_API_KEY`. The `.env` file is not versioned. Variab
 | `MAX_HISTORY_TURNS` | `50` | history window |
 | `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | HTTP API only: comma-separated origins allowed by CORS (the Vite dev server) |
 | `MAX_SESSIONS` | `200` | HTTP API only: sessions kept in memory; above it, the least recently used idle session is dropped |
+| `API_HOST`, `API_PORT` | `127.0.0.1`, `8000` | HTTP API only: address of `python -m emporio_agent.api` (the container forces `0.0.0.0:8000`) |
+| `PUBLIC_URL` | `http://localhost:8080` | Docker Compose only: URL the browser uses to open the site; baked into the frontend build |
+| `FRONTEND_PORT`, `BACKEND_PORT` | `8080`, `8000` | Docker Compose only: host ports of the site and of the backend (the backend port is bound to `127.0.0.1`) |
 
 Note: the default of `LLM_EFFORT` is now `medium` (it was `low` earlier in the project; see [Technical decisions](#technical-decisions)). An older local `.env` that still contains `LLM_EFFORT=low` overrides the default, so update or remove that line.
 
@@ -159,7 +166,35 @@ npm install
 npm run dev                 # http://localhost:5173
 ```
 
-`VITE_API_BASE_URL` selects the mode. Filled in: **API mode**, the chat talks to the real agent through the backend above. Empty or missing: **demo mode**, with fictional answers from `frontend/src/data/` and no agent at all; the header shows "Modo demonstração" and a footer notice says the answers are fictional. The variable is read at dev/build time, so restart `npm run dev` after changing it. Other scripts: `npm run lint` (oxlint), `npm run build` (writes `frontend/dist/`), `npm run preview`. Details: [frontend/README.md](frontend/README.md).
+`VITE_API_BASE_URL` selects the mode. Filled in: **API mode**, the chat talks to the real agent through the backend above. Empty or missing: **demo mode**, with fictional answers from `frontend/src/data/` and no agent at all; the header shows "Modo demonstração" and a footer notice says the answers are fictional. The variable is read at dev/build time, so restart `npm run dev` after changing it. Other scripts: `npm test` (Vitest), `npm run lint` (oxlint), `npm run build` (writes `frontend/dist/`), `npm run preview`. Details: [frontend/README.md](frontend/README.md).
+
+## Running with Docker Compose
+
+Requires Docker with Compose v2. From the repository root:
+
+```bash
+cp .env.example .env        # PowerShell: Copy-Item .env.example .env — then fill in GROQ_API_KEY
+docker compose up --build   # site at http://localhost:8080, Swagger at http://localhost:8000/docs
+docker compose down         # stop (the runtime volume with handoffs is kept; add -v to drop it)
+```
+
+| Service | Image | What it does |
+|---|---|---|
+| `backend` | [Dockerfile](Dockerfile): `python:3.13-slim`, non-root user | `python -m emporio_agent.api` on port 8000, published only on `127.0.0.1:${BACKEND_PORT}`. Contains only the code, the runtime dependencies, `knowledge/policies.md` and the CSV files (the [.dockerignore](.dockerignore) is an allow-list: no `.env`, PDFs, docs or tests). Configuration comes from `.env` through `env_file`; without the file the service still starts, in degraded mode. Volume `runtime` keeps `runtime/handoffs.jsonl`. |
+| `frontend` | [frontend/Dockerfile](frontend/Dockerfile): Node build stage + `nginxinc/nginx-unprivileged` | Serves the built site on `${FRONTEND_PORT}` and proxies `/api/` to the backend ([nginx template](frontend/nginx/default.conf.template)), so the browser talks to one origin and CORS is not involved. Long proxy timeout for slow replies, SPA fallback, long cache for hashed assets, and a per-IP rate limit on `/api/` (20 requests/min, burst 10) answered with the API's own `{error, message}` envelope. |
+
+Both services have health checks (`/api/health` and `/healthz`); the frontend starts only after the backend is healthy. The backend health check passes in degraded mode too (the process is up); the agent status is in the body of `/api/health` and in the chat header.
+
+**Deploy preparation.** The images are self-contained and reproducible from a clean checkout (the CI builds them on every push). For a host other than `localhost`:
+
+1. Set `PUBLIC_URL` to the public address of the site (for example `https://chat.example.com`) and rebuild the frontend: Vite reads `VITE_API_BASE_URL` at build time, and Compose passes `PUBLIC_URL` as that build argument.
+2. Provide the provider key as an environment variable or secret of the platform instead of a file, and keep the defaults of the other variables unless needed.
+3. Put TLS in front of the frontend service (a load balancer or reverse proxy); only the frontend port needs to be public.
+4. Run a **single backend replica**: sessions live in process memory (see [Known limitations](#known-limitations)).
+
+`BACKEND_URL` (frontend container, default `http://backend:8000`) points nginx at a backend outside Compose if needed.
+
+Validated on 2026-11-03 on Windows (Docker 29.7, Compose 5.4): both images built (backend 486 MB, mostly pandas/numpy; frontend 89 MB), both services healthy, site and SPA fallback served, `/api/health` and `POST /api/sessions` answered through the proxy, the backend running as a non-root user, the rate limit returning 429 with the JSON envelope, and one real chat message (Groq, `openai/gpt-oss-120b`) answered through nginx → API → agent with a call to `informacoes_loja`.
 
 ## HTTP API
 
@@ -222,11 +257,13 @@ Two kinds of verification, kept apart on purpose:
 **1. Automated local tests: no real model, no network.**
 
 ```bash
-python -m pytest -q          # full Python suite, never calls the real model
-cd frontend && npm run lint && npm run build   # frontend: static checks and production build
+python -m pytest -q                                   # backend: full Python suite, never calls the real model
+cd frontend && npm test && npm run lint && npm run build   # frontend: tests, static checks, production build
 ```
 
-Unit and integration tests use a fake LLM (`FakeLLM` in `tests/fakes.py`). The API tests (`tests/test_api.py`) run the FastAPI app in-process with `TestClient` and the same fake LLM: routes, status codes, error envelope, degraded mode, CORS preflight, OpenAPI routes, session store (limit, eviction, busy session, concurrent requests, random session ids), body size limit (413) and the absence of tool arguments and personal data in responses. Current state: **1099 passed, 2 deselected** (the two `llm` smoke tests below); it was 1091 at commit `71bd693`, before the fixes from the final review. `npm run lint` and `npm run build` pass. The frontend has **no automated tests** (no unit or browser tests).
+Unit and integration tests use a fake LLM (`FakeLLM` in `tests/fakes.py`). The API tests (`tests/test_api.py`) run the FastAPI app in-process with `TestClient` and the same fake LLM: routes, status codes, error envelope, degraded mode, CORS preflight, OpenAPI routes, session store (limit, eviction, busy session, concurrent requests, random session ids), body size limit (413) and the absence of tool arguments and personal data in responses. Current state: **1105 passed, 2 deselected** (the two `llm` smoke tests below).
+
+The frontend suite (`frontend/tests/`, **61 tests**, Vitest + React Testing Library on jsdom) never touches the network: every test either runs in demo mode or replaces `fetch` with a route table that fails on any unmapped call. It covers the HTTP client (error envelope, network failure, timeout with abort), `chatService` in both modes, the `useConversations` hook (sending, persistence in `localStorage`, `404` with a new session and a notice, automatic retry on `409`, no retry on `422`, empty replies, failed greeting), `useBackendHealth`, the `Composer`, `MessageList`, `ChatPanel` and `Sidebar` components, and the whole `ChatPage` rendered against a mocked API (greeting, typing indicator, reply, error with "Tentar de novo", suggestions, backend down). Tests query by role, label and visible text, not by implementation details; a mutation check (breaking the 404 and 422 handling in the hook) made the suite fail as expected. `npm run lint` and `npm run build` pass.
 
 **2. Tests with a real provider (Groq by default; Anthropic as the alternative), run by hand.**
 
@@ -236,6 +273,18 @@ python scripts/run_scenarios.py ...   # end-to-end scenarios (T14), see below
 ```
 
 Tests marked `llm` are skipped by default (`addopts = "-m 'not llm'"`). The real-model results ([End-to-end scenario results](#end-to-end-scenario-results-t14), [docs/E2E_RESULTS.md](docs/E2E_RESULTS.md), the recorded examples) were obtained **through the agent directly** (`scripts/run_scenarios.py`, `scripts/record_example.py`). The web path was exercised once with a real provider on 2026-11-03: a headless browser drove the real frontend (Vite, API mode) through the HTTP API to the agent with Anthropic `claude-sonnet-5-5` (`LLM_MAX_TOKENS=4096`, `medium`). Two customer messages, three model calls: the Ohana CK-20 price, promotion and installments came from `detalhar_produto`, and the follow-up "E em 4x?" was answered from the session context. The same run checked degraded mode (no key: health `degraded`, 503 shown in the chat) and an unreachable provider (200 with `stop: "llm_error"` and Mel's fallback text in the chat). Evidence: [docs/e2e/web_e2e_anthropic.md](docs/e2e/web_e2e_anthropic.md). The web path has **not** been run with Groq.
+
+## Continuous integration
+
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs on every push and pull request to `main`, on a clean Ubuntu runner, with no `.env` and no API key:
+
+| Job | Steps |
+|---|---|
+| Backend (pytest) | Python 3.13 with pip cache, `pip install -r requirements.txt`, `python -m pytest -q`, `python scripts/build_policies.py --check` |
+| Frontend (lint, tests, build) | Node 24 with npm cache, `npm ci`, `npm run lint`, `npm test`, `npm run build` |
+| Docker images | after both jobs pass: `docker compose config --quiet` and `docker compose build` |
+
+The workflow has read-only permissions and cancels superseded runs on the same branch. No job calls a real AI provider: the `llm` smoke tests are excluded by the pytest configuration and the frontend tests mock `fetch`.
 
 ## Utilities
 
@@ -490,7 +539,7 @@ emporio-da-musica-agent/
 │   ├── cli.py                   # terminal interface; build_agent() and greeting() shared with the API
 │   ├── config.py                # Settings from .env (provider, model, REFERENCE_DATE, limits)
 │   ├── api/                     # HTTP layer (FastAPI)
-│   │   ├── __main__.py          # python -m emporio_agent.api → uvicorn on 127.0.0.1:8000
+│   │   ├── __main__.py          # python -m emporio_agent.api → uvicorn (API_HOST/API_PORT, default 127.0.0.1:8000)
 │   │   ├── app.py               # create_app(): routes, error envelope, CORS, degraded mode
 │   │   ├── schemas.py           # Pydantic request/response/error models
 │   │   └── sessions.py          # SessionStore: in-memory sessions, lock per session, LRU limit
@@ -502,20 +551,25 @@ emporio-da-musica-agent/
 │   └── policies/store.py        # PolicyStore: sections of knowledge/policies.md
 ├── frontend/                    # web chat (React 19 + Vite 8)
 │   ├── .env.example             # VITE_API_BASE_URL
+│   ├── Dockerfile, nginx/       # build stage + unprivileged nginx (static site, /api proxy, rate limit)
 │   ├── public/                  # favicon and demo images
-│   └── src/
-│       ├── main.jsx, App.jsx
-│       ├── pages/ChatPage.jsx
-│       ├── components/          # chat/, layout/, products/, icons.jsx
-│       ├── hooks/useConversations.js
-│       ├── services/            # http.js (only HTTP client), chatService.js (only place with /api paths)
-│       ├── data/                # demo mode only: demo.js, demoChat.js
-│       ├── styles/, utils/
+│   ├── src/
+│   │   ├── main.jsx, App.jsx
+│   │   ├── pages/ChatPage.jsx
+│   │   ├── components/          # chat/, layout/, products/, icons.jsx
+│   │   ├── hooks/               # useConversations.js (chat state), useBackendHealth.js
+│   │   ├── services/            # http.js (only HTTP client), chatService.js (only place with /api paths)
+│   │   ├── data/                # demo content, suggestions and categories (demo.js, demoChat.js)
+│   │   ├── styles/, utils/
+│   └── tests/                   # Vitest + Testing Library, mirrors src/ (services, hooks, components, pages, utils)
 ├── scripts/                     # build_policies.py, run_scenarios.py (T14), record_example.py (T15)
 ├── tests/                       # pytest suite (FakeLLM); tests/test_api.py covers the HTTP API
 ├── examples/conversations/      # real example conversations (T15)
 ├── docs/                        # PROGRESS.md, AGENT_GUIDE.md, E2E_RESULTS.md, e2e/ (real transcripts)
-├── .env.example                 # backend configuration (copy to .env)
+├── .github/workflows/ci.yml     # CI: backend tests, frontend lint/tests/build, Docker images
+├── Dockerfile, .dockerignore    # backend image (allow-list context)
+├── compose.yaml                 # backend + frontend
+├── .env.example                 # backend and Compose configuration (copy to .env)
 ├── requirements.txt, pyproject.toml
 └── README.md, ARCHITECTURE.md, TECHNICAL_DECISIONS.md, TASKS.md, DATA_ANALYSIS.md
 ```
@@ -586,10 +640,10 @@ Full analysis in [DATA_ANALYSIS.md](DATA_ANALYSIS.md).
 - **No return verdict.** Orders carry neither the purchase channel nor the real delivery date, so the agent does not say whether a return or exchange is eligible.
 - **No persistence across sessions.** Each conversation lives in memory; only the optional transcript is written to disk (CLI only; the API has no transcript export).
 - **No real WhatsApp channel.** CLI and a local web chat only; messaging integrations were not implemented. The handoff protocol is local.
-- **Web path validated once, with Anthropic only.** One short real conversation frontend → API → agent → Anthropic `claude-sonnet-5-5` (2026-11-03, [evidence](docs/e2e/web_e2e_anthropic.md)); no conversation through the web path with the default Groq provider, and all T14/T15 results come from the agent called directly. The frontend has no automated tests of its own.
+- **Web path validated once, with Anthropic only.** One short real conversation frontend → API → agent → Anthropic `claude-sonnet-5-5` (2026-11-03, [evidence](docs/e2e/web_e2e_anthropic.md)); no conversation through the web path with the default Groq provider, and all T14/T15 results come from the agent called directly. In Docker, one Groq message went through nginx → API → agent (no browser). The frontend's automated tests mock the API.
 - **API sessions are lost on restart.** Sessions live only in the server's memory; after a restart the frontend gets `404 session_not_found`, warns that the previous context was lost and resends the last message once in a new session. Earlier details (for example, the order number and e-mail already given) must be repeated.
 - **Single process.** Sessions are in the memory of one process: running several uvicorn workers or replicas would split them. No database or shared cache by design (D18).
-- **No authentication or rate limiting on the API; meant for local use.** Anyone who can reach the port can open sessions and spend the provider quota. `POST /api/sessions` does not call the model and has no rate limit, so a burst of `MAX_SESSIONS` (200) calls evicts every idle session through the LRU limit, and their users lose context (`404`, then a new session). CORS does not prevent this (it only binds browsers). `python -m emporio_agent.api` listens on `127.0.0.1` and CORS only admits the local Vite origins: this is a local prototype, not a deployable service. The session id is a random token (`secrets.token_urlsafe`) and is the only credential of a conversation.
+- **No authentication on the API.** Anyone who can reach it can open sessions and spend the provider quota. In Docker Compose the nginx proxy limits `/api/` to 20 requests per minute per IP (burst 10) and only the site port is public; run directly (`python -m emporio_agent.api`), the API has no rate limit at all. `POST /api/sessions` does not call the model and has no rate limit, so a burst of `MAX_SESSIONS` (200) calls evicts every idle session through the LRU limit, and their users lose context (`404`, then a new session). CORS does not prevent this (it only binds browsers). `python -m emporio_agent.api` listens on `127.0.0.1` by default and CORS only admits the local Vite origins. The Docker setup is ready to deploy as a demo, but a public service would also need authentication or a captcha in front of the chat. The session id is a random token (`secrets.token_urlsafe`) and is the only credential of a conversation.
 - **Per-session history grows without a bound.** `Session.messages` keeps every message and tool result of the conversation in memory; `MAX_HISTORY_TURNS` only limits what is sent to the model, and `MAX_SESSIONS` limits the number of sessions, not their size.
 - **500 errors log the traceback on the server.** The response body never carries internal details, but the server log of an unexpected exception includes its traceback, which could contain data from the request if an exception message ever did.
 - **Web chat history stays in the browser.** The frontend saves its conversations, including whatever the customer typed (order number, e-mail), in the browser's `localStorage`, with no expiry and no "clear history" button. The chat footer says so ("As conversas ficam salvas neste navegador.").

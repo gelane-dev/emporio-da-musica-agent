@@ -34,3 +34,19 @@ Estado e pendências: [[docs/PROGRESS]]. Não duplique conteúdo: cite a seção
 - Commit(s) pequenos no seu branch, mensagem no padrão `tipo(escopo): descrição` em português, terminando com:
   `Co-Authored-By: Claude Sonnet <noreply@anthropic.com>`
 - Relatório final objetivo (no `worker_done`): arquivos alterados, testes executados com resultado, desvios do contrato (se houver) e pendências.
+
+## Padrões do projeto (vale para agentes e pessoas)
+
+**Arquitetura.** Backend em camadas: `domain/` (regras puras), `data/` e `policies/` (fontes), `tools/` (únicos pontos de consulta do modelo), `agent/` (loop e prompt), `llm/` (adaptadores atrás de `LLMClient`), `api/` (camada fina: usa `cli.build_agent` e `Agent.respond`, sem lógica própria de atendimento). No frontend, componentes não chamam `fetch` nem conhecem caminhos `/api` (só `services/`); o estado das conversas fica em `hooks/`; `data/` guarda só conteúdo estático (modo demonstrativo, sugestões, categorias).
+
+**Testes.** Nenhum teste automático chama provedor de IA ou rede.
+- Backend: `python -m pytest -q` com `FakeLLM` (`tests/fakes.py`); o marcador `llm` (provedor real) fica fora por padrão.
+- Frontend: `cd frontend && npm test` (Vitest + Testing Library em `frontend/tests/`, espelhando `src/`); `fetch` sempre mockado com `tests/helpers.js`; consultas por papel, rótulo ou texto visível, não por detalhes de implementação.
+- Antes de cada commit: a suíte do backend; se tocou o frontend, também `npm test`, `npm run lint` e `npm run build`; se tocou Docker, `docker compose config --quiet`. O CI (`.github/workflows/ci.yml`) repete tudo isso e constrói as imagens.
+- Execuções reais (Groq ou Anthropic) só com autorização do usuário, no mínimo necessário, e registradas em [[docs/E2E_RESULTS]] ou `docs/e2e/`. Nunca apresentar teste não executado como aprovado.
+
+**Git.** Um commit por mudança lógica, `tipo(escopo): descrição` em português (`feat`, `fix`, `test`, `docs`, `chore`, `ci`). `git add` com caminhos explícitos (nunca `git add -A`). Push só com autorização do usuário; sem force push nem reescrita de histórico.
+
+**Segurança.** Nunca versionar `.env`, chaves, `venv/`, `node_modules/`, `dist/` ou `runtime/`; `.env.example` sem segredos. Variáveis `VITE_*` vão para o bundle do navegador: nunca coloque segredo nelas. A API não devolve argumentos de ferramentas nem dados pessoais; o `.dockerignore` da raiz é uma lista de inclusão.
+
+**Documentação.** `README.md` (inglês) descreve o projeto para quem avalia; documentos internos em português. Toda mudança de comportamento, comando ou variável atualiza o README e, se for decisão, [[TECHNICAL_DECISIONS]]; progresso em [[docs/PROGRESS]].
