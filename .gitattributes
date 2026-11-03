@@ -1,2 +1,8 @@
 # Arquivo gerado deve manter LF para que build_policies.py --check funcione em qualquer checkout
 knowledge/policies.md text eol=lf
+
+# Arquivos lidos dentro de contêineres Linux: sempre LF, mesmo em checkouts no Windows
+Dockerfile text eol=lf
+*.template text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf

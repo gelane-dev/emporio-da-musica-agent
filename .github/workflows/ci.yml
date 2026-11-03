@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      # Sem .env e sem chaves: os testes usam provedores falsos; os smoke tests reais (-m llm) ficam fora.
+      - name: Testes
+        run: python -m pytest -q
+
+      - name: Manual de políticas em dia com o PDF
+        run: python scripts/build_policies.py --check
+
+  frontend:
+    name: Frontend (lint, testes, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testes
+        run: npm test
+
+      # Build no modo API (o mesmo do contêiner); sem a variável o Vite geraria o modo demonstrativo.
+      - name: Build de produção
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: http://localhost:8080
+
+  docker:
+    name: Imagens Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validar o Compose
+        run: docker compose config --quiet
+
+      - name: Construir as imagens
+        run: docker compose build
