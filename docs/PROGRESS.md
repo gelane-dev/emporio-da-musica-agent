@@ -24,11 +24,16 @@
 | T14 Cenários E2E | histórico em `low` (Groq): 12/13 aprovados, cenário 5 não aprovado; regressão `medium` em 03/11 com Anthropic `claude-sonnet-5-5`: 14/14 checagens e revisão manual ok; regressão `medium` na Groq não executada (cota) — [[docs/E2E_RESULTS]] | `b80958e`, `1a0779f`, `4ac2216` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
 | T15 Conversas de exemplo | 3 conversas reais: C1 regravada em 03/11 com Anthropic `claude-sonnet-5-5` `medium` (correta; gravação `low` com erro preservada em docs/e2e); C2 `low` correta; C3 `medium` correta | `01f50ba` | [[ARCHITECTURE#5.9.2 Contrato da T15 (gravação das conversas de exemplo)]] |
 | T16 README | final em inglês; atualizado em 03/11 com a regressão e a C1 feitas com a Anthropic | `f541806` | — |
+| T18 API HTTP + frontend web | concluída (verificação local: pytest com `FakeLLM`, lint e build); **sem teste com o provedor real** | `40cafe0`, `773ed61` | D18/D19; [[ARCHITECTURE#5.10 `api/` — camada HTTP (2026-11-03, D18)]] e §8 |
 | T17 Entrega | publicada em 02/11 (push autorizado pelo usuário); atualização de 03/11 commitada localmente, **push aguardando autorização** | — | ver "Preparação da T17" |
 
-Suíte atual: 1029 testes passando + 2 smokes reais pulados (Anthropic e Groq), sem avisos; verificada também em clone limpo e em ambiente virtual novo instalado só pelo `requirements.txt`.
+Suíte atual (03/11/2026, branch `gelane-dev/backend-e-frontend`): **1099 passed, 2 deselected** (marcador `llm`) com as correções da revisão no worktree (1091 em `773ed61`), inclusive `tests/test_api.py`; `npm run lint` e `npm run build` do frontend sem erros.
+
+Suíte em 01/11 (antes da API): 1029 testes passando + 2 smokes reais pulados (Anthropic e Groq), sem avisos; verificada também em clone limpo e em ambiente virtual novo instalado só pelo `requirements.txt`.
 
 ## Decisões recentes (resumo; detalhes nos documentos citados)
+
+- 2026-11-03 — API HTTP fina (FastAPI) sobre o agente, sessões só em memória ([[TECHNICAL_DECISIONS#D18 — API HTTP fina sobre o agente (decisão do usuário, 2026-11-03)]]) e frontend React/Vite reintroduzido e ligado à API ([[TECHNICAL_DECISIONS#D19 — Frontend web reintroduzido e conectado à API (decisão do usuário, 2026-11-03)]]); revisam D6.
 
 - 2026-11-01 — Tratamentos de ambiguidades P1–P16 aprovados ([[DATA_ANALYSIS#4.2 Contradições, lacunas e tratamento]], [[TECHNICAL_DECISIONS#D15 — Limitações explícitas em vez de interpretações (revisado em 2026-11-01)]]).
 - 2026-11-01 — Persona Mel, sem emojis, somente CLI, Claude Sonnet com provedor configurável ([[TECHNICAL_DECISIONS#Decisões aprovadas (2026-11-01)]]).
@@ -72,7 +77,7 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 ## Preparação da T17 (revisão de entrega, 01/11/2026 — sem publicação)
 
 - Segredos: nenhuma chave real no histórico completo (`gsk_…`, `sk-ant-…`); única atribuição é valor fictício de teste.
-- Não versionados (confirmado): `.env`, `venv/`, `runtime/`, `frontend/` (fora do escopo, decisão do usuário; mantida intacta no disco), `node_modules`.
+- Não versionados (confirmado): `.env`, `venv/`, `runtime/`, `frontend/` (fora do escopo, decisão do usuário; mantida intacta no disco — **revertido em 03/11 por nova decisão do usuário: `frontend/` voltou em `773ed61`, T18**), `node_modules`.
 - Tamanho do `.git`: 3 MB; maiores arquivos: PDFs de `data/`.
 - Histórico: commits incrementais (sem squash/force-push), autor `gelane-dev`.
 - `gh` não instalado; publicação depende de instalação/autenticação ou de um repositório vazio criado pelo usuário.
@@ -101,6 +106,15 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 - Regressão única `medium`: `claude-sonnet-5-5`, `LLM_MAX_TOKENS=4096`, 13 cenários × 1 ⇒ 14/14; revisão manual sem veredito, sem procedimento fora do manual, sem exposição de dados; uma imprecisão de redação no cenário 2 (feriados). Relatório: [[docs/e2e/t14_regressao_claude_medium.md]].
 - C1 regravada com o mesmo provedor: correta. Nenhuma alteração de código.
 - Não executado: regressão `medium` na Groq (padrão do projeto).
+
+## API HTTP e frontend (T18, 03/11/2026, branch `gelane-dev/backend-e-frontend`)
+
+- `40cafe0` — `src/emporio_agent/api/` (`app.py`, `schemas.py`, `sessions.py`, `__main__.py`) + `tests/test_api.py`; `fastapi`, `uvicorn`, `httpx` no `requirements.txt`; `CORS_ORIGINS` e `MAX_SESSIONS` no `.env.example`. Nada fora de `api/` mudou em `src/`, `data/` ou `knowledge/`.
+- `773ed61` — `frontend/` volta ao versionamento por decisão do usuário, revertendo a exclusão de `1463ba2` e da reescrita de 02/11 (que continuam válidas para o histórico anterior); `node_modules/`, `dist/` e `frontend/.env` ignorados.
+- Verificado (local, sem provedor real): `pytest` 1091 passed, 2 deselected em `773ed61` e 1099 com as correções da revisão; `npm run lint` e `npm run build` sem erros; respostas reais da API conferidas em processo com `TestClient` + `FakeLLM` (exemplos do README).
+- Revisão somente leitura (outro agente, Orca): 0 achados altos, 3 médios, 7 baixos. Correções despachadas em paralelo pelo coordenador: estado de envio por conversa, tratamento de 409/timeout, `maxLength` 2000 no composer, status do cabeçalho por `GET /api/health`, texto da nota de privacidade (frontend); `session_id` com `secrets.token_urlsafe` e limite de tamanho do corpo com 413 `payload_too_large` (API). Essas correções já estavam aplicadas no worktree (ainda não commitadas) quando a documentação foi atualizada, e ela as descreve como estão no código: corpo até 16 KiB (`MAX_BODY_BYTES`), `session_id` até 64 caracteres, token de 128 bits, timeout do cliente de 90 s, `hooks/useBackendHealth.js`, até 3 novas tentativas em 409. **Conferir de novo no commit final.** Achados aceitos como limitação documentada: sem limite de taxa em `POST /api/sessions` (descarte LRU em massa; API só local), `Session.messages` sem limite em memória, traceback no log de erro 500, histórico do chat no `localStorage`, sem autenticação.
+- Documentação atualizada (README com diagramas Mermaid validados com `@mermaid-js/mermaid-cli`, ARCHITECTURE §5.10/§8, TECHNICAL_DECISIONS D18/D19, TASKS T18, `frontend/README.md`).
+- **Pendente:** conversa real frontend → API → Groq (nunca executada); testes automatizados do frontend.
 
 ## Pendências abertas
 

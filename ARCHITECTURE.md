@@ -35,10 +35,12 @@ Agente de atendimento por texto, em Python, baseado em **function calling**: o L
                                                                               │  a partir do PDF)
 ```
 
+> **Atualização (2026-11-03, D18/D19).** Além da CLI, o mesmo agente é exposto por uma API HTTP fina (`src/emporio_agent/api/`, FastAPI) consumida por um chat web (`frontend/`, React 19 + Vite 8). O diagrama acima mostra só o caminho da CLI e o provedor original; o provedor padrão hoje é a Groq (D17). Visão completa e diagramas Mermaid do frontend, do backend e da sequência de uma mensagem: §8 e [[README]] (seção *Architecture*). Contrato HTTP: §5.10.
+
 ### Princípios
 1. **Originais intocados** — `data/` é somente leitura; tratamento acontece em memória.
 2. **LLM redige, Python calcula** — preço final, parcelas, prazos, horário vêm prontos das tools.
-3. **Camadas com dependência em um sentido só**: `cli → agent → tools → (data | domain | policies)`. `domain` não conhece `data` nem LLM; `data` não conhece LLM.
+3. **Camadas com dependência em um sentido só**: `cli → agent → tools → (data | domain | policies)`; a API fica no mesmo nível da CLI (`api → cli.build_agent/greeting`, `api → agent`) e nada do núcleo importa `api`. `domain` não conhece `data` nem LLM; `data` não conhece LLM.
 4. **Tudo testável sem LLM**, exceto o próprio loop (testado com LLM falso).
 5. **Simplicidade** — sem framework de agentes, sem banco, sem vector store.
 
@@ -83,7 +85,12 @@ emporio-da-musica-agent/
 │       │   ├── prompts.py             # build_system_prompt(settings, now)
 │       │   ├── session.py             # Session (histórico, truncamento, export .md)
 │       │   └── agent.py               # Agent.respond(): loop de tool use
-│       └── cli.py                     # REPL com rich, --debug, /sair, /salvar
+│       ├── cli.py                     # REPL com rich, --debug, /sair, /salvar
+│       └── api/                       # (2026-11-03, D18) API HTTP fina — §5.10 e §8
+│           ├── __main__.py            # python -m emporio_agent.api → uvicorn 127.0.0.1:8000
+│           ├── app.py                 # create_app(): rotas, envelope de erro, CORS, modo degradado
+│           ├── schemas.py             # modelos Pydantic de requisição/resposta/erro
+│           └── sessions.py            # SessionStore: sessões em memória, lock por sessão, limite LRU
 ├── scripts/
 │   ├── build_policies.py              # PDF → knowledge/policies.md (rodado 1x)
 │   └── run_scenarios.py               # cenários E2E com LLM real
@@ -99,6 +106,7 @@ emporio-da-musica-agent/
 │   └── test_agent_loop.py
 ├── examples/
 │   └── conversations/                 # 3–5 transcripts .md (entregável E3)
+├── frontend/                          # (2026-11-03, D19) chat web React 19 + Vite 8 — §8
 ├── runtime/                           # gerado em execução (gitignored): transcripts, handoffs
 ├── .env.example
 ├── .gitignore
@@ -785,7 +793,7 @@ def main(argv: list[str] | None = None, *, settings: Settings | None = None, llm
 - Ctrl+C e EOF encerram com despedida, código 0, sem traceback.
 
 ### 5.9 Composição (injeção de dependências)
-Feita em um único lugar (`cli.py` → `build_agent(settings)`): `load_all → repositórios → PolicyStore → ToolRegistry([...]) → AnthropicClient → Agent`. Testes montam o mesmo grafo com `FakeLLM` e `clock` fixo.
+Feita em um único lugar (`cli.py` → `build_agent(settings)`): `load_all → repositórios → PolicyStore → ToolRegistry([...]) → AnthropicClient → Agent`. Testes montam o mesmo grafo com `FakeLLM` e `clock` fixo. (Hoje o cliente vem de `llm/factory.create_llm_client`, Groq por padrão — D17. A API HTTP reutiliza o mesmo `build_agent`; ver §5.10.)
 
 #### 5.9.1 Contrato detalhado da T14 (cenários end-to-end)
 
@@ -844,6 +852,42 @@ python scripts/record_example.py --script PATH --out PATH [--title TEXTO] [--ref
 
 Custo estimado: ~8 turnos × 8–10 mil tokens ≈ 75 mil tokens (executar após os testes pendentes da T14).
 
+### 5.10 `api/` — camada HTTP (2026-11-03, D18)
+
+Contrato definido pelo coordenador antes da implementação (commit `40cafe0`); testes em `tests/test_api.py` com `FakeLLM` e `TestClient`. A camada **não contém lógica do agente**: só monta o agente, guarda sessões e traduz `AgentReply` em JSON.
+
+```python
+# api/app.py
+def create_app(settings: Settings | None = None, llm: LLMClient | None = None,
+               env: Mapping[str, str] | None = None) -> FastAPI
+    # settings ausente ⇒ load_settings(); ValueError ⇒ Settings() + detail "Configuração inválida..."
+    # _build(): cli.build_agent(settings, llm=llm, env=env)
+    #   LLMError | DataLoadError | PolicyStoreError ⇒ agent=None (modo degradado)
+    # ApiState(settings, agent, detail, sessions=SessionStore(MAX_SESSIONS))
+app  # atributo de módulo criado sob demanda (__getattr__): importar o módulo não monta o agente
+
+# api/sessions.py
+class SessionStore:                       # OrderedDict[id, _Entry(session, lock)] + lock global
+    def create(self, started_at: datetime) -> Session
+    def use(self, session_id: str) -> ContextManager[Session]   # SessionNotFound | SessionBusy (sem esperar)
+    def delete(self, session_id: str) -> None                   # SessionNotFound
+```
+
+| Rota | Corpo | Sucesso | Erros |
+|---|---|---|---|
+| `GET /api/health` | — | 200 `{status: ok\|degraded, agent_ready, provider, model, detail}` | — |
+| `POST /api/sessions` | vazio | 201 `{session_id, greeting, created_at}`; `greeting = cli.greeting(now, store_status(now, tz))`, sem LLM | 413, 503, 500 |
+| `POST /api/chat` | `{session_id: str\|null, message: str}` | 200 `{session_id, reply, stop, tool_calls: [{name, ok, duration_ms}]}` | 404, 409, 413, 422, 503, 500 |
+| `DELETE /api/sessions/{session_id}` | — | 204 sem corpo | 404, 500 |
+
+- `message`: `strip()`, 1..2000 caracteres (`schemas.MAX_MESSAGE_LENGTH`), senão 422. `session_id`: no máximo 64 caracteres (`schemas.MAX_SESSION_ID_LENGTH`), senão 422. `session_id` nulo/ausente ⇒ cria sessão (sem saudação).
+- `stop ∈ end_turn | max_tokens | refusal | max_iterations | llm_error`. Falha do provedor durante a conversa **não** é erro HTTP: 200 com `stop="llm_error"` e o texto de contingência do agente (igual à CLI).
+- `tool_calls` **nunca** inclui `arguments` (`consultar_pedido`/`encaminhar_atendente` levam e-mail, telefone e texto livre). Log INFO da rota de chat: só id da sessão, `stop` e nomes das ferramentas.
+- Envelope único de erro `{error, message}` (mensagem em pt-BR, sem detalhes internos), inclusive para 422 e 500: `invalid_request` 422, `session_not_found` 404, `session_busy` 409, `payload_too_large` 413 (corpo acima de 16 KiB, `app.MAX_BODY_BYTES`, recusado por middleware antes da leitura do JSON), `agent_unavailable` 503, `internal_error` 500; rotas inexistentes usam `not_found`/`method_not_allowed`.
+- Sessões: só em memória, um lock por sessão (segunda mensagem concorrente ⇒ 409, sem esperar), limite `MAX_SESSIONS` (padrão 200) com descarte da sessão ociosa usada há mais tempo. O `session_id` é um token aleatório de 128 bits gerado em `SessionStore.create` (`secrets.token_urlsafe(16)`), única credencial da conversa.
+- CORS: `CORS_ORIGINS` (padrão `http://localhost:5173,http://127.0.0.1:5173`), métodos GET/POST/DELETE/OPTIONS, header `Content-Type`, sem credenciais. Um middleware interno ao CORS converte exceções inesperadas no envelope 500 **com** cabeçalhos CORS.
+- Execução: `python -m emporio_agent.api` (uvicorn em 127.0.0.1:8000) ou `uvicorn emporio_agent.api.app:app --port 8000`. Swagger em `/docs`.
+
 ## 6. Observabilidade
 - `logging` padrão: nível INFO registra cada tool call (nome, args, ok, duração) e uso de tokens por turno; nunca loga e-mail/telefone do cliente (mascarar).
 - `--debug` na CLI mostra as tool calls inline — útil para os exemplos e para o avaliador entender o "quando consultar".
@@ -852,3 +896,40 @@ Custo estimado: ~8 turnos × 8–10 mil tokens ≈ 75 mil tokens (executar após
 - Chave de API só via `.env` (gitignored); `.env.example` versionado.
 - Verificação de identidade obrigatória para pedidos (TECHNICAL_DECISIONS D8).
 - Sem persistência de dados pessoais entre sessões; transcripts salvos apenas sob comando e em `runtime/` (gitignored). Exemplos publicados usam pedidos fictícios do próprio dataset.
+- API HTTP (D18): sem autenticação nem limite de taxa, pensada para uso local (`python -m emporio_agent.api` escuta em 127.0.0.1). Chaves continuam só no `.env` do backend; o frontend só recebe `VITE_API_BASE_URL` (tudo que começa com `VITE_` vai para o bundle do navegador). Respostas da API não trazem argumentos de ferramentas. O histórico do chat web fica no `localStorage` do navegador.
+
+## 8. Camada HTTP e frontend (2026-11-03, D18/D19)
+
+Commits `40cafe0` (API) e `773ed61` (frontend). Diagramas completos (sistema, frontend, backend e sequência) no [[README]], seção *Architecture*; aqui ficam o resumo e as fronteiras.
+
+```mermaid
+flowchart LR
+    fe["frontend/src<br/>useConversations → chatService → http"] -- "HTTP JSON /api/*" --> api["api/app.py<br/>create_app()"]
+    api --> store["api/sessions.py<br/>SessionStore"]
+    store --> session["agent/session.py<br/>Session"]
+    api -- "build_agent() · greeting()" --> cli["cli.py"]
+    api -- "Agent.respond()" --> agent["agent/agent.py<br/>Agent"]
+    cli --> agent
+    agent --> core["llm/ · tools/ → data/ · domain/ · policies/"]
+```
+
+**Backend.** `api/` é a única parte nova do pacote; nada fora dela mudou. Fluxo de `POST /api/chat`: valida `ChatRequest` (422) → `require_agent()` (503 se degradado) → `SessionStore.use(session_id)` (404/409) → `Agent.respond(session, message)` → `ChatResponse` sem argumentos de ferramentas.
+
+**Frontend** (`frontend/src`; ver [[frontend/README]]):
+
+| Camada | Arquivos | Papel |
+|---|---|---|
+| Entrada | `main.jsx`, `App.jsx`, `pages/ChatPage.jsx` | monta a página única do chat |
+| Componentes | `components/layout/` (`AppShell`, `Sidebar`), `components/chat/` (`ChatPanel`, `MessageList`, `MessageBubble`, `Composer`, `SuggestionChips`, `TypingIndicator`), `components/products/` (`ProductCard`, `ProductDetail`, `InstrumentFigure`) | apresentação; não chamam `fetch` nem conhecem rotas |
+| Estado | `hooks/useConversations.js`, `hooks/useBackendHealth.js` | conversas, `sessionId`, estado de envio e erro **por conversa**, saudação, reenvio após 404, novas tentativas após 409; persistência em `localStorage`. `useBackendHealth` consulta `GET /api/health` uma vez ao montar a página (status do cabeçalho: online, degradado, indisponível) |
+| Serviços | `services/http.js` (único cliente HTTP, `ApiError`, timeout de 90 s), `services/chatService.js` (único lugar com as rotas `/api`) | `createSession`, `sendChatMessage`, `checkHealth`, `isDemoMode` |
+| Demonstração | `data/demo.js`, `data/demoChat.js` | respostas fictícias quando `VITE_API_BASE_URL` está vazia; a UI sinaliza "Modo demonstração" |
+
+**Contrato frontend ↔ API.**
+- O modo é decidido por `VITE_API_BASE_URL` (lida em build/dev). Com valor: modo API; vazia: modo demonstrativo sinalizado.
+- Conversa nova (modo API) ⇒ `POST /api/sessions`; a saudação real vira a primeira mensagem e o `session_id` é guardado na conversa.
+- `404 session_not_found` (servidor reiniciado) ⇒ descarta o `sessionId`, insere um aviso na conversa e reenvia a mensagem **uma vez** com `session_id: null`.
+- `409 session_busy` ⇒ até 3 novas tentativas automáticas (após 2; 3,5; 5 s) antes de mostrar o erro. `503`, timeout (90 s) e falha de rede ⇒ mensagem clara no banner de erro da conversa; `422` sem botão "Tentar de novo". O composer limita a mensagem a 2000 caracteres (contador perto do fim); o status do cabeçalho vem de `GET /api/health`.
+- Resposta exibida como texto (`white-space: pre-wrap`): Markdown não é renderizado; não há `dangerouslySetInnerHTML`. No modo API não há cartões de produto (`products: []`).
+
+**Verificação.** Automatizada e local: `pytest` (1099 passed, 2 deselected com as correções da revisão; 1091 em `773ed61`; `tests/test_api.py` com `FakeLLM`), `npm run lint`, `npm run build`. **Não houve** execução frontend → API → Groq com o provedor real, e o frontend não tem testes automatizados.

@@ -11,6 +11,7 @@ Protótipo em Python (desafio Artefact). Este arquivo é só um índice; o repos
 | Contratos entre módulos e estrutura | `ARCHITECTURE.md` (§5 = contratos) |
 | Tarefas e critérios de aceite | `TASKS.md` |
 | Decisões técnicas e diretrizes aprovadas | `TECHNICAL_DECISIONS.md` |
+| API HTTP e frontend web (D18/D19) | `ARCHITECTURE.md` §5.10 e §8; `frontend/README.md` |
 | Fatos sobre os dados e o manual, ambiguidades P1–P16 | `DATA_ANALYSIS.md` |
 | Resultados reais da T14 e testes pendentes (cota Groq) | `docs/E2E_RESULTS.md` |
 

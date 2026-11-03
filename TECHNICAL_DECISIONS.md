@@ -1,7 +1,7 @@
 # TECHNICAL_DECISIONS.md — Decisões técnicas (para aprovação)
 
 Formato de cada decisão: **contexto → decisão → alternativas descartadas → consequências**.
-Todas as decisões que dependiam de aprovação foram aprovadas em 2026-11-01 (ver "Decisões aprovadas"); D17 substituiu o provedor de D5 por decisão do usuário.
+Todas as decisões que dependiam de aprovação foram aprovadas em 2026-11-01 (ver "Decisões aprovadas"); D17 substituiu o provedor de D5 por decisão do usuário. D18 (API HTTP) e D19 (frontend web) foram decididas pelo usuário em 2026-11-03 e revisam D6.
 
 ---
 
@@ -102,6 +102,37 @@ Todas as decisões que dependiam de aprovação foram aprovadas em 2026-11-01 (v
 
 **Revisão (02/11/2026, decisão do usuário): `LLM_EFFORT` padrão = `medium`.** Evidência real (docs/E2E_RESULTS.md §4): com `low`, o `gpt-oss-120b` deu veredito de prazo de devolução e ofereceu procedimento fora do manual mesmo com o prompt reforçado; com `medium`, não deu veredito e usou `encaminhar_atendente` com o protocolo real. `low` continua configurável. Custo: mais tokens de raciocínio por chamada (pesa no limite diário da Groq). Os resultados da T14 em `low` ficam como histórico; uma regressão única em `medium` valida o novo padrão.
 
+## D18 — API HTTP fina sobre o agente (decisão do usuário, 2026-11-03)
+
+**Contexto.** O usuário decidiu oferecer o atendimento também por um chat web (D19). O agente só era acessível pela CLI (D6). Era preciso expor `Agent.respond` por HTTP sem tocar no núcleo já testado nem nos resultados reais (T14/T15).
+
+**Decisão.**
+- **Camada fina** em `src/emporio_agent/api/` (FastAPI + uvicorn): o app monta o agente uma vez com `cli.build_agent`, gera a saudação com `cli.greeting` e, a cada `POST /api/chat`, chama `Agent.respond` sobre uma `agent.session.Session`. Nenhuma regra, ferramenta, dado ou prompt foi alterado. Contrato em ARCHITECTURE §5.10.
+- **Sessões só em memória, sem banco** (`api/sessions.py`, `SessionStore`): um lock por sessão (mensagem concorrente na mesma sessão ⇒ 409 `session_busy`, sem esperar e sem corromper o histórico) e limite `MAX_SESSIONS` (padrão 200) com descarte da sessão ociosa usada há mais tempo. `session_id` é um token aleatório de 128 bits gerado na API (`secrets.token_urlsafe(16)`), única credencial da conversa. Coerente com D7 (sem persistência de dados pessoais).
+- **Modo degradado em vez de falha na subida:** sem chave, ou com falha ao carregar dados/políticas, o servidor sobe com `agent=None`; `GET /api/health` responde `degraded` com o motivo em português e as rotas de conversa respondem 503 `agent_unavailable`. A CLI mantém o código de saída 2.
+- **Envelope único de erro** `{error, message}` para todos os status (422, 404, 409, 413, 503, 500 e rotas inexistentes), mensagens em pt-BR para o usuário final, sem stack trace no corpo. Corpo acima de 16 KiB ⇒ 413 `payload_too_large` antes de ler o JSON; `session_id` limitado a 64 caracteres.
+- **Sem argumentos de ferramentas na resposta:** `tool_calls` traz só `name`, `ok`, `duration_ms` (argumentos de `consultar_pedido`/`encaminhar_atendente` contêm e-mail, telefone e texto livre). O log da rota de chat registra só id da sessão, `stop` e nomes das ferramentas.
+- **Falha do provedor durante a conversa não é erro HTTP:** 200 com `stop="llm_error"` e o texto de contingência do agente, como na CLI.
+- **CORS restrito** às origens do Vite local por padrão (`CORS_ORIGINS`), métodos GET/POST/DELETE/OPTIONS, header `Content-Type`, sem credenciais.
+
+**Alternativas descartadas.** Reescrever o loop dentro da API (duplicaria lógica testada); persistir sessões em banco/Redis (dados pessoais, escopo de protótipo); expor os argumentos das ferramentas para depuração (vazamento de PII); streaming de tokens (o agente devolve a resposta final após o loop de ferramentas).
+
+**Consequências.** Reiniciar o servidor apaga todas as sessões (o frontend trata o 404, D19). Funciona em um único processo (vários workers dividiriam as sessões). Sem autenticação nem limite de taxa: a API é para uso local (`python -m emporio_agent.api` escuta em 127.0.0.1). Testada só com `FakeLLM` (`tests/test_api.py`); nenhuma execução pela API com o provedor real.
+
+## D19 — Frontend web reintroduzido e conectado à API (decisão do usuário, 2026-11-03)
+
+**Contexto.** O chat React/Vite existia localmente, fora do escopo, e foi retirado do histórico antes da publicação (commit `1463ba2` e reescrita de 02/11). O usuário decidiu trazê-lo de volta neste branch (commit `773ed61`), revertendo essa exclusão, e ligá-lo ao agente pela API (D18). Revisa D6 ("somente CLI"): a CLI continua sendo a interface de referência das execuções reais.
+
+**Decisão.**
+- `frontend/` (React 19 + Vite 8, oxlint), sem biblioteca de UI, roteador ou gerenciador de estado: o estado fica em `hooks/useConversations.js`.
+- **Isolamento do HTTP:** componentes não chamam `fetch`; `services/http.js` é o único cliente (timeout de 90 s, `ApiError` com `status` e `code` do envelope) e `services/chatService.js` é o único lugar que conhece as rotas `/api`.
+- **Dois modos, decididos por `VITE_API_BASE_URL`:** com valor, modo API (saudação real de `POST /api/sessions`, `session_id` guardado por conversa); vazia, o modo demonstrativo original com respostas fictícias de `src/data/`, **sinalizado na UI** ("Modo demonstração" no cabeçalho e aviso no rodapé) para nunca ser confundido com o agente. Chaves de `localStorage` separadas por modo.
+- **Sessão perdida (404 `session_not_found`):** descarta o id, avisa na conversa que o contexto anterior se perdeu e reenvia a mensagem **uma vez** em sessão nova.
+- **Estado por conversa:** envio, erro e última mensagem ficam por conversa (uma conversa não bloqueia nem mostra o erro de outra); `409 session_busy` ⇒ até 3 novas tentativas automáticas com espera; status do cabeçalho por `GET /api/health` (`hooks/useBackendHealth.js`); composer limitado a 2000 caracteres.
+- **Resposta só texto:** a API não devolve produtos estruturados, então no modo API não há cartões de produto; o texto é exibido sem interpretar HTML nem Markdown (só quebras de linha).
+
+**Consequências.** Markdown aparece literal no chat; cartões e detalhe de produto existem só no modo demonstrativo (dados fictícios); o histórico das conversas fica no `localStorage` do navegador. Verificação: `npm run lint` e `npm run build`; não há testes automatizados do frontend e a integração frontend → API → Groq **não** foi testada com o provedor real.
+
 ## D16 — Parâmetros de chamada ao modelo (2026-11-01, antes da T08)
 
 **Contexto.** Regras atuais da API para o Claude Sonnet 5.5 (`claude-sonnet-5-5`, modelo aprovado em D5), conferidas na documentação da API antes de escrever o adaptador.
@@ -125,11 +156,13 @@ Todas as decisões que dependiam de aprovação foram aprovadas em 2026-11-01 (v
 
 **Aprovado (2026-11-01):** Claude Sonnet via API com camada independente de provedor. **Substituído por D17:** o usuário passou a usar a Groq como provedor padrão; o adaptador Anthropic permanece como alternativa por configuração.
 
-## D6 — Interface: **CLI** (aprovado; sem UI)
+## D6 — Interface: **CLI** (aprovado; sem UI — revisado por D18/D19 em 2026-11-03)
 
 **Decisão.** CLI interativa (`python -m emporio_agent`) com `rich` para formatação, flag `--debug` que exibe as tool calls. Foco do desafio é o agente funcionando.
 
 **Aprovado:** somente CLI. Streamlit não será implementado.
+
+**Revisão (2026-11-03, decisão do usuário):** além da CLI, API HTTP fina (D18) e chat web React/Vite (D19). A CLI segue como interface de referência das execuções com o modelo real.
 
 ## D7 — Histórico de conversa: **em memória por sessão + exportação de transcript**
 
@@ -183,6 +216,8 @@ Português do Brasil, informal mas profissional, frases curtas (canal tipo Whats
 | `rich` | CLI |
 | `rapidfuzz` | Busca aproximada por nome de produto ("takamine gd 20") |
 | `pytest` | Testes (dev) |
+| `fastapi`, `uvicorn` | API HTTP (D18, 2026-11-03) |
+| `httpx` | só para o `TestClient` do FastAPI nos testes da API (dev) |
 
 Python 3.13 (já há `venv/` com 3.13.15). `requirements.txt` com versões fixadas.
 
@@ -204,7 +239,8 @@ Python 3.13 (já há `venv/` com 3.13.15). `requirements.txt` com versões fixad
 | D9 | Data de referência | Data real do sistema em produção; data controlada injetável em testes e exemplos |
 | D10 | Persona | Mel |
 | D11 | Emojis | **Sem emojis** por padrão |
-| D6 | Interface | **Somente CLI**; Streamlit não será implementado |
+| D6 | Interface | **Somente CLI**; Streamlit não será implementado (revisado em 2026-11-03: D18/D19) |
+| D18/D19 | API HTTP e frontend web (2026-11-03) | API FastAPI fina com sessões em memória; chat React/Vite reintroduzido e ligado à API, modo demonstrativo sinalizado |
 
 ## Diretrizes obrigatórias (definidas na aprovação)
 

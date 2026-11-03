@@ -56,6 +56,7 @@ T01 Setup
 | T15 | Conversas de exemplo | T14 | 1h | Obrigatória (entregável) |
 | T16 | README | T15 | 1,5h | Obrigatória (entregável) |
 | T17 | Revisão final e entrega | T16 | 0,5h | Obrigatória |
+| T18 | API HTTP + frontend web (adicionada em 2026-11-03, D18/D19) | T13 | — | Opcional (decisão do usuário) — concluída |
 
 Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 
@@ -341,6 +342,21 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 - [ ] Repositório público no GitHub; nenhum segredo commitado (`git log -p | grep -i api_key` vazio).
 - [ ] Nenhuma alteração após o prazo.
 **Commit.** `chore: revisão final para entrega` (se houver ajustes)
+
+## T18 — API HTTP e frontend web (adicionada em 2026-11-03; concluída)
+**Objetivo.** Expor o agente por HTTP e ligar o chat web a ele, sem alterar o núcleo (decisão do usuário; D18, D19).
+**Contrato.** ARCHITECTURE §5.10 (API) e §8 (frontend ↔ API).
+**Escopo.** `src/emporio_agent/api/` (`app.py`, `schemas.py`, `sessions.py`, `__main__.py`), `tests/test_api.py`, `frontend/` (reintroduzido no versionamento), `.env.example` (`CORS_ORIGINS`, `MAX_SESSIONS`), `requirements.txt` (`fastapi`, `uvicorn`, `httpx`).
+**Critérios de aceite.**
+- [x] Rotas `GET /api/health`, `POST /api/sessions`, `POST /api/chat`, `DELETE /api/sessions/{id}` reutilizando `cli.build_agent`, `cli.greeting` e `Agent.respond` (sem duplicar lógica do agente).
+- [x] Envelope `{error, message}` em todos os erros; `tool_calls` sem `arguments`; `stop="llm_error"` com 200; modo degradado sem chave (health `degraded`, 503 nas rotas de conversa).
+- [x] Sessões só em memória, lock por sessão (409) e limite `MAX_SESSIONS`; CORS restrito e configurável.
+- [x] Testes da API com `FakeLLM` (`tests/test_api.py`); suíte completa verde: 1091 passed, 2 deselected em `773ed61`; 1099 passed, 2 deselected com as correções da revisão final.
+- [x] Frontend: componentes sem `fetch`; `services/http.js` e `services/chatService.js`; `sessionId` por conversa; saudação real; 404 ⇒ aviso + um reenvio em sessão nova; modo demonstrativo sinalizado na UI.
+- [x] `npm run lint` e `npm run build` sem erros.
+- [ ] Conversa real frontend → API → Groq — **não executada** (nenhum teste com o provedor real nesta tarefa).
+- [ ] Testes automatizados do frontend — não existem.
+**Commits.** `40cafe0` `feat(api): API FastAPI sobre o agente existente (sessões em memória, CORS, Swagger)`; `773ed61` `feat(frontend): reintroduz o frontend React/Vite e conecta o chat à API`.
 
 ---
 

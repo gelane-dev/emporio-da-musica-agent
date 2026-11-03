@@ -1,6 +1,6 @@
 # Empório da Música — customer service agent
 
-Text-based customer service agent for the fictional musical instrument store Empório da Música, built as a prototype for the Artefact technical challenge. This README reports real results from runs with the Groq API (the default provider) and, on 2026-11-03, one regression run and one example recording with the Anthropic API (`claude-sonnet-5-5`, the configurable alternative). Anything not yet validated with the real model is marked as pending; nothing pending is presented as passed.
+Text-based customer service agent for the fictional musical instrument store Empório da Música, built as a prototype for the Artefact technical challenge. The same agent is reachable from a terminal (CLI) and, through a thin HTTP API (FastAPI), from a web chat (React + Vite). This README reports real results from runs with the Groq API (the default provider) and, on 2026-11-03, one regression run and one example recording with the Anthropic API (`claude-sonnet-5-5`, the configurable alternative). Anything not yet validated with the real model is marked as pending; nothing pending is presented as passed.
 
 ## Contents
 
@@ -9,9 +9,11 @@ Text-based customer service agent for the fictional musical instrument store Emp
 - [Technologies](#technologies)
 - [Installation and configuration](#installation-and-configuration)
 - [Running](#running)
+- [HTTP API](#http-api)
 - [Tests](#tests)
 - [Utilities](#utilities)
-- [Architecture overview](#architecture-overview)
+- [Architecture](#architecture)
+- [Folder structure](#folder-structure)
 - [Technical decisions](#technical-decisions)
 - [Data handling and ambiguities](#data-handling-and-ambiguities)
 - [Known limitations](#known-limitations)
@@ -32,6 +34,14 @@ The assistant, named Mel, talks to the customer in Brazilian Portuguese and answ
 The agent uses **function calling (tool use)**: the model decides when to call deterministic tools that query the CSV files or the policy manual. Every numeric rule (prices, installments, shipping, opening hours) is computed in Python; the model only writes the reply. When the manual or the data are contradictory or silent, the agent reports a limitation instead of inventing a rule.
 
 How a turn works: the customer message goes to the model together with the system prompt and the tool schemas; the model may call tools (up to `MAX_TOOL_ITERATIONS` rounds); each tool returns structured data plus a list of limitations; the model writes the final reply from that data; the reply passes through an output guard before it is shown.
+
+**Three ways in, one agent.** All entry points build the agent with the same function, `cli.build_agent`, and call the same `Agent.respond(session, text)`; no agent logic is duplicated.
+
+| Entry point | What it is | Status |
+|---|---|---|
+| CLI (`python -m emporio_agent`) | Interactive terminal conversation (`rich`), `--debug`, transcripts | Original deliverable; used for every real-model run (T14, T15) |
+| HTTP API (`python -m emporio_agent.api`) | FastAPI, four routes under `/api`, sessions in memory, Swagger at `/docs` | Commit `40cafe0`; covered by automated tests with a fake LLM |
+| Web frontend (`frontend/`) | React 19 + Vite 8 chat that calls the API; falls back to a clearly labeled demo mode without an API URL | Commit `773ed61`; lint and build checked; not tested against the real provider |
 
 ## Implemented features
 
@@ -61,10 +71,12 @@ How a turn works: the customer message goes to the model together with the syste
 - Python 3.13
 - Groq SDK (`groq`) with `openai/gpt-oss-120b` as the default model
 - Anthropic SDK (`anthropic`) as a configurable alternative
-- pandas (CSV data in memory), pydantic (tool argument and result models), pypdf (offline extraction of the policy PDF), rapidfuzz (fuzzy product search), rich (CLI formatting), python-dotenv, tzdata
-- pytest (tests)
+- pandas (CSV data in memory), pydantic (tool argument and result models, API schemas), pypdf (offline extraction of the policy PDF), rapidfuzz (fuzzy product search), rich (CLI formatting), python-dotenv, tzdata
+- FastAPI (HTTP API) served by uvicorn (ASGI server)
+- pytest (tests); httpx, only because FastAPI's `TestClient` needs it in the API tests
+- Frontend: React 19 and Vite 8 (`@vitejs/plugin-react`), oxlint for linting; plain CSS, no UI library, no router, no state library (state lives in one hook). Node.js 20+.
 
-Pinned versions are in [requirements.txt](requirements.txt).
+Pinned versions are in [requirements.txt](requirements.txt) and [frontend/package.json](frontend/package.json) (exact versions in `frontend/package-lock.json`).
 
 ## Installation and configuration
 
@@ -92,12 +104,18 @@ Edit `.env` and fill in `GROQ_API_KEY`. The `.env` file is not versioned. Variab
 | `REFERENCE_DATE` | empty | controlled date/time (see [Running](#running)) |
 | `MAX_TOOL_ITERATIONS` | `6` | tool loop iteration limit |
 | `MAX_HISTORY_TURNS` | `50` | history window |
+| `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | HTTP API only: comma-separated origins allowed by CORS (the Vite dev server) |
+| `MAX_SESSIONS` | `200` | HTTP API only: sessions kept in memory; above it, the least recently used idle session is dropped |
 
 Note: the default of `LLM_EFFORT` is now `medium` (it was `low` earlier in the project; see [Technical decisions](#technical-decisions)). An older local `.env` that still contains `LLM_EFFORT=low` overrides the default, so update or remove that line.
 
 To use Anthropic instead, set `LLM_PROVIDER=anthropic`, `LLM_MODEL=claude-sonnet-5-5`, `LLM_MAX_TOKENS=16000` and `ANTHROPIC_API_KEY`.
 
 ## Running
+
+There are three ways to run the project. The CLI and the API read the same `.env` at the repository root; the frontend has its own `frontend/.env`.
+
+### CLI (terminal)
 
 ```bash
 python -m emporio_agent            # interactive conversation
@@ -119,14 +137,105 @@ By default the agent uses the real system date and time (time zone `America/Camp
 
 Without an API key for the selected provider (for example, no `.env`), the CLI exits with a clear message in Portuguese and exit code 2.
 
-## Tests
+### Backend: HTTP API
+
+From the repository root, with the virtual environment active and `GROQ_API_KEY` in `.env`:
 
 ```bash
-python -m pytest -q          # full suite, never calls the real model
-python -m pytest -q -m llm   # smoke tests against the real provider (require GROQ_API_KEY / ANTHROPIC_API_KEY)
+python -m emporio_agent.api                                       # uvicorn on http://127.0.0.1:8000
+python -m uvicorn emporio_agent.api.app:app --reload --port 8000  # same app, with auto-reload
 ```
 
-Unit and integration tests use a fake LLM (`FakeLLM`); tests marked `llm` are skipped by default (`addopts = "-m 'not llm'"`). Current state: **1054 passing; 2 real-provider smoke tests skipped by default** (`-m llm`).
+Interactive documentation (Swagger) at <http://localhost:8000/docs>; OpenAPI schema at `/openapi.json`. Without a key the server still starts, in **degraded mode**: `GET /api/health` answers `"status": "degraded"` with the reason, and the conversation routes answer `503 agent_unavailable` (the CLI, in the same situation, exits with code 2).
+
+### Frontend (web chat)
+
+Requires Node.js 20+. In a second terminal:
+
+```bash
+cd frontend
+cp .env.example .env        # PowerShell: Copy-Item .env.example .env  — sets VITE_API_BASE_URL=http://localhost:8000
+npm install
+npm run dev                 # http://localhost:5173
+```
+
+`VITE_API_BASE_URL` selects the mode. Filled in: **API mode**, the chat talks to the real agent through the backend above. Empty or missing: **demo mode**, with fictional answers from `frontend/src/data/` and no agent at all; the header shows "Modo demonstração" and a footer notice says the answers are fictional. The variable is read at dev/build time, so restart `npm run dev` after changing it. Other scripts: `npm run lint` (oxlint), `npm run build` (writes `frontend/dist/`), `npm run preview`. Details: [frontend/README.md](frontend/README.md).
+
+## HTTP API
+
+Base URL `http://localhost:8000`, prefix `/api`, JSON in UTF-8. The examples below are real responses of the app, produced in-process with FastAPI's `TestClient`, a fake LLM and reference date 2026-03-25 10:00; the chat `reply` is therefore the fake model's text, not Mel's. `<session_id>` stands for the opaque random token generated by the API with `secrets.token_urlsafe`.
+
+| Method and path | Purpose | Success | Errors |
+|---|---|---|---|
+| `GET /api/health` | Service and agent status | 200 | — |
+| `POST /api/sessions` | Start a conversation; returns Mel's greeting (same text as the CLI, generated locally, no LLM call) | 201 | 413, 503, 500 |
+| `POST /api/chat` | Send a customer message; `session_id` null or missing creates a new session (without a greeting) | 200 | 404, 409, 413, 422, 503, 500 |
+| `DELETE /api/sessions/{session_id}` | End a conversation (removes it from memory) | 204, no body | 404, 500 |
+
+```http
+GET /api/health                       → 200
+{"status": "ok", "agent_ready": true, "provider": "groq", "model": "openai/gpt-oss-120b", "detail": null}
+
+GET /api/health   (no GROQ_API_KEY)   → 200
+{"status": "degraded", "agent_ready": false, "provider": "groq", "model": "openai/gpt-oss-120b",
+ "detail": "Chave da API não configurada. Copie .env.example para .env e preencha GROQ_API_KEY."}
+
+POST /api/sessions                    → 201
+{"session_id": "<session_id>",
+ "greeting": "Olá! Eu sou a Mel, assistente virtual da Empório da Música. Como posso ajudar?\n\nA loja está aberta agora (hoje, das 09:00 às 18:00).",
+ "created_at": "2026-03-25T10:00:00-04:00"}
+
+POST /api/chat  {"session_id": "<session_id>", "message": "Oi"}   → 200
+{"session_id": "<session_id>", "reply": "(texto da FakeLLM)", "stop": "end_turn", "tool_calls": []}
+
+DELETE /api/sessions/<session_id>         → 204
+```
+
+`message` is stripped and must have 1 to 2000 characters; `session_id`, when present, at most 64 characters; the whole body at most 16 KiB (else 413). `stop` is one of `end_turn`, `max_tokens`, `refusal`, `max_iterations`, `llm_error`. A provider failure during the conversation is **still a 200** with `stop: "llm_error"` and Mel's fallback text, exactly as in the CLI. Each item of `tool_calls` carries only `name`, `ok` and `duration_ms`; tool **arguments are never returned**, because those of `consultar_pedido` and `encaminhar_atendente` contain personal data.
+
+**Error envelope.** Every error, including validation (422) and unexpected failures (500), has the same shape, with a message in Portuguese meant for the end user and no stack trace:
+
+```http
+POST /api/chat  {"session_id": "deadbeef", "message": "Oi"}   → 404
+{"error": "session_not_found", "message": "Sessão não encontrada. Ela pode ter expirado ou o servidor foi reiniciado; inicie uma nova conversa."}
+
+POST /api/chat  {"session_id": "<session_id>", "message": "   "}  → 422
+{"error": "invalid_request", "message": "A mensagem não pode ficar vazia."}
+
+POST /api/sessions   (no GROQ_API_KEY)                        → 503
+{"error": "agent_unavailable", "message": "O atendimento está indisponível no momento. Tente novamente mais tarde."}
+```
+
+| HTTP | `error` | When |
+|---|---|---|
+| 422 | `invalid_request` | invalid body, empty or too long `message` |
+| 404 | `session_not_found` | unknown `session_id` (for example after a server restart: sessions live only in memory) |
+| 409 | `session_busy` | a message is already being processed in that session |
+| 413 | `payload_too_large` | request body above 16 KiB, rejected before the JSON is read |
+| 503 | `agent_unavailable` | the agent could not be built (missing key, data or policies failed to load) |
+| 500 | `internal_error` | unexpected exception (logged on the server, details never sent to the client) |
+
+## Tests
+
+Two kinds of verification, kept apart on purpose:
+
+**1. Automated local tests: no real model, no network.**
+
+```bash
+python -m pytest -q          # full Python suite, never calls the real model
+cd frontend && npm run lint && npm run build   # frontend: static checks and production build
+```
+
+Unit and integration tests use a fake LLM (`FakeLLM` in `tests/fakes.py`). The API tests (`tests/test_api.py`) run the FastAPI app in-process with `TestClient` and the same fake LLM: routes, status codes, error envelope, degraded mode, CORS preflight, OpenAPI routes, session store (limit, eviction, busy session, concurrent requests, random session ids), body size limit (413) and the absence of tool arguments and personal data in responses. Current state: **1099 passed, 2 deselected** (the two `llm` smoke tests below); it was 1091 at commit `773ed61`, before the fixes from the final review. `npm run lint` and `npm run build` pass. The frontend has **no automated tests** (no unit or browser tests).
+
+**2. Tests with the real provider (Groq), run by hand and limited by the free-tier quota.**
+
+```bash
+python -m pytest -q -m llm   # smoke tests against the real provider (require GROQ_API_KEY / ANTHROPIC_API_KEY)
+python scripts/run_scenarios.py ...   # end-to-end scenarios (T14), see below
+```
+
+Tests marked `llm` are skipped by default (`addopts = "-m 'not llm'"`). The real-model results ([End-to-end scenario results](#end-to-end-scenario-results-t14), [docs/E2E_RESULTS.md](docs/E2E_RESULTS.md), the recorded examples) were all obtained **through the agent directly** (`scripts/run_scenarios.py`, `scripts/record_example.py`), never through the HTTP API or the web frontend. **No conversation through frontend → API → Groq has been run yet**; the API and the frontend are verified only by the automated checks above.
 
 ## Utilities
 
@@ -142,18 +251,274 @@ python scripts/record_example.py --script PATH --out PATH   # records a real exa
 
 `scripts/record_example.py` takes a script of customer messages (`--script`), an output file (`--out`), and optionally `--title`, `--reference-date`, `--pause` (default 20 s between turns) and `--force`. Contract: [ARCHITECTURE.md](ARCHITECTURE.md), section 5.9.2.
 
-## Architecture overview
+## Architecture
+
+Diagrams are in Mermaid (rendered by GitHub and by Obsidian). Every box names a real file, class or function of the repository.
+
+### Software architecture (whole system)
+
+```mermaid
+flowchart LR
+    customer(["Customer"])
+
+    subgraph browser["Browser"]
+        fe["frontend/ — React 19 + Vite 8<br/>ChatPage · useConversations · chatService · http"]
+    end
+
+    subgraph py["Python package src/emporio_agent"]
+        cli["cli.py<br/>main() · build_agent() · greeting()"]
+        api["api/app.py — FastAPI<br/>create_app() · SessionStore"]
+        agent["agent/agent.py<br/>Agent.respond()"]
+        llm["llm/<br/>create_llm_client() → GroqClient | AnthropicClient"]
+        tools["tools/<br/>ToolRegistry + 8 tools"]
+        data["data/<br/>load_all() · CatalogRepository · OrderRepository"]
+        domain["domain/<br/>pricing · shipping · store_hours · limitations"]
+        policies["policies/store.py<br/>PolicyStore"]
+    end
+
+    groq[("Groq API<br/>openai/gpt-oss-120b")]
+    csv[("data/*.csv<br/>read-only")]
+    md[("knowledge/policies.md")]
+
+    customer -- terminal --> cli
+    customer -- web chat --> fe
+    fe -- "HTTP JSON /api/*" --> api
+    api -- "build_agent() at startup" --> cli
+    cli -- "build_agent()" --> agent
+    api -- "Agent.respond()" --> agent
+    cli -- "Agent.respond()" --> agent
+    agent --> llm
+    llm -- HTTPS --> groq
+    agent -- "ToolRegistry.execute()" --> tools
+    tools --> data
+    tools --> domain
+    tools --> policies
+    data --> csv
+    policies --> md
+```
+
+The API is a thin layer: it reuses `cli.build_agent` and `cli.greeting`, keeps `agent.session.Session` objects in memory, and translates `Agent.respond` results into JSON. The frontend never talks to the model; it only knows the four `/api` routes.
+
+### Frontend (`frontend/src`)
+
+```mermaid
+flowchart TB
+    main["main.jsx"] --> app["App.jsx"] --> page["pages/ChatPage.jsx"]
+
+    subgraph comps["components/"]
+        shell["layout/AppShell.jsx"]
+        sidebar["layout/Sidebar.jsx"]
+        panel["chat/ChatPanel.jsx"]
+        list["chat/MessageList.jsx"]
+        bubble["chat/MessageBubble.jsx"]
+        chips["chat/SuggestionChips.jsx"]
+        typing["chat/TypingIndicator.jsx"]
+        composer["chat/Composer.jsx"]
+        card["products/ProductCard.jsx"]
+        detail["products/ProductDetail.jsx"]
+        figure["products/InstrumentFigure.jsx"]
+    end
+
+    subgraph state["hooks/ (state)"]
+        hook["useConversations.js<br/>conversations · sessionId per conversation<br/>sending state and error per conversation<br/>requestGreeting · sendMessage · retryLast"]
+        healthhook["useBackendHealth.js<br/>header status: online · degraded · offline"]
+    end
+
+    subgraph svc["services/"]
+        chat["chatService.js<br/>createSession · sendChatMessage · checkHealth · isDemoMode"]
+        http["http.js<br/>request · ApiError · 90 s timeout"]
+    end
+
+    subgraph demo["data/ (demo mode only)"]
+        demojs["demo.js<br/>CATEGORIES · SUGGESTIONS · WELCOME_TEXT<br/>seedConversations · createConversation"]
+        demochat["demoChat.js<br/>demoRespond"]
+    end
+
+    ls[("localStorage<br/>emporio.conversations.api.v1<br/>emporio.conversations.v1")]
+    backend[["FastAPI backend /api/*"]]
+
+    page --> shell
+    page --> sidebar
+    page --> panel
+    page --> detail
+    page --> hook
+    page --> healthhook
+    healthhook -- "checkHealth()" --> chat
+    panel --> list
+    panel --> composer
+    list --> bubble
+    list --> chips
+    list --> typing
+    bubble --> card
+    card --> figure
+    detail --> figure
+    sidebar --> demojs
+    chips --> demojs
+    hook --> chat
+    hook --> demojs
+    hook --> ls
+    chat --> http
+    chat -. "VITE_API_BASE_URL empty" .-> demochat
+    chat -. "VITE_API_BASE_URL empty" .-> demojs
+    http -- "fetch, VITE_API_BASE_URL set" --> backend
+```
+
+Components never call `fetch` or know URL paths: `services/http.js` is the only HTTP client and `services/chatService.js` the only place that knows the `/api` routes. In API mode, replies are plain text (`products: []`), so `ProductCard` and `ProductDetail` only appear in demo mode. `utils/time.js` (time formatting) and `components/icons.jsx` (SVG icons) are omitted from the diagram.
+
+### Backend (`src/emporio_agent`)
+
+```mermaid
+flowchart TB
+    subgraph apipkg["api/"]
+        main["__main__.py<br/>main() → uvicorn.run"]
+        app["app.py<br/>create_app() · ApiState · require_agent()<br/>routes: health · create_session · chat · delete_session<br/>exception handlers → error envelope · CORSMiddleware"]
+        schemas["schemas.py<br/>ChatRequest · ChatResponse · ToolCallInfo<br/>SessionCreated · HealthResponse · ErrorResponse"]
+        sessions["sessions.py<br/>SessionStore: create · use · delete<br/>SessionNotFound · SessionBusy"]
+    end
+
+    config["config.py<br/>load_settings() · read_env() · now()"]
+    cli["cli.py<br/>build_agent() · greeting()"]
+    session["agent/session.py<br/>Session"]
+
+    subgraph agentpkg["agent/"]
+        agent["agent.py<br/>Agent.respond() → AgentReply"]
+        prompts["prompts.py<br/>build_system_prompt · build_dynamic_context"]
+        guard["output_guard.py<br/>sanitize_reply"]
+    end
+
+    subgraph llmpkg["llm/"]
+        factory["factory.py<br/>create_llm_client"]
+        groq["groq_client.py<br/>GroqClient (default)"]
+        anth["anthropic_client.py<br/>AnthropicClient"]
+    end
+
+    tools["tools/__init__.py<br/>build_tool_registry → ToolRegistry<br/>catalog · order · policy · handoff tools"]
+    data["data/<br/>loader.load_all · repository"]
+    domain["domain/<br/>pricing · shipping · store_hours · limitations"]
+    policies["policies/store.py<br/>PolicyStore.from_markdown"]
+
+    main --> app
+    app --> schemas
+    app --> sessions
+    app --> config
+    app -- "_build()" --> cli
+    app -- "greeting()" --> cli
+    app -- "Agent.respond()" --> agent
+    sessions --> session
+    cli --> data
+    cli --> policies
+    cli --> tools
+    cli --> factory
+    cli -- "Agent(llm, registry, settings)" --> agent
+    factory --> groq
+    factory --> anth
+    agent --> prompts
+    agent --> guard
+    agent --> session
+    agent -- "LLMClient.complete()" --> groq
+    agent -- "ToolRegistry.execute()" --> tools
+    tools --> data
+    tools --> domain
+    tools --> policies
+```
+
+If `build_agent` fails at startup (missing key → `LLMError`; data or policies → `DataLoadError` / `PolicyStoreError`), `create_app` still returns an app with `agent = None`: health reports `degraded` and the other routes answer 503. Importing `emporio_agent.api.app` does not build the agent; the module-level `app` is created on first access.
+
+### Sequence: one conversation through the web chat
+
+```mermaid
+sequenceDiagram
+    actor U as Customer
+    participant F as Frontend<br/>useConversations
+    participant S as chatService / http
+    participant A as FastAPI<br/>api/app.py
+    participant ST as SessionStore
+    participant AG as Agent.respond
+    participant L as LLM (GroqClient)
+    participant T as ToolRegistry
+
+    U->>F: opens a new conversation
+    F->>S: createSession()
+    S->>A: POST /api/sessions
+    A->>ST: create(now)
+    A-->>S: 201 session_id, greeting, created_at
+    S-->>F: sessionId + greeting
+    F-->>U: shows Mel's greeting
+
+    U->>F: types a message
+    F->>S: sendChatMessage(sessionId, message)
+    S->>A: POST /api/chat with session_id and message
+    A->>A: validate ChatRequest (else 422 invalid_request)
+    A->>ST: use(session_id)
+    alt unknown session_id (server restarted)
+        ST-->>A: SessionNotFound
+        A-->>S: 404 session_not_found
+        S-->>F: ApiError status 404
+        F->>F: drop sessionId, add notice to the chat
+        F->>S: sendChatMessage(null, message), once
+        S->>A: POST /api/chat with session_id null
+        A->>ST: create(now) then use(new id)
+    end
+    A->>AG: respond(session, message)
+    loop at most MAX_TOOL_ITERATIONS rounds
+        AG->>L: complete(system, history, tool specs)
+        L-->>AG: tool calls or final text
+        opt the model asked for tools
+            AG->>T: execute(name, arguments)
+            T-->>AG: ToolResult (data + limitations)
+        end
+    end
+    AG->>AG: sanitize_reply(text)
+    AG-->>A: AgentReply(text, tool_calls, stop)
+    A-->>S: 200 session_id, reply, stop, tool_calls (name, ok, duration_ms)
+    S-->>F: text, sessionId, stop, toolCalls
+    F-->>U: shows the reply (plain text, line breaks kept)
+```
+
+Other errors on the way back: on `409 session_busy` (the server is still working on an earlier message of that session, for example after a client timeout) the frontend waits and retries automatically up to three times (after 2, 3.5 and 5 s) before showing the error. `503 agent_unavailable`, network failures and the 90-second client timeout become a clear message in that conversation's error banner; a `422` is shown without the "Tentar de novo" button, since resending would fail again. Sending state and errors are kept per conversation, so a slow reply in one conversation does not unlock, block or show its error in another. The composer limits the message to 2000 characters (the API limit), with a counter near the end. The header status comes from `GET /api/health`, queried once when the page loads (`hooks/useBackendHealth.js`: online, degraded or offline) instead of a fixed "Online". A provider error inside `Agent.respond` is not an HTTP error: the reply is Mel's fallback text with `stop: "llm_error"`.
+
+Principles (unchanged by the API and the frontend): the original `data/` is never modified; the LLM writes and Python computes; dependencies flow one way (`cli | api → agent → tools → data | domain | policies`); everything is testable without an LLM except the loop itself (tested with a fake LLM); no agent framework, database or vector store. Contracts between modules: [ARCHITECTURE.md](ARCHITECTURE.md) (section 5; the HTTP layer is section 5.10).
+
+## Folder structure
 
 ```
-Customer → CLI (cli.py) → Agent (tool-use loop + Session)
-                            ├─ llm/     provider adapter (Groq by default, Anthropic as alternative)
-                            └─ tools/   8 typed tools
-                                 ├─ data/     CSVs loaded in memory (pandas), read-only
-                                 ├─ domain/   pure rules: prices, PIX, installments, hours, shipping
-                                 └─ policies/ sections of knowledge/policies.md (generated from the PDF)
+emporio-da-musica-agent/
+├── data/                        # original challenge files (CSV + policy PDF), never modified
+├── knowledge/policies.md        # policy manual converted from the PDF (scripts/build_policies.py)
+├── src/emporio_agent/
+│   ├── __main__.py              # python -m emporio_agent → cli.main()
+│   ├── cli.py                   # terminal interface; build_agent() and greeting() shared with the API
+│   ├── config.py                # Settings from .env (provider, model, REFERENCE_DATE, limits)
+│   ├── api/                     # HTTP layer (FastAPI)
+│   │   ├── __main__.py          # python -m emporio_agent.api → uvicorn on 127.0.0.1:8000
+│   │   ├── app.py               # create_app(): routes, error envelope, CORS, degraded mode
+│   │   ├── schemas.py           # Pydantic request/response/error models
+│   │   └── sessions.py          # SessionStore: in-memory sessions, lock per session, LRU limit
+│   ├── agent/                   # Agent.respond (tool-use loop), Session, prompts, output guard
+│   ├── llm/                     # LLMClient interface, Groq (default) and Anthropic adapters
+│   ├── tools/                   # 8 tools + ToolRegistry
+│   ├── data/                    # CSV loader, models, quality checks, repositories
+│   ├── domain/                  # pure rules: pricing, shipping, store hours, limitations
+│   └── policies/store.py        # PolicyStore: sections of knowledge/policies.md
+├── frontend/                    # web chat (React 19 + Vite 8)
+│   ├── .env.example             # VITE_API_BASE_URL
+│   ├── public/                  # favicon and demo images
+│   └── src/
+│       ├── main.jsx, App.jsx
+│       ├── pages/ChatPage.jsx
+│       ├── components/          # chat/, layout/, products/, icons.jsx
+│       ├── hooks/useConversations.js
+│       ├── services/            # http.js (only HTTP client), chatService.js (only place with /api paths)
+│       ├── data/                # demo mode only: demo.js, demoChat.js
+│       ├── styles/, utils/, assets/
+├── scripts/                     # build_policies.py, run_scenarios.py (T14), record_example.py (T15)
+├── tests/                       # pytest suite (FakeLLM); tests/test_api.py covers the HTTP API
+├── examples/conversations/      # real example conversations (T15)
+├── docs/                        # PROGRESS.md, AGENT_GUIDE.md, E2E_RESULTS.md, e2e/ (real transcripts)
+├── .env.example                 # backend configuration (copy to .env)
+├── requirements.txt, pyproject.toml
+└── README.md, ARCHITECTURE.md, TECHNICAL_DECISIONS.md, TASKS.md, DATA_ANALYSIS.md
 ```
-
-Principles: the original `data/` is never modified; the LLM writes and Python computes; dependencies flow one way (`cli → agent → tools → data | domain | policies`); everything is testable without an LLM except the loop itself (tested with a fake LLM); no agent framework, database or vector store. Details, folder structure and contracts between modules: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Technical decisions
 
@@ -172,7 +537,15 @@ Full rationale in [TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md).
 - **Prompt strategy (D10).** The system prompt defines the persona (Mel, no emojis), the scope (only the store's instruments), the grounding rule (price, stock and delivery time only via tools), polite refusal of unrelated topics, and the duty to pass on the limitations returned by the tools. The manual's conduct rules go in the prompt; policy content comes through a tool. There is no separate intent classifier. Prompt injection defense lives in the tool layer, not in the prompt.
 - **Data handling (D3, D8).** pandas in memory, no database; corrections and normalizations only in memory. An order lookup requires the order number plus an email or phone that matches the customer of that order, and never returns contact details or the address. A customer is never identified by name or email alone (customers 11 and 43 share an email).
 - **History (D7).** In-memory history per session (needed for follow-ups such as "and in 10x?"), with a configurable turn window and Markdown transcript export. No persistence across sessions, to avoid storing personal data (LGPD).
-- **Interface (D6).** CLI only, with `rich` for formatting and `--debug` for observability. The focus of the challenge is the working agent.
+- **Interface (D6, revised by D18 and D19).** The CLI, with `rich` for formatting and `--debug` for observability, remains the reference interface and the one used for all real-model runs. The focus of the challenge is the working agent.
+- **HTTP API as a thin layer (D18, user decision on 2026-11-03).** FastAPI over the existing agent, with no duplicated logic: the app builds the agent once with `cli.build_agent`, creates the greeting with `cli.greeting`, and each `POST /api/chat` calls `Agent.respond` on an `agent.session.Session`.
+  - **Sessions only in memory, no database.** `api/sessions.py` keeps sessions in an ordered dictionary with one lock per session (a second message in the same session while the first is running gets `409 session_busy` instead of corrupting the history) and an LRU limit (`MAX_SESSIONS`, default 200). This follows D7 (no persistence of personal data); the price is that a restart loses every conversation (`404 session_not_found`), which the frontend handles.
+  - **Degraded mode instead of crashing.** Without a key, or if data or policies fail to load, the server starts anyway; `/api/health` explains why and the conversation routes answer `503`. The CLI keeps its exit code 2.
+  - **One error envelope** `{error, message}` for every status, including 422 and 500, with messages in Portuguese for the end user and no internal details.
+  - **No tool arguments in responses.** `tool_calls` exposes only `name`, `ok` and `duration_ms`; arguments of `consultar_pedido` and `encaminhar_atendente` carry e-mail, phone and free text. The API log records only session id, `stop` and tool names, never the customer's text.
+  - **Small, bounded requests.** Bodies above 16 KiB are rejected with `413 payload_too_large` before the JSON is read; `message` has at most 2000 characters and `session_id` at most 64. The session id is a 128-bit random token (`secrets.token_urlsafe(16)`), since it is the only credential of a conversation. Caveat: for chunked bodies (no `Content-Length`) the size middleware hands the already-read body to the route through Starlette's private `request._body` cache; this relies on the pinned Starlette version and is covered by a test (`tests/test_api.py`), so an upgrade that changes it fails the suite.
+  - **CORS limited** to the Vite dev server origins by default (`CORS_ORIGINS`), methods GET/POST/DELETE/OPTIONS, header `Content-Type`, no credentials.
+- **Web frontend reintroduced (D19, user decision on 2026-11-03).** The React/Vite chat had been removed from the history before publication as out of scope (see [Use of AI tools](#use-of-ai-tools)); the user brought it back on this branch (commit `773ed61`) and connected it to the API. It is a chat, not an online store. Without `VITE_API_BASE_URL` it keeps its original demo mode with fictional answers, now **signaled in the interface** ("Modo demonstração") so it can never be mistaken for the agent. In API mode the reply is plain text: the API returns no structured product data, so product cards are not shown.
 - **Reference date (D9).** Real system date in production; `REFERENCE_DATE` only for tests and examples.
 
 ## Data handling and ambiguities
@@ -211,8 +584,19 @@ Full analysis in [DATA_ANALYSIS.md](DATA_ANALYSIS.md).
 - **Holidays unknown.** Opening hours consider only the regular schedule; the manual does not list holidays, so the agent does not assert that the store is open on a holiday.
 - **No shipping by postal code.** The manual has no postal-code table or list of metropolitan-region municipalities; outside Campo Grande the agent presents the rules and the limitation.
 - **No return verdict.** Orders carry neither the purchase channel nor the real delivery date, so the agent does not say whether a return or exchange is eligible.
-- **No persistence across sessions.** Each conversation lives in memory; only the optional transcript is written to disk.
-- **No real WhatsApp channel.** CLI only; messaging integrations were not implemented. The handoff protocol is local.
+- **No persistence across sessions.** Each conversation lives in memory; only the optional transcript is written to disk (CLI only; the API has no transcript export).
+- **No real WhatsApp channel.** CLI and a local web chat only; messaging integrations were not implemented. The handoff protocol is local.
+- **Web path not tested with the real provider.** The HTTP API and the frontend were verified only by automated local checks (pytest with `FakeLLM`, `npm run lint`, `npm run build`). No conversation frontend → API → Groq has been run, and all T14/T15 results come from the agent called directly. The frontend has no automated tests of its own.
+- **API sessions are lost on restart.** Sessions live only in the server's memory; after a restart the frontend gets `404 session_not_found`, warns that the previous context was lost and resends the last message once in a new session. Earlier details (for example, the order number and e-mail already given) must be repeated.
+- **Single process.** Sessions are in the memory of one process: running several uvicorn workers or replicas would split them. No database or shared cache by design (D18).
+- **No authentication or rate limiting on the API; meant for local use.** Anyone who can reach the port can open sessions and spend the provider quota. `POST /api/sessions` does not call the model and has no rate limit, so a burst of `MAX_SESSIONS` (200) calls evicts every idle session through the LRU limit, and their users lose context (`404`, then a new session). CORS does not prevent this (it only binds browsers). `python -m emporio_agent.api` listens on `127.0.0.1` and CORS only admits the local Vite origins: this is a local prototype, not a deployable service. The session id is a random token (`secrets.token_urlsafe`) and is the only credential of a conversation.
+- **Per-session history grows without a bound.** `Session.messages` keeps every message and tool result of the conversation in memory; `MAX_HISTORY_TURNS` only limits what is sent to the model, and `MAX_SESSIONS` limits the number of sessions, not their size.
+- **500 errors log the traceback on the server.** The response body never carries internal details, but the server log of an unexpected exception includes its traceback, which could contain data from the request if an exception message ever did.
+- **Web chat history stays in the browser.** The frontend saves its conversations, including whatever the customer typed (order number, e-mail), in the browser's `localStorage`, with no expiry and no "clear history" button. The chat footer says so ("As conversas ficam salvas neste navegador.").
+- **A client timeout does not cancel the server.** If a reply takes longer than the 90-second client timeout, the server keeps processing and stores the answer in the session, but the user does not see it; the timeout message warns that "Tentar de novo" may send the same question again.
+- **Markdown shown literally in the web chat.** Mel answers in simple Markdown; the chat bubble keeps line breaks (`white-space: pre-wrap`) but does not render Markdown, so `**bold**` appears with the asterisks. (The CLI renders Markdown through `rich`.)
+- **Text-only replies in API mode.** The API returns only text, so the product cards and the product detail panel of the frontend appear only in demo mode, with fictional data.
+- **Demo mode is fictional.** Without `VITE_API_BASE_URL` the frontend answers from `frontend/src/data/`, not from the agent; the interface says so, but its prices and products are not the store's data.
 - **Small, heuristic end-to-end scenarios.** There are 13 scenarios plus an emoji check, evaluated by presence of terms and tools called; the report needs manual review and the model varies between runs. The passed scenarios were exercised with earlier prompt versions.
 - **Emoji removal.** The output guard is covered by automated tests; check 14 (no emojis) also passed in the 2026-11-03 regression with Anthropic. It was not re-checked on Groq under `medium`.
 - **Credentials.** The real-provider smoke tests, the scenarios and the example recordings depend on an API key. The code was first built and tested without a live key; the real runs came afterwards.
@@ -344,6 +728,7 @@ Setting `LLM_EFFORT=medium` on the command line is only needed while the local `
 - Resolve the P1–P16 contradictions with the team and then turn the limitations into rules.
 - Add embeddings and a vector store if the manual grows.
 - Optional conversation persistence with consent, a real WhatsApp channel and holidays from a calendar.
+- Run the web path against the real provider (a short scripted conversation through the frontend and the API), add frontend tests, render Markdown safely in the chat bubble, and return structured product data from the API so the product cards can show real products. Before any deployment: authentication, rate limiting and a shared session store.
 - Broader product-conflict detection with assisted review.
 
 ## Use of AI tools
@@ -371,3 +756,5 @@ Examples of problems caught by the process (from `docs/PROGRESS.md` and `docs/E2
 - Recorded lessons: `send` only guarantees queuing, so contract changes must be confirmed in `worker_done`; files generated with `--check` need a `.gitattributes` with `eol=lf`.
 
 History rewrite before publication. By the user's decision, the git history was rewritten before anything was published, to remove two items from every commit: the PDF with the challenge statement and an experimental frontend that was out of scope (both kept locally and not versioned). Backup references and the reflog were purged, `git fsck` is clean, and the documentation was updated to match.
+
+**API and frontend stage (2026-11-03, branch `gelane-dev/backend-e-frontend`).** The user later decided to bring the frontend back and connect it to the agent through an HTTP API (D18, D19). This stage was also orchestrated with Claude agents through Orca: the coordinator (Claude Opus 5.5) first wrote the HTTP contract (routes, payloads, error envelope, CORS, session rules) from the facts of the existing code, and the two commits (`40cafe0` API with its tests, `773ed61` frontend) carry the `Co-Authored-By: Claude Opus 5.5` trailer. The documentation update (this README, `ARCHITECTURE.md`, `TECHNICAL_DECISIONS.md`, `docs/PROGRESS.md`, `TASKS.md`) was written by a Claude agent dispatched by the coordinator, with a separate read-only reviewer agent running in parallel; the diagrams were drawn after reading the code, and every file, route and function they name was checked to exist. As before, nothing was run against the real provider in this stage; the verification was the local suite (1091 passed at `773ed61`, 1099 with the review fixes), `npm run lint` and `npm run build`.

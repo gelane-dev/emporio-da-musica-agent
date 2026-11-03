@@ -34,7 +34,7 @@ Outros scripts: `npm run lint` (oxlint), `npm run build` (gera `dist/`), `npm ru
 | Conversa nova | saudação real de `POST /api/sessions` | saudação fixa de `src/data/demo.js` |
 | Conversas iniciais | nenhuma (só as suas) | exemplos de `src/data/demo.js` |
 | Cartões de produto | não (a resposta é texto) | sim (`ProductCard`) |
-| Sinalização na UI | "Online" | "Modo demonstração" no cabeçalho e aviso no rodapé |
+| Sinalização na UI | status de `GET /api/health`: "Online", "Atendimento degradado" ou "Indisponível" | "Modo demonstração" no cabeçalho e aviso no rodapé |
 | `localStorage` | `emporio.conversations.api.v1` | `emporio.conversations.v1` |
 
 A variável é lida no build/dev (`import.meta.env`): após alterá-la, reinicie o `npm run dev`.
@@ -43,27 +43,49 @@ A variável é lida no build/dev (`import.meta.env`): após alterá-la, reinicie
 
 Componentes não chamam `fetch` nem conhecem paths:
 
-- `src/services/http.js` — cliente único. Timeout de 60 s (`AbortController`), erros como
+- `src/services/http.js` — cliente único. Timeout de 90 s (`AbortController`), erros como
   `ApiError` com `status` e `code` (campo `error` do envelope `{error, message}`).
 - `src/services/chatService.js` — `createSession()` (`POST /api/sessions`),
   `sendChatMessage()` (`POST /api/chat` com `{session_id, message}`, normalizado para
   `{text, products: [], sessionId, stop, toolCalls}`) e `checkHealth()` (`GET /api/health`).
 - `src/hooks/useConversations.js` — estado das conversas. Guarda o `sessionId` do backend em
-  cada conversa (persistido no `localStorage`) e o envia na mensagem seguinte.
+  cada conversa (persistido no `localStorage`) e o envia na mensagem seguinte. Envio, erro e
+  última mensagem são **por conversa**: uma conversa não bloqueia nem mostra o erro de outra.
+- `src/hooks/useBackendHealth.js` — consulta `GET /api/health` uma vez ao montar a página e
+  alimenta o status do cabeçalho (verificando, online, degradado, indisponível).
 
 Tratamento de erros:
 
 - `404 session_not_found` — as sessões vivem só na memória do servidor; após um reinício o id
   antigo some. O frontend descarta o id, mostra um aviso na conversa de que o contexto anterior
   se perdeu e reenvia a mensagem **uma vez** numa sessão nova.
-- `409 session_busy` e `503 agent_unavailable` — mensagem clara no banner de erro, com
-  "Tentar de novo".
-- Timeout / rede / demais erros — banner com a mensagem do backend (pt-BR) ou uma genérica.
+- `409 session_busy` — o servidor ainda processa uma mensagem anterior da sessão (por exemplo,
+  após um timeout do cliente): até 3 novas tentativas automáticas (após 2; 3,5; 5 s) antes de
+  mostrar o erro.
+- `503 agent_unavailable` — mensagem clara no banner de erro, com "Tentar de novo".
+- `422` (mensagem inválida) — banner sem "Tentar de novo" (reenviar daria o mesmo erro). O
+  composer já limita a mensagem a 2000 caracteres, o mesmo limite da API, com contador perto do fim.
+- Timeout (90 s) — aviso de que a resposta ainda pode estar sendo processada e de que "Tentar de
+  novo" pode enviar a mesma pergunta outra vez (o servidor não cancela o processamento).
+- Rede / demais erros — banner com a mensagem do backend (pt-BR) ou uma genérica.
 
 As respostas da Mel vêm em Markdown simples; o balão preserva quebras de linha
-(`white-space: pre-wrap`) e mostra o texto sem interpretar HTML.
+(`white-space: pre-wrap`) e mostra o texto sem interpretar HTML nem Markdown (`**negrito**`
+aparece com os asteriscos).
+
+## Verificação e limitações
+
+- Verificado só localmente: `npm run lint` e `npm run build` sem erros. Não há testes
+  automatizados do frontend. A API é testada no backend (`tests/test_api.py`, com LLM falso).
+- **A integração frontend → API → Groq não foi testada com o provedor real.**
+- As conversas (inclusive o que o cliente digitou) ficam no `localStorage` do navegador, sem
+  expiração; o rodapé informa "As conversas ficam salvas neste navegador.".
+- No modo API a resposta é só texto: sem cartões de produto. Sessões do backend vivem só em
+  memória e se perdem ao reiniciá-lo (tratado com o aviso e o reenvio descritos acima).
+- Arquitetura completa e diagramas: `README.md` da raiz (seção *Architecture*) e
+  `ARCHITECTURE.md` §8.
 
 ## Estrutura
 
-`components/` (chat, layout, produtos), `pages/`, `hooks/` (estado), `services/` (HTTP),
+`components/` (chat, layout, produtos), `pages/`, `hooks/` (estado das conversas e do backend), `services/` (HTTP),
 `styles/`, `data/` (somente modo demonstrativo), `utils/`.
