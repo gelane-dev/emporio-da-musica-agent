@@ -131,7 +131,20 @@ Todas as decisões que dependiam de aprovação foram aprovadas em 2026-11-01 (v
 - **Estado por conversa:** envio, erro e última mensagem ficam por conversa (uma conversa não bloqueia nem mostra o erro de outra); `409 session_busy` ⇒ até 3 novas tentativas automáticas com espera; status do cabeçalho por `GET /api/health` (`hooks/useBackendHealth.js`); composer limitado a 2000 caracteres.
 - **Resposta só texto:** a API não devolve produtos estruturados, então no modo API não há cartões de produto; o texto é exibido sem interpretar HTML nem Markdown (só quebras de linha).
 
-**Consequências.** Markdown aparece literal no chat; cartões e detalhe de produto existem só no modo demonstrativo (dados fictícios); o histórico das conversas fica no `localStorage` do navegador. Verificação: `npm run lint` e `npm run build`; não há testes automatizados do frontend e a integração frontend → API → provedor real foi validada uma vez, com Anthropic (não com a Groq).
+**Consequências.** Markdown aparece literal no chat; cartões e detalhe de produto existem só no modo demonstrativo (dados fictícios); o histórico das conversas fica no `localStorage` do navegador. Verificação: `npm run lint` e `npm run build` (testes automatizados do frontend vieram depois, em D20); a integração frontend → API → provedor real foi validada uma vez, com Anthropic (não com a Groq).
+
+## D20 — Testes do frontend, CI e Docker (pedido do usuário, 2026-11-03)
+
+**Contexto.** Preparar a entrega para apresentação profissional sem mudar a arquitetura (D18, D19). Atualiza a consequência de D19 "não há testes automatizados do frontend".
+
+**Decisão.**
+- **Testes do frontend:** Vitest + React Testing Library + jsdom (mesmo ecossistema do Vite, sem configuração de transpilação à parte), em `frontend/tests/` espelhando `src/`. O modo API é ligado por arquivo com `vi.hoisted(() => vi.stubEnv(...))`, porque `http.js` e `useConversations.js` leem `VITE_API_BASE_URL` na importação; `fetch` é sempre substituído por uma tabela de rotas que falha em chamada não mapeada. Nenhum teste usa provedor de IA.
+- **CI (GitHub Actions):** push e pull request para a `main`; jobs de backend (pytest + `build_policies.py --check`), frontend (lint, testes, build) e imagens Docker (depois dos dois). Sem `.env` nem chaves; permissões só de leitura.
+- **Docker:** backend em `python:3.13-slim`, usuário sem root, `PYTHONPATH=/app/src` mantendo a estrutura do repositório (o `config.REPO_ROOT` continua resolvendo `data/`, `knowledge/` e `runtime/`); dependências do `requirements.txt` sem `-e .` e sem `pytest`; `.dockerignore` como lista de inclusão. Frontend em build Node + `nginx-unprivileged`, com proxy de `/api/` para o backend: mesma origem, sem CORS. Compose com health checks, `depends_on` saudável e volume para `runtime/`. Sem banco nem serviços extras (D7, D18).
+- **`API_HOST`/`API_PORT`** em `python -m emporio_agent.api` (padrão inalterado, 127.0.0.1:8000), para o contêiner escutar em 0.0.0.0.
+- **Limite por IP no proxy** (20 req/min, rajada 10, resposta 429 no envelope `{error, message}`): a API não tem autenticação e cada mensagem gasta cota do provedor. Fica no nginx, sem mudar a API.
+
+**Consequências.** `VITE_API_BASE_URL` é definido no build: trocar o endereço público (`PUBLIC_URL`) exige reconstruir o frontend. Sessões continuam em memória: uma única réplica do backend. Sem autenticação, um serviço público ainda precisaria de login ou captcha na frente do chat.
 
 ## D16 — Parâmetros de chamada ao modelo (2026-11-01, antes da T08)
 
