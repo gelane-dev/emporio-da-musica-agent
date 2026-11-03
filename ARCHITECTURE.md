@@ -854,7 +854,7 @@ Custo estimado: ~8 turnos × 8–10 mil tokens ≈ 75 mil tokens (executar após
 
 ### 5.10 `api/` — camada HTTP (2026-11-03, D18)
 
-Contrato definido pelo coordenador antes da implementação (commit `40cafe0`); testes em `tests/test_api.py` com `FakeLLM` e `TestClient`. A camada **não contém lógica do agente**: só monta o agente, guarda sessões e traduz `AgentReply` em JSON.
+Contrato definido pelo coordenador antes da implementação (commit `67f6b1f`); testes em `tests/test_api.py` com `FakeLLM` e `TestClient`. A camada **não contém lógica do agente**: só monta o agente, guarda sessões e traduz `AgentReply` em JSON.
 
 ```python
 # api/app.py
@@ -900,7 +900,7 @@ class SessionStore:                       # OrderedDict[id, _Entry(session, lock
 
 ## 8. Camada HTTP e frontend (2026-11-03, D18/D19)
 
-Commits `40cafe0` (API) e `773ed61` (frontend). Diagramas completos (sistema, frontend, backend e sequência) no [[README]], seção *Architecture*; aqui ficam o resumo e as fronteiras.
+Commits `67f6b1f` (API) e `71bd693` (frontend). Diagramas completos (sistema, frontend, backend e sequência) no [[README]], seção *Architecture*; aqui ficam o resumo e as fronteiras.
 
 ```mermaid
 flowchart LR
@@ -932,4 +932,4 @@ flowchart LR
 - `409 session_busy` ⇒ até 3 novas tentativas automáticas (após 2; 3,5; 5 s) antes de mostrar o erro. `503`, timeout (90 s) e falha de rede ⇒ mensagem clara no banner de erro da conversa; `422` sem botão "Tentar de novo". O composer limita a mensagem a 2000 caracteres (contador perto do fim); o status do cabeçalho vem de `GET /api/health`.
 - Resposta exibida como texto (`white-space: pre-wrap`): Markdown não é renderizado; não há `dangerouslySetInnerHTML`. No modo API não há cartões de produto (`products: []`).
 
-**Verificação.** Automatizada e local: `pytest` (1099 passed, 2 deselected com as correções da revisão; 1091 em `773ed61`; `tests/test_api.py` com `FakeLLM`), `npm run lint`, `npm run build`. **Não houve** execução frontend → API → Groq com o provedor real, e o frontend não tem testes automatizados.
+**Verificação.** Automatizada e local: `pytest` (1099 passed, 2 deselected com as correções da revisão; 1091 em `71bd693`; `tests/test_api.py` com `FakeLLM`), `npm run lint`, `npm run build`. Execução real única (03/11/2026): navegador → frontend → API → agente → Anthropic `claude-sonnet-5-5`, mais modo degradado e provedor inalcançável ([[docs/e2e/web_e2e_anthropic.md]]). **Não houve** execução pelo caminho web com a Groq, e o frontend não tem testes automatizados.

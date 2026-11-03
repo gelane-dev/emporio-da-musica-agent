@@ -24,10 +24,10 @@
 | T14 Cenários E2E | histórico em `low` (Groq): 12/13 aprovados, cenário 5 não aprovado; regressão `medium` em 03/11 com Anthropic `claude-sonnet-5-5`: 14/14 checagens e revisão manual ok; regressão `medium` na Groq não executada (cota) — [[docs/E2E_RESULTS]] | `b80958e`, `1a0779f`, `4ac2216` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
 | T15 Conversas de exemplo | 3 conversas reais: C1 regravada em 03/11 com Anthropic `claude-sonnet-5-5` `medium` (correta; gravação `low` com erro preservada em docs/e2e); C2 `low` correta; C3 `medium` correta | `01f50ba` | [[ARCHITECTURE#5.9.2 Contrato da T15 (gravação das conversas de exemplo)]] |
 | T16 README | final em inglês; atualizado em 03/11 com a regressão e a C1 feitas com a Anthropic | `f541806` | — |
-| T18 API HTTP + frontend web | concluída (verificação local: pytest com `FakeLLM`, lint e build); **sem teste com o provedor real** | `40cafe0`, `773ed61` | D18/D19; [[ARCHITECTURE#5.10 `api/` — camada HTTP (2026-11-03, D18)]] e §8 |
+| T18 API HTTP + frontend web | concluída e integrada na `main`; pytest com `FakeLLM`, lint e build; 1 conversa real frontend → API → Anthropic em 03/11 (Groq não) | `67f6b1f`, `71bd693`, `9cc2441`, `6404109` | D18/D19; [[ARCHITECTURE#5.10 `api/` — camada HTTP (2026-11-03, D18)]] e §8 |
 | T17 Entrega | publicada em 02/11 (push autorizado pelo usuário); atualização de 03/11 commitada localmente, **push aguardando autorização** | — | ver "Preparação da T17" |
 
-Suíte atual (03/11/2026, branch `gelane-dev/backend-e-frontend`): **1099 passed, 2 deselected** (marcador `llm`) com as correções da revisão no worktree (1091 em `773ed61`), inclusive `tests/test_api.py`; `npm run lint` e `npm run build` do frontend sem erros.
+Suíte atual (03/11/2026, `main` após a integração): **1099 passed, 2 deselected** (marcador `llm`) (1091 em `71bd693`, antes das correções da revisão), inclusive `tests/test_api.py`; `npm run lint` e `npm run build` do frontend sem erros.
 
 Suíte em 01/11 (antes da API): 1029 testes passando + 2 smokes reais pulados (Anthropic e Groq), sem avisos; verificada também em clone limpo e em ambiente virtual novo instalado só pelo `requirements.txt`.
 
@@ -77,7 +77,7 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 ## Preparação da T17 (revisão de entrega, 01/11/2026 — sem publicação)
 
 - Segredos: nenhuma chave real no histórico completo (`gsk_…`, `sk-ant-…`); única atribuição é valor fictício de teste.
-- Não versionados (confirmado): `.env`, `venv/`, `runtime/`, `frontend/` (fora do escopo, decisão do usuário; mantida intacta no disco — **revertido em 03/11 por nova decisão do usuário: `frontend/` voltou em `773ed61`, T18**), `node_modules`.
+- Não versionados (confirmado): `.env`, `venv/`, `runtime/`, `frontend/` (fora do escopo, decisão do usuário; mantida intacta no disco — **revertido em 03/11 por nova decisão do usuário: `frontend/` voltou em `71bd693` (`773ed61` na branch), T18**), `node_modules`.
 - Tamanho do `.git`: 3 MB; maiores arquivos: PDFs de `data/`.
 - Histórico: commits incrementais (sem squash/force-push), autor `gelane-dev`.
 - `gh` não instalado; publicação depende de instalação/autenticação ou de um repositório vazio criado pelo usuário.
@@ -109,12 +109,20 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 
 ## API HTTP e frontend (T18, 03/11/2026, branch `gelane-dev/backend-e-frontend`)
 
-- `40cafe0` — `src/emporio_agent/api/` (`app.py`, `schemas.py`, `sessions.py`, `__main__.py`) + `tests/test_api.py`; `fastapi`, `uvicorn`, `httpx` no `requirements.txt`; `CORS_ORIGINS` e `MAX_SESSIONS` no `.env.example`. Nada fora de `api/` mudou em `src/`, `data/` ou `knowledge/`.
-- `773ed61` — `frontend/` volta ao versionamento por decisão do usuário, revertendo a exclusão de `1463ba2` e da reescrita de 02/11 (que continuam válidas para o histórico anterior); `node_modules/`, `dist/` e `frontend/.env` ignorados.
-- Verificado (local, sem provedor real): `pytest` 1091 passed, 2 deselected em `773ed61` e 1099 com as correções da revisão; `npm run lint` e `npm run build` sem erros; respostas reais da API conferidas em processo com `TestClient` + `FakeLLM` (exemplos do README).
+- `67f6b1f` (na branch: `40cafe0`) — `src/emporio_agent/api/` (`app.py`, `schemas.py`, `sessions.py`, `__main__.py`) + `tests/test_api.py`; `fastapi`, `uvicorn`, `httpx` no `requirements.txt`; `CORS_ORIGINS` e `MAX_SESSIONS` no `.env.example`. Nada fora de `api/` mudou em `src/`, `data/` ou `knowledge/`.
+- `71bd693` (na branch: `773ed61`) — `frontend/` volta ao versionamento por decisão do usuário, revertendo a exclusão de `1463ba2` e da reescrita de 02/11 (que continuam válidas para o histórico anterior); `node_modules/`, `dist/` e `frontend/.env` ignorados.
+- Verificado (local, sem provedor real): `pytest` 1091 passed, 2 deselected em `71bd693` e 1099 com as correções da revisão; `npm run lint` e `npm run build` sem erros; respostas reais da API conferidas em processo com `TestClient` + `FakeLLM` (exemplos do README).
 - Revisão somente leitura (outro agente, Orca): 0 achados altos, 3 médios, 7 baixos. Correções despachadas em paralelo pelo coordenador: estado de envio por conversa, tratamento de 409/timeout, `maxLength` 2000 no composer, status do cabeçalho por `GET /api/health`, texto da nota de privacidade (frontend); `session_id` com `secrets.token_urlsafe` e limite de tamanho do corpo com 413 `payload_too_large` (API). Essas correções já estavam aplicadas no worktree (ainda não commitadas) quando a documentação foi atualizada, e ela as descreve como estão no código: corpo até 16 KiB (`MAX_BODY_BYTES`), `session_id` até 64 caracteres, token de 128 bits, timeout do cliente de 90 s, `hooks/useBackendHealth.js`, até 3 novas tentativas em 409. **Conferir de novo no commit final.** Achados aceitos como limitação documentada: sem limite de taxa em `POST /api/sessions` (descarte LRU em massa; API só local), `Session.messages` sem limite em memória, traceback no log de erro 500, histórico do chat no `localStorage`, sem autenticação.
 - Documentação atualizada (README com diagramas Mermaid validados com `@mermaid-js/mermaid-cli`, ARCHITECTURE §5.10/§8, TECHNICAL_DECISIONS D18/D19, TASKS T18, `frontend/README.md`).
-- **Pendente:** conversa real frontend → API → Groq (nunca executada); testes automatizados do frontend.
+- **Pendente:** conversa real pelo caminho web com a Groq; testes automatizados do frontend. (A conversa real pelo caminho web com a Anthropic foi feita na integração; ver a seção seguinte.)
+
+## Integração na `main` (03/11/2026)
+
+- Os 4 commits da branch `gelane-dev/backend-e-frontend` foram aplicados na `main` por cherry-pick (histórico linear, mensagens originais): `40cafe0`→`67f6b1f`, `773ed61`→`71bd693`, `81a17b0`→`9cc2441`, `1324625`→`6404109`. Conflitos só em `README.md` e `docs/PROGRESS.md` (resultados da Anthropic de `7901bdc`/`cf4f182` × camada web), resolvidos mantendo os dois lados.
+- Antes da integração, a cópia local antiga de `frontend/` (ignorada, versão de 01/11 só com modo demonstrativo) foi guardada em `C:/Users/Dell/Desktop/emporio-da-musica-agent-backups/20261103-integracao/frontend-local-main`; a versão versionada (03/11, ligada à API) a substitui.
+- Consolidação (`510ac27`): removido `frontend/src/assets/hero.png` (sem uso) e `frontend/.gitignore` (regras repetidas; as úteis foram para o `.gitignore` da raiz).
+- Verificado na `main`: `pytest` 1099 passed, 2 deselected; `npm run lint` e `npm run build` sem erros.
+- Validação real pelo navegador com Anthropic `claude-sonnet-5-5` (3 chamadas), modo degradado e provedor inalcançável: [[docs/e2e/web_e2e_anthropic.md]]. Provedor padrão do `.env` inalterado (Groq).
 
 ## Pendências abertas
 

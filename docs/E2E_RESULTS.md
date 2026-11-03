@@ -68,9 +68,24 @@ Revisão manual pelos critérios críticos (todas as respostas lidas):
 
 Comando usado (com `LLM_PROVIDER=anthropic LLM_MODEL=claude-sonnet-5-5` para a Anthropic): `LLM_EFFORT=medium python scripts/record_example.py --script examples/conversations/roteiros/01_catalogo_violoes.txt --out examples/conversations/01_catalogo_violoes.md --title "Catálogo: violões até R$ 1000"` (~25–35 mil tokens). Código 3 = erro do LLM: nada é gravado.
 
-## 5. O que resta (opcional, só com cota da Groq)
+## 5. Caminho web real (T18, 03/11/2026, Anthropic)
+
+Depois da integração da API e do frontend na `main`, uma única conversa real pelo caminho completo: navegador (Edge headless, dirigido pelo DevTools Protocol) → frontend (Vite, modo API) → FastAPI → `Agent.respond` → Anthropic `claude-sonnet-5-5` (`LLM_MAX_TOKENS=4096`, `medium`). Relatório: [[docs/e2e/web_e2e_anthropic.md]].
+
+| Verificação | Resultado |
+|---|---|
+| Saudação (`POST /api/sessions`, sem chamada ao modelo) | 201, mostrada no chat, status "Online" |
+| "Quanto custa o ukulele Ohana CK-20?" | `detalhar_produto`; R$ 549,00 → R$ 439,20 (20%), 1x–4x confirmadas, 5x "a confirmar", PIX sem acúmulo |
+| "E em 4x, quanto fica cada parcela?" (contexto) | R$ 109,80, a partir do histórico da sessão, sem nova ferramenta |
+| Sem chave (modo degradado) | health `degraded`; 503 `agent_unavailable` mostrado no banner de erro do chat |
+| Provedor inalcançável | 200 com `stop=llm_error`; texto de contingência da Mel no chat |
+
+Custo: 3 chamadas ao modelo (o prefixo do sistema foi lido do cache nas chamadas 2 e 3). O caminho web com a Groq **não** foi executado.
+
+## 6. O que resta (opcional, só com cota da Groq)
 
 1. R1 (§3) na Groq — confirmar o padrão `openai/gpt-oss-120b` em `medium`.
 2. R2 (§3) — somente se R1 tiver falhas corrigidas.
+3. Uma conversa curta pelo caminho web com a Groq (o mesmo roteiro do §5).
 
 Antes de rodar, verificar a cota: o erro 429 da Groq informa "tokens per day (TPD): Limit 200000, Used …" e o tempo de espera.

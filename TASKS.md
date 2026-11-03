@@ -351,12 +351,12 @@ Total estimado: ~18h (≈ 15,5h sem opcionais/folgas).
 - [x] Rotas `GET /api/health`, `POST /api/sessions`, `POST /api/chat`, `DELETE /api/sessions/{id}` reutilizando `cli.build_agent`, `cli.greeting` e `Agent.respond` (sem duplicar lógica do agente).
 - [x] Envelope `{error, message}` em todos os erros; `tool_calls` sem `arguments`; `stop="llm_error"` com 200; modo degradado sem chave (health `degraded`, 503 nas rotas de conversa).
 - [x] Sessões só em memória, lock por sessão (409) e limite `MAX_SESSIONS`; CORS restrito e configurável.
-- [x] Testes da API com `FakeLLM` (`tests/test_api.py`); suíte completa verde: 1091 passed, 2 deselected em `773ed61`; 1099 passed, 2 deselected com as correções da revisão final.
+- [x] Testes da API com `FakeLLM` (`tests/test_api.py`); suíte completa verde: 1091 passed, 2 deselected em `71bd693`; 1099 passed, 2 deselected com as correções da revisão final.
 - [x] Frontend: componentes sem `fetch`; `services/http.js` e `services/chatService.js`; `sessionId` por conversa; saudação real; 404 ⇒ aviso + um reenvio em sessão nova; modo demonstrativo sinalizado na UI.
 - [x] `npm run lint` e `npm run build` sem erros.
-- [ ] Conversa real frontend → API → Groq — **não executada** (nenhum teste com o provedor real nesta tarefa).
+- [x] Conversa real frontend → API → agente → provedor: executada uma vez com Anthropic `claude-sonnet-5-5` em 03/11, após a integração na `main` ([[docs/e2e/web_e2e_anthropic.md]]). Com a Groq: **não executada**.
 - [ ] Testes automatizados do frontend — não existem.
-**Commits.** `40cafe0` `feat(api): API FastAPI sobre o agente existente (sessões em memória, CORS, Swagger)`; `773ed61` `feat(frontend): reintroduz o frontend React/Vite e conecta o chat à API`.
+**Commits.** `67f6b1f` `feat(api): API FastAPI sobre o agente existente (sessões em memória, CORS, Swagger)`; `71bd693` `feat(frontend): reintroduz o frontend React/Vite e conecta o chat à API`.
 
 ---
 

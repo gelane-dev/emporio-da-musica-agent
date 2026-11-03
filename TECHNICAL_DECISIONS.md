@@ -117,11 +117,11 @@ Todas as decisões que dependiam de aprovação foram aprovadas em 2026-11-01 (v
 
 **Alternativas descartadas.** Reescrever o loop dentro da API (duplicaria lógica testada); persistir sessões em banco/Redis (dados pessoais, escopo de protótipo); expor os argumentos das ferramentas para depuração (vazamento de PII); streaming de tokens (o agente devolve a resposta final após o loop de ferramentas).
 
-**Consequências.** Reiniciar o servidor apaga todas as sessões (o frontend trata o 404, D19). Funciona em um único processo (vários workers dividiriam as sessões). Sem autenticação nem limite de taxa: a API é para uso local (`python -m emporio_agent.api` escuta em 127.0.0.1). Testada só com `FakeLLM` (`tests/test_api.py`); nenhuma execução pela API com o provedor real.
+**Consequências.** Reiniciar o servidor apaga todas as sessões (o frontend trata o 404, D19). Funciona em um único processo (vários workers dividiriam as sessões). Sem autenticação nem limite de taxa: a API é para uso local (`python -m emporio_agent.api` escuta em 127.0.0.1). Testes automatizados com `FakeLLM` (`tests/test_api.py`); uma conversa real pela API (e pelo frontend) com Anthropic `claude-sonnet-5-5` em 03/11 ([[docs/e2e/web_e2e_anthropic.md]]); nenhuma pela API com a Groq.
 
 ## D19 — Frontend web reintroduzido e conectado à API (decisão do usuário, 2026-11-03)
 
-**Contexto.** O chat React/Vite existia localmente, fora do escopo, e foi retirado do histórico antes da publicação (commit `1463ba2` e reescrita de 02/11). O usuário decidiu trazê-lo de volta neste branch (commit `773ed61`), revertendo essa exclusão, e ligá-lo ao agente pela API (D18). Revisa D6 ("somente CLI"): a CLI continua sendo a interface de referência das execuções reais.
+**Contexto.** O chat React/Vite existia localmente, fora do escopo, e foi retirado do histórico antes da publicação (commit `1463ba2` e reescrita de 02/11). O usuário decidiu trazê-lo de volta neste branch (commit `773ed61`, integrado na `main` como `71bd693`), revertendo essa exclusão, e ligá-lo ao agente pela API (D18). Revisa D6 ("somente CLI"): a CLI continua sendo a interface de referência das execuções reais.
 
 **Decisão.**
 - `frontend/` (React 19 + Vite 8, oxlint), sem biblioteca de UI, roteador ou gerenciador de estado: o estado fica em `hooks/useConversations.js`.
@@ -131,7 +131,7 @@ Todas as decisões que dependiam de aprovação foram aprovadas em 2026-11-01 (v
 - **Estado por conversa:** envio, erro e última mensagem ficam por conversa (uma conversa não bloqueia nem mostra o erro de outra); `409 session_busy` ⇒ até 3 novas tentativas automáticas com espera; status do cabeçalho por `GET /api/health` (`hooks/useBackendHealth.js`); composer limitado a 2000 caracteres.
 - **Resposta só texto:** a API não devolve produtos estruturados, então no modo API não há cartões de produto; o texto é exibido sem interpretar HTML nem Markdown (só quebras de linha).
 
-**Consequências.** Markdown aparece literal no chat; cartões e detalhe de produto existem só no modo demonstrativo (dados fictícios); o histórico das conversas fica no `localStorage` do navegador. Verificação: `npm run lint` e `npm run build`; não há testes automatizados do frontend e a integração frontend → API → Groq **não** foi testada com o provedor real.
+**Consequências.** Markdown aparece literal no chat; cartões e detalhe de produto existem só no modo demonstrativo (dados fictícios); o histórico das conversas fica no `localStorage` do navegador. Verificação: `npm run lint` e `npm run build`; não há testes automatizados do frontend e a integração frontend → API → provedor real foi validada uma vez, com Anthropic (não com a Groq).
 
 ## D16 — Parâmetros de chamada ao modelo (2026-11-01, antes da T08)
 

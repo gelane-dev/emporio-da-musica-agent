@@ -77,7 +77,9 @@ aparece com os asteriscos).
 
 - Verificado só localmente: `npm run lint` e `npm run build` sem erros. Não há testes
   automatizados do frontend. A API é testada no backend (`tests/test_api.py`, com LLM falso).
-- **A integração frontend → API → Groq não foi testada com o provedor real.**
+- Integração real validada uma vez: navegador → frontend → API → agente → Anthropic
+  `claude-sonnet-5-5` (03/11/2026, `docs/e2e/web_e2e_anthropic.md`). Com a Groq (provedor
+  padrão) o caminho web **não** foi executado.
 - As conversas (inclusive o que o cliente digitou) ficam no `localStorage` do navegador, sem
   expiração; o rodapé informa "As conversas ficam salvas neste navegador.".
 - No modo API a resposta é só texto: sem cartões de produto. Sessões do backend vivem só em
