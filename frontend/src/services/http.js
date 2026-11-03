@@ -1,7 +1,7 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 /** Tempo máximo de espera por resposta. O agente (LLM + ferramentas) pode demorar. */
-export const REQUEST_TIMEOUT_MS = 60_000
+export const REQUEST_TIMEOUT_MS = 90_000
 
 const FALLBACK_MESSAGE = 'O atendimento está temporariamente indisponível. Tente novamente em instantes.'
 

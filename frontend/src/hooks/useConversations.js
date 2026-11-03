@@ -13,9 +13,25 @@ const SESSION_LOST_NOTICE =
   'Sua última mensagem foi reenviada em um novo atendimento — se precisar, repita detalhes já informados.'
 
 const ERROR_MESSAGES = {
-  session_busy: 'Ainda estou respondendo à sua mensagem anterior. Aguarde um instante e tente de novo.',
+  session_busy:
+    'Ainda estou respondendo à sua mensagem anterior. Aguarde alguns segundos e tente de novo.',
   agent_unavailable:
     'O atendimento está indisponível no momento (o agente não pôde ser iniciado). Tente novamente mais tarde.',
+}
+
+const CHAT_TIMEOUT_MESSAGE =
+  'A resposta está demorando mais que o normal e ainda pode estar sendo processada. ' +
+  'Aguarde alguns segundos antes de usar "Tentar de novo" — isso pode enviar a mesma pergunta outra vez.'
+
+const BUSY_LOCAL_MESSAGE =
+  'Sua mensagem não foi enviada porque a resposta anterior desta conversa ainda está em andamento. ' +
+  'Quando ela chegar, use "Tentar de novo" para enviá-la.'
+
+/** Esperas entre novas tentativas automáticas quando a API responde 409 session_busy. */
+const BUSY_RETRY_DELAYS_MS = [2000, 3500, 5000]
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function friendlyError(err, fallback) {
@@ -25,6 +41,14 @@ function friendlyError(err, fallback) {
 
 function isSessionLost(err) {
   return err instanceof ApiError && err.status === 404 && err.code === 'session_not_found'
+}
+
+function isSessionBusy(err) {
+  return err instanceof ApiError && err.status === 409 && err.code === 'session_busy'
+}
+
+function isInvalidRequest(err) {
+  return err instanceof ApiError && err.status === 422
 }
 
 function newConversation() {
@@ -82,11 +106,13 @@ function makeMessage(role, text, extra = {}) {
 export function useConversations() {
   const [state, setState] = useState(initialState)
   const { conversations, activeId } = state
-  const [isSending, setIsSending] = useState(false)
-  const [error, setError] = useState('')
   const [query, setQuery] = useState('')
-  const sendingRef = useRef(false)
-  const lastTextRef = useRef('')
+  // Envio, erro e última mensagem são POR CONVERSA: uma conversa nunca bloqueia,
+  // esconde o indicador de digitação nem mostra o erro de outra.
+  const [pending, setPending] = useState(() => new Set())
+  const [errors, setErrors] = useState(() => new Map())
+  const pendingRef = useRef(new Set())
+  const lastTextRef = useRef(new Map())
   const stateRef = useRef(state)
   const greetingRequests = useRef(new Map())
 
@@ -118,9 +144,26 @@ export function useConversations() {
     [],
   )
 
+  const setPendingFor = useCallback((conversationId, isPending) => {
+    const next = new Set(pendingRef.current)
+    if (isPending) next.add(conversationId)
+    else next.delete(conversationId)
+    pendingRef.current = next
+    setPending(next)
+  }, [])
+
+  /** Define (ou limpa, com mensagem vazia) o erro de uma conversa. */
+  const setErrorFor = useCallback((conversationId, message, retryable = true) => {
+    setErrors((current) => {
+      const next = new Map(current)
+      if (message) next.set(conversationId, { message, retryable })
+      else next.delete(conversationId)
+      return next
+    })
+  }, [])
+
   const selectConversation = useCallback(
     (id) => {
-      setError('')
       commit((current) => ({ ...current, activeId: id }))
     },
     [commit],
@@ -129,13 +172,12 @@ export function useConversations() {
   /** Modo API: abre a sessão no backend e mostra a saudação real da Mel. */
   const requestGreeting = useCallback(
     (conversationId) => {
-      const pending = greetingRequests.current.get(conversationId)
-      if (pending) return pending
+      const running = greetingRequests.current.get(conversationId)
+      if (running) return running
 
       const run = (async () => {
-        sendingRef.current = true
-        setIsSending(true)
-        setError('')
+        setPendingFor(conversationId, true)
+        setErrorFor(conversationId, '')
         try {
           const session = await createSession()
           commit((current) =>
@@ -152,19 +194,19 @@ export function useConversations() {
             }),
           )
         } catch (err) {
-          setError(
+          setErrorFor(
+            conversationId,
             `Não foi possível iniciar o atendimento. ${friendlyError(err, 'Tente novamente em instantes.')}`,
           )
         } finally {
-          sendingRef.current = false
-          setIsSending(false)
+          setPendingFor(conversationId, false)
           greetingRequests.current.delete(conversationId)
         }
       })()
       greetingRequests.current.set(conversationId, run)
       return run
     },
-    [commit],
+    [commit, setErrorFor, setPendingFor],
   )
 
   const activeNeedsGreeting =
@@ -176,13 +218,23 @@ export function useConversations() {
   }, [activeNeedsGreeting, activeConversationId, requestGreeting])
 
   const requestReply = useCallback(
-    async (conversationId, text, history) => {
-      sendingRef.current = true
-      setIsSending(true)
-      setError('')
-      lastTextRef.current = text
+    async (conversationId, text) => {
+      setPendingFor(conversationId, true)
+      setErrorFor(conversationId, '')
+      lastTextRef.current.set(conversationId, text)
 
-      const send = (sessionId) => sendChatMessage({ sessionId, conversationId, message: text, history })
+      // 409 session_busy: o servidor ainda processa uma mensagem desta sessão (ex.: após um
+      // timeout do cliente). Espera e tenta de novo algumas vezes antes de mostrar o erro.
+      const send = async (sessionId) => {
+        for (let attempt = 0; ; attempt += 1) {
+          try {
+            return await sendChatMessage({ sessionId, conversationId, message: text })
+          } catch (err) {
+            if (!isSessionBusy(err) || attempt >= BUSY_RETRY_DELAYS_MS.length) throw err
+            await wait(BUSY_RETRY_DELAYS_MS[attempt])
+          }
+        }
+      }
 
       try {
         let reply
@@ -205,7 +257,7 @@ export function useConversations() {
         const assistantText = (reply?.text ?? '').trim()
         const products = Array.isArray(reply?.products) ? reply.products : []
         if (!assistantText && products.length === 0) {
-          setError('O assistente não retornou conteúdo para esta mensagem.')
+          setErrorFor(conversationId, 'O assistente não retornou conteúdo para esta mensagem.')
           return
         }
         const assistantMessage = makeMessage('assistant', assistantText, {
@@ -221,24 +273,34 @@ export function useConversations() {
           })),
         )
       } catch (err) {
-        setError(friendlyError(err, 'Não foi possível concluir o atendimento.'))
+        const message =
+          err instanceof ApiError && err.code === 'timeout'
+            ? CHAT_TIMEOUT_MESSAGE
+            : friendlyError(err, 'Não foi possível concluir o atendimento.')
+        // 422 (mensagem inválida): reenviar o mesmo texto falharia de novo, então não há retry.
+        setErrorFor(conversationId, message, !isInvalidRequest(err))
       } finally {
-        sendingRef.current = false
-        setIsSending(false)
+        setPendingFor(conversationId, false)
       }
     },
-    [commit, findConversation],
+    [commit, findConversation, setErrorFor, setPendingFor],
   )
 
+  /** Envia `rawText` na conversa `targetId` (padrão: a ativa). Devolve `false` se não enviou. */
   const sendMessage = useCallback(
     async (rawText, targetId) => {
       const text = rawText.trim()
-      if (!text || sendingRef.current) return
+      if (!text) return false
 
-      const conversationId = targetId ?? activeId
+      const conversationId = targetId ?? stateRef.current.activeId
+      if (pendingRef.current.has(conversationId)) {
+        // Nunca descarta em silêncio: guarda o texto para o "Tentar de novo" e avisa.
+        lastTextRef.current.set(conversationId, text)
+        setErrorFor(conversationId, BUSY_LOCAL_MESSAGE)
+        return false
+      }
       const userMessage = makeMessage('user', text)
 
-      let history = []
       commit((current) => {
         const found = current.conversations.find((item) => item.id === conversationId)
         if (!found) {
@@ -247,7 +309,6 @@ export function useConversations() {
           created.title = text.slice(0, 42)
           created.updatedAt = userMessage.createdAt
           created.messages = [...created.messages, userMessage]
-          history = created.messages
           return {
             activeId: conversationId,
             conversations: [created, ...current.conversations],
@@ -260,7 +321,6 @@ export function useConversations() {
           updatedAt: userMessage.createdAt,
           messages: [...found.messages, userMessage],
         }
-        history = nextItem.messages
         return {
           ...current,
           activeId: conversationId,
@@ -268,15 +328,15 @@ export function useConversations() {
         }
       })
 
-      await requestReply(conversationId, text, history)
+      await requestReply(conversationId, text)
+      return true
     },
-    [activeId, commit, requestReply],
+    [commit, requestReply, setErrorFor],
   )
 
   const startConversation = useCallback(
     (seedMessage) => {
       const conversation = newConversation()
-      setError('')
       commit((current) => ({
         conversations: [conversation, ...current.conversations],
         activeId: conversation.id,
@@ -295,31 +355,38 @@ export function useConversations() {
   )
 
   const retryLast = useCallback(() => {
-    if (sendingRef.current || !active) return
+    if (!active || pendingRef.current.has(active.id)) return
     if (!DEMO_MODE && active.messages.length === 0 && !active.sessionId) {
       void requestGreeting(active.id)
       return
     }
-    const text = lastTextRef.current.trim()
+    const text = (lastTextRef.current.get(active.id) ?? '').trim()
     if (!text) return
     // Avisos (role "notice") não contam: a última mensagem real decide se é só reenviar.
     const last = active.messages.findLast((item) => item.role !== 'notice')
     if (last?.role === 'user' && last.text === text) {
-      void requestReply(active.id, text, active.messages)
+      void requestReply(active.id, text)
       return
     }
-    void sendMessage(text)
+    void sendMessage(text, active.id)
   }, [active, requestGreeting, requestReply, sendMessage])
+
+  const dismissError = useCallback(() => {
+    if (active) setErrorFor(active.id, '')
+  }, [active, setErrorFor])
+
+  const activeError = active ? errors.get(active.id) : undefined
 
   return {
     conversations: filtered,
     active,
     isDemo: DEMO_MODE,
-    isSending,
-    error,
+    isSending: Boolean(active) && pending.has(active.id),
+    error: activeError?.message ?? '',
+    canRetry: activeError?.retryable ?? false,
     query,
     setQuery,
-    setError,
+    dismissError,
     selectConversation,
     startConversation,
     sendMessage,

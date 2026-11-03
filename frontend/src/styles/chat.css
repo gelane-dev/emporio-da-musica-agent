@@ -67,6 +67,14 @@
   background: var(--muted);
 }
 
+.status-dot--warn {
+  background: #c08a1e;
+}
+
+.status-dot--off {
+  background: var(--danger);
+}
+
 .chat-header__actions {
   display: flex;
   align-items: center;
@@ -301,6 +309,17 @@
 
 .composer textarea::placeholder {
   color: #9f8c8f;
+}
+
+.composer__count {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.composer__count--full {
+  color: var(--danger);
 }
 
 .composer__icon {

@@ -393,3 +393,80 @@ def test_session_store_lock_e_erros():
         store.delete("x")
     with pytest.raises(ValueError):
         SessionStore(max_sessions=0)
+
+
+# ----------------------------------------------------------------------------- B1/B6
+
+
+def test_session_id_e_token_urlsafe_longo_e_distinto(tmp_path):
+    import re
+
+    client, _ = make_client(tmp_path, [fake_text("Olá!")])
+    ids = {client.post("/api/sessions").json()["session_id"] for _ in range(20)}
+    ids.add(client.post("/api/chat", json={"message": "oi"}).json()["session_id"])
+    assert len(ids) == 21
+    for session_id in ids:
+        assert len(session_id) >= 22  # token_urlsafe(16): 128 bits
+        assert re.fullmatch(r"[A-Za-z0-9_-]+", session_id)
+
+
+def test_session_id_longo_demais_422(tmp_path):
+    client, _ = make_client(tmp_path)
+    body = assert_envelope(
+        client.post("/api/chat", json={"session_id": "x" * 65, "message": "oi"}), 422, "invalid_request"
+    )
+    assert "64" in body["message"]
+
+
+@pytest.mark.parametrize("origin", [DEFAULT_CORS_ORIGINS[0], None])
+def test_corpo_grande_413_com_envelope_e_cors(tmp_path, origin):
+    client, llm = make_client(tmp_path)
+    headers = {"Origin": origin} if origin else {}
+    response = client.post("/api/chat", json={"message": "a" * 17_000}, headers=headers)
+    assert_envelope(response, 413, "payload_too_large")
+    if origin:
+        assert response.headers["access-control-allow-origin"] == origin
+    else:
+        assert "access-control-allow-origin" not in response.headers
+    assert len(client.app.state.api.sessions) == 0
+
+
+def test_corpo_grande_413_origem_nao_permitida_sem_cors(tmp_path):
+    client, _ = make_client(tmp_path)
+    response = client.post(
+        "/api/chat", json={"message": "a" * 17_000}, headers={"Origin": "http://evil.example"}
+    )
+    assert_envelope(response, 413, "payload_too_large")
+    assert "access-control-allow-origin" not in response.headers
+
+
+def test_corpo_chunked_grande_413_e_pequeno_passa(tmp_path):
+    import json
+
+    client, _ = make_client(tmp_path, [fake_text("Olá!")])
+    headers = {"Content-Type": "application/json"}
+
+    def chunks(payload: bytes):
+        for i in range(0, len(payload), 1024):
+            yield payload[i : i + 1024]
+
+    big = json.dumps({"message": "a" * 17_000}).encode()
+    assert_envelope(client.post("/api/chat", content=chunks(big), headers=headers), 413, "payload_too_large")
+    small = json.dumps({"message": "oi"}).encode()
+    response = client.post("/api/chat", content=chunks(small), headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["reply"] == "Olá!"
+
+
+def test_corpo_no_limite_nao_e_413(tmp_path):
+    client, _ = make_client(tmp_path)
+    # ~16 KiB mas mensagem acima de 2000 caracteres: passa do middleware e vira 422.
+    response = client.post("/api/chat", json={"message": "a" * 16_000})
+    assert_envelope(response, 422, "invalid_request")
+
+
+def test_openapi_documenta_413(tmp_path):
+    client, _ = make_client(tmp_path)
+    paths = client.get("/openapi.json").json()["paths"]
+    assert "413" in paths["/api/chat"]["post"]["responses"]
+    assert "413" in paths["/api/sessions"]["post"]["responses"]

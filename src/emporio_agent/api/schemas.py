@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 MAX_MESSAGE_LENGTH = 2000
+MAX_SESSION_ID_LENGTH = 64
 
 MSG_EMPTY = "A mensagem não pode ficar vazia."
 MSG_TOO_LONG = f"A mensagem pode ter no máximo {MAX_MESSAGE_LENGTH} caracteres."
@@ -28,7 +29,9 @@ class SessionCreated(BaseModel):
 
 class ChatRequest(BaseModel):
     session_id: str | None = Field(
-        default=None, description="Sessão existente. Nulo ou ausente cria uma sessão nova."
+        default=None,
+        max_length=MAX_SESSION_ID_LENGTH,
+        description="Sessão existente. Nulo ou ausente cria uma sessão nova.",
     )
     message: str = Field(
         description=f"Mensagem do cliente (1 a {MAX_MESSAGE_LENGTH} caracteres, sem contar espaços nas pontas).",

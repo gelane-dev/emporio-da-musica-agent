@@ -3,10 +3,12 @@ import ChatPanel from '../components/chat/ChatPanel.jsx'
 import AppShell from '../components/layout/AppShell.jsx'
 import Sidebar from '../components/layout/Sidebar.jsx'
 import ProductDetail from '../components/products/ProductDetail.jsx'
+import { useBackendHealth } from '../hooks/useBackendHealth.js'
 import { useConversations } from '../hooks/useConversations.js'
 
 export default function ChatPage() {
   const chat = useConversations()
+  const health = useBackendHealth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [product, setProduct] = useState(null)
 
@@ -50,12 +52,14 @@ export default function ChatPage() {
       <ChatPanel
         conversation={chat.active}
         isDemo={chat.isDemo}
+        health={health}
         isSending={chat.isSending}
         error={chat.error}
+        canRetry={chat.canRetry}
         onSend={chat.sendMessage}
         onOpenProduct={setProduct}
         onOpenSidebar={() => setSidebarOpen(true)}
-        onDismissError={() => chat.setError('')}
+        onDismissError={chat.dismissError}
         onRetry={chat.retryLast}
       />
       {product ? (

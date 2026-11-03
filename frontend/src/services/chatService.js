@@ -30,9 +30,9 @@ export async function createSession() {
  * `{ text, products, sessionId, stop, toolCalls }`.
  * No modo API não há produtos estruturados: a resposta é só texto.
  */
-export async function sendChatMessage({ sessionId, conversationId, message, history }) {
+export async function sendChatMessage({ sessionId, conversationId, message }) {
   if (isDemoMode()) {
-    const reply = await demoRespond({ conversationId, message, history })
+    const reply = await demoRespond({ conversationId, message })
     return { ...reply, sessionId: null, stop: 'demo', toolCalls: [] }
   }
 

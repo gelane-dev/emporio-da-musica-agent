@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 import threading
 from collections import OrderedDict
 from collections.abc import Iterator
@@ -53,9 +54,11 @@ class SessionStore:
 
     def create(self, started_at: datetime) -> Session:
         with self._lock:
-            session = Session(started_at=started_at)
-            while session.id in self._entries:  # colisão improvável do id curto
-                session = Session(started_at=started_at)
+            # Id exposto pela API é a única credencial da sessão: 128 bits aleatórios.
+            session_id = secrets.token_urlsafe(16)
+            while session_id in self._entries:  # colisão praticamente impossível
+                session_id = secrets.token_urlsafe(16)
+            session = Session(started_at=started_at, session_id=session_id)
             self._entries[session.id] = _Entry(session)
             self._evict_locked(keep=session.id)
             return session

@@ -22,6 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from emporio_agent import __version__
 from emporio_agent.agent.agent import Agent
 from emporio_agent.api.schemas import (
+    MAX_SESSION_ID_LENGTH,
     MSG_EMPTY,
     ChatRequest,
     ChatResponse,
@@ -49,10 +50,14 @@ MSG_INTERNAL = "Ocorreu um erro inesperado. Tente novamente em instantes."
 MSG_INVALID = "Requisição inválida. Envie um JSON com o campo 'message' (texto)."
 MSG_MISSING_MESSAGE = "O campo 'message' é obrigatório."
 MSG_DATA_ERROR = "Não foi possível carregar os dados da loja."
+MSG_TOO_LARGE = "A requisição é grande demais. Envie uma mensagem mais curta."
+
+MAX_BODY_BYTES = 16 * 1024
 
 _ERROR_RESPONSES: dict[int | str, dict] = {
     404: {"model": ErrorResponse, "description": "Sessão não encontrada (`session_not_found`)."},
     409: {"model": ErrorResponse, "description": "Sessão ocupada com outra mensagem (`session_busy`)."},
+    413: {"model": ErrorResponse, "description": "Corpo acima de 16 KiB (`payload_too_large`)."},
     422: {"model": ErrorResponse, "description": "Requisição inválida (`invalid_request`)."},
     500: {"model": ErrorResponse, "description": "Erro inesperado (`internal_error`)."},
     503: {"model": ErrorResponse, "description": "Agente indisponível (`agent_unavailable`)."},
@@ -121,6 +126,8 @@ def _validation_message(exc: RequestValidationError) -> str:
                 return MSG_MISSING_MESSAGE
             return "O campo 'message' precisa ser um texto."
         if loc[-1:] == ("session_id",):
+            if err.get("type") == "string_too_long":
+                return f"O campo 'session_id' pode ter no máximo {MAX_SESSION_ID_LENGTH} caracteres."
             return "O campo 'session_id' precisa ser um texto ou nulo."
     return MSG_INVALID
 
@@ -197,6 +204,22 @@ def create_app(
             logger.error("Erro inesperado na API (%s).", type(exc).__name__, exc_info=exc)
             return _error(500, "internal_error", MSG_INTERNAL)
 
+    # Também interno ao CORS: rejeita corpos grandes antes de lê-los/decodificá-los.
+    @app.middleware("http")
+    async def _limit_body(request: Request, call_next):
+        length = request.headers.get("content-length")
+        if length is not None:
+            if length.strip().isdigit() and int(length) > MAX_BODY_BYTES:
+                return _error(413, "payload_too_large", MSG_TOO_LARGE)
+        elif "chunked" in request.headers.get("transfer-encoding", "").lower():
+            body = b""
+            async for chunk in request.stream():
+                body += chunk
+                if len(body) > MAX_BODY_BYTES:
+                    return _error(413, "payload_too_large", MSG_TOO_LARGE)
+            request._body = body  # repassa o corpo já lido à rota (cache do BaseHTTPMiddleware)
+        return await call_next(request)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_parse_origins(values.get("CORS_ORIGINS")),
@@ -236,7 +259,7 @@ def create_app(
         tags=["Sessões"],
         summary="Iniciar uma conversa",
         description="Cria uma sessão em memória e devolve a saudação inicial da Mel.",
-        responses={k: _ERROR_RESPONSES[k] for k in (500, 503)},
+        responses={k: _ERROR_RESPONSES[k] for k in (413, 500, 503)},
     )
     def create_session() -> SessionCreated:
         require_agent()
@@ -259,7 +282,7 @@ def create_app(
             "sessão nova. Falhas do provedor de IA durante a conversa ainda retornam 200, com "
             "`stop=llm_error` e uma mensagem de contingência."
         ),
-        responses={k: _ERROR_RESPONSES[k] for k in (404, 409, 422, 500, 503)},
+        responses={k: _ERROR_RESPONSES[k] for k in (404, 409, 413, 422, 500, 503)},
     )
     def chat(body: ChatRequest) -> ChatResponse:
         agent = require_agent()
