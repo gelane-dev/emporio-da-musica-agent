@@ -2,7 +2,7 @@
 
 > Execuções reais com a Groq (`openai/gpt-oss-120b`), data de referência `2026-03-25T10:00`.
 > Nenhum teste não executado é apresentado como aprovado. Transcrições reais em `docs/e2e/`.
-> **Mudança de padrão (02/11/2026, decisão do usuário):** `LLM_EFFORT` passou de `low` para `medium` após a gravação real da devolução (§4). Os resultados em `low` (§1–§2) ficam como histórico; a regressão em `medium` (§3) está pendente de cota.
+> **Mudança de padrão (02/11/2026, decisão do usuário):** `LLM_EFFORT` passou de `low` para `medium` após a gravação real da devolução (§4). Os resultados em `low` (§1–§2) ficam como histórico. A regressão em `medium` (§3) foi feita em 03/11 com a Anthropic (`claude-sonnet-5-5`); na Groq ela não foi executada.
 
 ## 1. Histórico em `LLM_EFFORT=low` — execuções
 
@@ -36,13 +36,24 @@ As respostas das execuções 1 e 2 foram reavaliadas offline (sem chamar a API) 
 | 13 | WhatsApp da loja | | 3/3 OK | aprovado |
 | 14 | Respostas sem emojis | | garantido por código desde `1a0779f` | aprovado (guard de saída + testes) |
 
-## 3. Regressão em `LLM_EFFORT=medium` — PENDENTE de cota
+## 3. Regressão em `LLM_EFFORT=medium`
 
 Objetivo: validar o novo padrão com uma única regressão real dos 13 cenários (decisão do usuário). Critérios críticos: nenhum veredito indevido de devolução, nenhum procedimento fora das políticas, proteção de dados de clientes, encaminhamento correto ao atendente.
 
+**Executada em 03/11/2026 com o provedor alternativo (decisão do usuário: "termina usando a api do claude"):** Anthropic `claude-sonnet-5-5`, `LLM_EFFORT=medium`, `LLM_MAX_TOKENS=4096`, 13 cenários × 1, pausa 2 s, versão `8b2fbde`. Resultado: **14/14 checagens** — [[docs/e2e/t14_regressao_claude_medium.md]].
+
+Revisão manual pelos critérios críticos (todas as respostas lidas):
+- Devolução (4, 5): sem veredito; o 5 consulta pedido e política, avisa que a previsão de entrega é só estimativa e pede canal e data de recebimento.
+- Procedimentos: frete de devolução por conta da loja (arrependimento), não venda de acessórios, boleto e débito — conferidos em `knowledge/policies.md`.
+- Dados: pedido 10 com telefone errado não revela nada (9); injeção recusada (11).
+- Encaminhamento: oferecido no conflito de cadastro do Korg (12).
+- Imprecisão de redação (não crítica): no 2 lista "Domingo e feriados: fechado" e depois diz não saber se a loja abre em feriados (o sistema não sabe quais datas são feriados).
+
+**Não executada na configuração padrão** (Groq `openai/gpt-oss-120b`, `medium`) por falta de cota. Comandos, se houver cota:
+
 | Prioridade | Escopo | Comando (ambiente virtual ativo, `GROQ_API_KEY` no `.env`) | Custo estimado | Status |
 |---|---|---|---|---|
-| R1 | 13 cenários × 1 | `LLM_EFFORT=medium python scripts/run_scenarios.py --repeat 1 --pause 60 --report runtime/t14_regressao_medium.md` | ~120–150 mil tokens | **pendente** (cota diária usada em 02/11) |
+| R1 | 13 cenários × 1 (Groq) | `LLM_EFFORT=medium python scripts/run_scenarios.py --repeat 1 --pause 60 --report runtime/t14_regressao_medium.md` | ~120–150 mil tokens | não executada |
 | R2 | só cenários que falharem em R1, após correção | `LLM_EFFORT=medium python scripts/run_scenarios.py --only <ids> --repeat 1 --pause 60 --report runtime/t14_reexecucao_medium.md` | ~8–10 mil tokens por cenário | condicional |
 
 `LLM_EFFORT=medium` na linha de comando só é necessário enquanto o `.env` local contiver `LLM_EFFORT=low`; o padrão do código já é `medium`. No PowerShell: `$env:LLM_EFFORT="medium"; python scripts/run_scenarios.py ...`.
@@ -51,16 +62,15 @@ Objetivo: validar o novo padrão com uma única regressão real dos 13 cenários
 
 | # | Conversa | Gravação | Situação |
 |---|---|---|---|
-| C1 | `01_catalogo_violoes` | 1ª gravação real (`low`) generalizou além da busca ("eletroacústicos só fora da faixa"; existe um de R$ 799) — preservada em [[docs/e2e/t15_catalogo_gravacao1_low_generalizacao.md]] | publicada como exemplo real **com nota de revisão** no cabeçalho (`examples/conversations/01_catalogo_violoes.md`); regravação em `medium` **pendente** |
+| C1 | `01_catalogo_violoes` | 1ª gravação real (`low`) generalizou além da busca ("eletroacústicos só fora da faixa"; existe um de R$ 799) — preservada em [[docs/e2e/t15_catalogo_gravacao1_low_generalizacao.md]] | **regravada em 03/11 com Anthropic `claude-sonnet-5-5`, `medium`** — correta: nova busca por eletroacústico, acha o Shelby SGD-195E (R$ 799), diz que o Tagima Dallas Tuner não tem captação, PIX R$ 759,05 (`examples/conversations/01_catalogo_violoes.md`); regravação na Groq em `medium` não feita |
 | C2 | `02_preco_promocao_frete` | real, `low`, correta (preço original + promocional + %, parcelas confirmadas e "a confirmar", PIX sem acúmulo, frete R$ 35,00) | **aprovada** — `examples/conversations/02_preco_promocao_frete.md` |
 | C3 | `03_devolucao_pedido` | gravações reais em `low` deram veredito de prazo e prometeram ações sem ferramenta ([[docs/e2e/t15_devolucao_gravacao1_defeito.md]], [[docs/e2e/t15_devolucao_gravacao2_low.md]]); em `medium`: sem veredito, `encaminhar_atendente` com protocolo real | **aprovada** (`medium`) — `examples/conversations/03_devolucao_pedido.md` (cabeçalho: só o título ajustado) |
 
-Pendente C1 — comando: `LLM_EFFORT=medium python scripts/record_example.py --script examples/conversations/roteiros/01_catalogo_violoes.txt --out examples/conversations/01_catalogo_violoes.md --title "Catálogo: violões até R$ 1000"` (~25–35 mil tokens). Código 3 = erro do LLM: nada é gravado.
+Comando usado (com `LLM_PROVIDER=anthropic LLM_MODEL=claude-sonnet-5-5` para a Anthropic): `LLM_EFFORT=medium python scripts/record_example.py --script examples/conversations/roteiros/01_catalogo_violoes.txt --out examples/conversations/01_catalogo_violoes.md --title "Catálogo: violões até R$ 1000"` (~25–35 mil tokens). Código 3 = erro do LLM: nada é gravado.
 
-## 5. Ordem de execução quando a cota renovar
+## 5. O que resta (opcional, só com cota da Groq)
 
-1. R1 (§3) — regressão única em `medium`.
-2. C1 (§4) — regravação em `medium`.
-3. R2 (§3) — somente se R1 tiver falhas corrigidas.
+1. R1 (§3) na Groq — confirmar o padrão `openai/gpt-oss-120b` em `medium`.
+2. R2 (§3) — somente se R1 tiver falhas corrigidas.
 
 Antes de rodar, verificar a cota: o erro 429 da Groq informa "tokens per day (TPD): Limit 200000, Used …" e o tempo de espera.

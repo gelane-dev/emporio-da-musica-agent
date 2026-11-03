@@ -21,10 +21,10 @@
 | T11 Loop do agente | concluída | `1166fb1` | [[ARCHITECTURE#5.7.2 Contrato detalhado da T11 (loop do agente e sessão)]] |
 | T12 Encaminhamento | concluída | `fa858b9` | [[ARCHITECTURE#5.5.2 Contrato detalhado da T12 (`encaminhar_atendente`)]] |
 | T13 CLI | concluída | `80f487f` | [[ARCHITECTURE#5.8.1 Contrato detalhado da T13 (CLI)]] |
-| T14 Cenários E2E | 10 de 13 cenários aprovados em execuções reais; 5, 9, 10 ainda não validados (relatório [[docs/E2E_RESULTS]]) | `b80958e`, `1a0779f`, `4ac2216` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
-| T15 Conversas de exemplo | 3 conversas reais publicadas (C1 `low` com nota de revisão; C2 `low` correta; C3 `medium` correta); regravação da C1 em `medium` pendente | `01f50ba` | [[ARCHITECTURE#5.9.2 Contrato da T15 (gravação das conversas de exemplo)]] |
-| T16 README | final em inglês (exemplos reais, histórico da T14 em `low`, regressão `medium` pendente) | `f541806` | — |
-| T17 Entrega | preparada para publicação (histórico limpo, revisão de segurança, testes); **push aguardando autorização do usuário** | — | ver "Preparação da T17" |
+| T14 Cenários E2E | histórico em `low` (Groq): 12/13 aprovados, cenário 5 não aprovado; regressão `medium` em 03/11 com Anthropic `claude-sonnet-5-5`: 14/14 checagens e revisão manual ok; regressão `medium` na Groq não executada (cota) — [[docs/E2E_RESULTS]] | `b80958e`, `1a0779f`, `4ac2216` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
+| T15 Conversas de exemplo | 3 conversas reais: C1 regravada em 03/11 com Anthropic `claude-sonnet-5-5` `medium` (correta; gravação `low` com erro preservada em docs/e2e); C2 `low` correta; C3 `medium` correta | `01f50ba` | [[ARCHITECTURE#5.9.2 Contrato da T15 (gravação das conversas de exemplo)]] |
+| T16 README | final em inglês; atualizado em 03/11 com a regressão e a C1 feitas com a Anthropic | `f541806` | — |
+| T17 Entrega | publicada em 02/11 (push autorizado pelo usuário); atualização de 03/11 commitada localmente, **push aguardando autorização** | — | ver "Preparação da T17" |
 
 Suíte atual: 1029 testes passando + 2 smokes reais pulados (Anthropic e Groq), sem avisos; verificada também em clone limpo e em ambiente virtual novo instalado só pelo `requirements.txt`.
 
@@ -41,7 +41,7 @@ Suíte atual: 1029 testes passando + 2 smokes reais pulados (Anthropic e Groq), 
 | T05 | `run_a5ecc3d46e82` | Backend (impl.), QA (testes TDD a partir do contrato) — Sonnet | `gelane-dev/t05-backend`, `gelane-dev/t05-qa` | integração por squash sem conflitos; implementação e testes independentes concordaram na 1ª execução |
 
 | T08b (Groq) | `run_bb5ce514aa0a` | IA/RAG (adaptador), QA (testes) — Sonnet; +2 correções | `t08b-ia-rag`, `w6-qa` | 1ª tentativa parou no limite de uso de 5h da conta (sem produzir nada; provado pela transcrição) ⇒ `worker-stop`/`worker-abandon` + `--retry-of`; integração achou captura antecipada de `time.sleep` (script) e objetos de teste com validação estrita (testes) |
-| T14 (preparação) + README | `run_c7d7988248ee` | IA/RAG (script de cenários + ajustes de texto), QA (testes; +1 correção), Docs (rascunho do README) — Sonnet | `t14-ia-rag`, `w5-qa`, `t16-docs` | ambiguidade do contrato (emoji dentro ou fora do `evaluate`) resolvida a favor da checagem global |
+| T14 Cenários E2E | histórico em `low` (Groq): 12/13 aprovados, cenário 5 não aprovado; regressão `medium` em 03/11 com Anthropic `claude-sonnet-5-5`: 14/14 checagens e revisão manual ok; regressão `medium` na Groq não executada (cota) — [[docs/E2E_RESULTS]] | `b80958e`, `1a0779f`, `4ac2216` | [[ARCHITECTURE#5.9.1 Contrato detalhado da T14 (cenários end-to-end)]] |
 | T13 | `run_140a77ff0235` | Backend (CLI), QA (testes) — Sonnet | `t13-backend`, `w4-qa` | Backend perguntou (ask) antes de alterar teste da T01; aprovado `--version`; 33 testes do QA passaram na 1ª integração |
 | T11+T12 | `run_2d70073736b9` | IA/RAG (T11), Backend (T12), QA (testes) — Sonnet | `t11-ia-rag`, `t12-backend`, `w3-qa` | integração sem correções: 96 testes do QA passaram na 1ª execução |
 | T09+T10 | `run_5532f4d9b606` | Backend (T09), IA/RAG (T10), QA (testes; +2 correções) — Sonnet | `t09-backend`, `t10-ia-rag`, `w2-qa` | testes do QA corrigidos: categoria com nome exato, P15 com dados sintéticos (sem skip) e verificação de conceitos no prompt em vez de frases exatas |
@@ -94,6 +94,13 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 - Backup antes de alterar: bundle completo do repositório e cópia do `frontend/` (sem `node_modules`/`dist`) em `C:/Users/Dell/Desktop/emporio-da-musica-agent-backups/20261102-1849`.
 - `frontend/` e `.obsidian/` removidos do versionamento (mantidos no disco, no `.gitignore`); `frontend/` expurgado de todo o histórico (`git filter-branch --index-filter`, `--prune-empty`): 2 commits que só continham o frontend foram removidos; a mensagem do commit que ficou só com a alteração do `.gitignore` foi corrigida.
 - Verificado: nenhum commit/objeto com `frontend/` ou com o enunciado do desafio; `git fsck` limpo; referências de commit da documentação atualizadas.
+
+## Execução final com a Anthropic (03/11/2026, decisão do usuário)
+
+- Agendamento autônomo na Groq (18h41) cancelado após o usuário pedir para terminar com a API da Anthropic.
+- Regressão única `medium`: `claude-sonnet-5-5`, `LLM_MAX_TOKENS=4096`, 13 cenários × 1 ⇒ 14/14; revisão manual sem veredito, sem procedimento fora do manual, sem exposição de dados; uma imprecisão de redação no cenário 2 (feriados). Relatório: [[docs/e2e/t14_regressao_claude_medium.md]].
+- C1 regravada com o mesmo provedor: correta. Nenhuma alteração de código.
+- Não executado: regressão `medium` na Groq (padrão do projeto).
 
 ## Pendências abertas
 
