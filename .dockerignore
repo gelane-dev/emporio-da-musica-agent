@@ -1,0 +1,9 @@
+# Lista de inclusão: o backend só precisa do código, das dependências, do manual em Markdown e dos CSVs.
+# Fica tudo de fora por padrão (.env, venv/, frontend/, runtime/, docs, PDFs, .git).
+*
+!requirements.txt
+!src/
+!knowledge/
+!data/*.csv
+**/__pycache__
+**/*.egg-info

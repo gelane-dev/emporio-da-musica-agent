@@ -1,0 +1,40 @@
+# Execução integrada: docker compose up --build  →  http://localhost:8080
+# Configuração no .env da raiz (copie de .env.example). Sem chave de API o backend sobe "degraded".
+name: emporio-da-musica
+
+services:
+  backend:
+    build: .
+    image: emporio-da-musica/backend:local
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Fixos no contêiner (o .env local pode ter valores para a execução fora do Docker).
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+    # Publicado só no host local (Swagger em http://localhost:8000/docs); o navegador usa o proxy do frontend.
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - runtime:/app/runtime
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${PUBLIC_URL:-http://localhost:8080}
+    image: emporio-da-musica/frontend:local
+    environment:
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  # Encaminhamentos ao atendente (runtime/handoffs.jsonl) sobrevivem à recriação do contêiner.
+  runtime:
