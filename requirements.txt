@@ -1,5 +1,6 @@
 # Dependências de execução (versões fixadas — ver TECHNICAL_DECISIONS.md D13)
 anthropic==2.3.0
+fastapi==0.162.0
 groq==1.7.0
 pandas==3.1.0
 pydantic==2.14.2
@@ -9,9 +10,13 @@ rapidfuzz==3.14.6
 rich==15.0.0
 # Base de fusos horários para zoneinfo (necessária no Windows: America/Campo_Grande)
 tzdata==2026.6
+# Servidor ASGI da API HTTP (python -m emporio_agent.api)
+uvicorn==0.54.0
 
 # Desenvolvimento
 pytest==9.2.0
+# Cliente HTTP usado pelo TestClient do FastAPI nos testes da API
+httpx==0.28.1
 
 # Instala o próprio pacote (src/emporio_agent) em modo editável
 -e .
