@@ -34,10 +34,14 @@ Thumbs.db
 # Enunciado do desafio: mantido só localmente (decisão do usuário)
 data/desafio_tecnico_ai_eng_artefact.pdf
 
-# Frontend (React/Vite): dependências e build não são versionados
+# Frontend (React/Vite): dependências, build, variáveis locais e logs não são versionados
 frontend/node_modules/
 frontend/dist/
+frontend/dist-ssr/
 frontend/.env
+frontend/*.local
+npm-debug.log*
+*.log
 
 # Configuração local do Obsidian
 .obsidian/

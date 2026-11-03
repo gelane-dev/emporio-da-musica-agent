@@ -510,7 +510,7 @@ emporio-da-musica-agent/
 │       ├── hooks/useConversations.js
 │       ├── services/            # http.js (only HTTP client), chatService.js (only place with /api paths)
 │       ├── data/                # demo mode only: demo.js, demoChat.js
-│       ├── styles/, utils/, assets/
+│       ├── styles/, utils/
 ├── scripts/                     # build_policies.py, run_scenarios.py (T14), record_example.py (T15)
 ├── tests/                       # pytest suite (FakeLLM); tests/test_api.py covers the HTTP API
 ├── examples/conversations/      # real example conversations (T15)
