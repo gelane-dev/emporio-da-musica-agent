@@ -1,39 +1,60 @@
 # Exemplo — Catálogo: violões até R$ 1000
 
-> Gravada em: 02/11/2026 18:05 (data real da gravação)  
-> Provedor/modelo: groq / openai/gpt-oss-120b (LLM_EFFORT=low)  
+> Gravada em: 03/11/2026 11:02 (data real da gravação)  
+> Provedor/modelo: anthropic / claude-sonnet-5-5 (LLM_EFFORT=medium)  
 > Data de referência do agente: 25/03/2026 10:00  
-> Commit: 1ca7fe4  
+> Commit: 8b2fbde  
 > Conversa real, transcrita sem edição por scripts/record_example.py.
->
-> **Nota de revisão (cabeçalho; a conversa abaixo não foi editada):** no 2º turno a Mel afirmou que eletroacústicos só existem fora da faixa de R$ 1000 sem ter buscado com esse critério; os dados têm o Shelby SGD-195E Elétrico Aço (R$ 799). Erro de generalização registrado em docs/E2E_RESULTS.md (§4); o prompt foi reforçado e o padrão passou a `LLM_EFFORT=medium`; a regravação em `medium` está pendente de cota.
 
 # Conversa — Empório da Música
 
-Sessão: e6928f8f · Início: 25/03/2026 10:00
+Sessão: e535537d · Início: 25/03/2026 10:00
 
 **Cliente:** Oi! Quais violões vocês têm disponíveis por até R$ 1000?
 
-> Ferramenta: `buscar_produtos` {"apenas_disponiveis":true,"categoria":"Violão","limite":15,"ordenar":"relevancia","preco_max":1000} (erro)
+> Ferramenta: `buscar_produtos` {"texto":"violão","preco_max":1000} (ok)
 
-> Ferramenta: `buscar_produtos` {"apenas_disponiveis":true,"categoria":"Violões","limite":15,"ordenar":"relevancia","preco_max":1000} (ok)
+**Mel:** Oi! Temos vários violões até R$ 1.000. Estes são alguns que estão disponíveis (preços de tabela):
 
-**Mel:** Oi! Temos vários violões na faixa de até R$ 1 000. Seguem algumas opções:
+Nylon:
+- Tagima Memphis AC-39 Natural: R$ 429,90
+- Rozini RC-104 Estudante: R$ 459,90
+- Yamaha C40 Natural: R$ 599,90
+- Giannini GN-15 Cedro Natural: R$ 689,00
+- Yamaha C70 Natural: R$ 849,00
 
-1. **Yamaha C40 Nylon – Natural** – R$ 599,90  
-2. **Yamaha C70 Nylon – Natural** – R$ 849,00  
-3. **Tagima Memphis AC-39 Nylon – Natural** – R$ 429,90  
-4. **Giannini GN-15 Nylon – Cedro Natural** – R$ 689,00  
-5. **Yamaha F310 Aço – Natural** – R$ 699,90  
+Aço:
+- Giannini GF-1R Folk Sunburst: R$ 579,90
+- Yamaha F310 Natural: R$ 699,90
+- Tagima Dallas Tuner Natural: R$ 749,00
 
-Todos estão disponíveis no momento. Precisa de mais detalhes sobre algum modelo (especificações, parcelamento, desconto PIX) ou gostaria de ver outras opções?
+A busca encontrou 13 modelos nessa faixa, e eu mostrei só 8. Se quiser ver os outros, é só pedir.
+
+Você procura violão de nylon ou de aço? Se me disser também o nível, como iniciante ou intermediário, eu indico as melhores opções. Posso passar os detalhes, como parcelamento e PIX, de qualquer um deles.
 
 **Cliente:** Desses, algum é eletroacústico?
 
-> Ferramenta: `detalhar_produto` {"produto_id":81} (ok)
+> Ferramenta: `buscar_produtos` {"texto":"violão eletroacústico","preco_max":1000,"limite":15} (ok)
+> Ferramenta: `detalhar_produto` {"produto_id":86} (ok)
 
-**Mel:** Nenhum dos violões listados tem eletrônica integrada – todos são modelos acústicos (nylon ou aço) sem sistema de captação. Se quiser um modelo eletroacústico, temos opções fora da faixa de R$ 1 000; posso buscar alguns que se encaixem em um orçamento próximo ou sugerir alternativas que atendam a esse recurso. O que acha?
+> Ferramenta: `detalhar_produto` {"produto_id":107} (ok)
+
+**Mel:** Sim, há um eletroacústico até R$ 1.000. Dos que te mostrei antes, nenhum é.
+
+**Shelby SGD-195E Aço Sunburst**
+- É um violão dreadnought de aço, com captação e afinador integrado.
+- Tampo de spruce, laterais e fundo de sapele, braço de nato.
+- Preço: R$ 799,00, sem promoção no momento.
+- No PIX: R$ 759,05.
+- Parcelamento: até 7x de R$ 114,14.
+- Há unidades em estoque.
+
+O Tagima Dallas Tuner da lista anterior tem afinador integrado, mas não tem captação. Ele não serve para ligar em amplificador.
+
+Quer que eu veja mais algum modelo para você?
 
 **Cliente:** Quanto fica esse no PIX?
 
-**Mel:** O Yamaha C40 Nylon Natural sai por **R$ 569,91** no pagamento via PIX (valor com desconto de 5 %). Se quiser mais informações ou outra opção, é só falar!
+**Mel:** O Shelby SGD-195E fica em R$ 759,05 no PIX. O preço normal é R$ 799,00. Ele não tem promoção, então o desconto do PIX vale normalmente.
+
+Posso ajudar com mais alguma coisa, como o frete para a sua cidade?
