@@ -1,3 +1,6 @@
+# Limite por IP nas rotas da API: protege a cota do provedor de IA (a API não tem autenticação).
+limit_req_zone $binary_remote_addr zone=api_per_ip:10m rate=20r/m;
+
 server {
     listen 8080;
     server_name _;
@@ -8,6 +11,9 @@ server {
     client_max_body_size 32k;
 
     location /api/ {
+        limit_req zone=api_per_ip burst=10 nodelay;
+        limit_req_status 429;
+        error_page 429 = @rate_limited;
         proxy_pass ${BACKEND_URL};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -15,6 +21,12 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         # O agente (LLM + ferramentas) pode levar dezenas de segundos; o frontend desiste aos 90 s.
         proxy_read_timeout 120s;
+    }
+
+    # Mesmo envelope {error, message} da API, para o frontend mostrar a mensagem.
+    location @rate_limited {
+        default_type application/json;
+        return 429 '{"error":"rate_limited","message":"Muitas mensagens em pouco tempo. Aguarde um instante e tente de novo."}';
     }
 
     location = /healthz {
