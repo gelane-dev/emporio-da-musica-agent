@@ -216,6 +216,35 @@ describe('useConversations (modo API)', () => {
     expect(result.current.conversations.map((item) => item.id)).toEqual([firstId])
   })
 
+  it('cada nova conversa recebe uma animação da Mel diferente da conversa ativa, sem chamada extra à API', async () => {
+    const fetchMock = mockApi({
+      'POST /api/sessions': [
+        jsonResponse(SESSION),
+        jsonResponse({ ...SESSION, session_id: 'sess-2' }),
+        jsonResponse({ ...SESSION, session_id: 'sess-3' }),
+        jsonResponse({ ...SESSION, session_id: 'sess-4' }),
+      ],
+    })
+    const { result } = await renderReady()
+    const ids = ['dancing', 'ukulele', 'singing', 'headphones', 'surprise']
+    let previous = result.current.active.animation
+    expect(ids).toContain(previous)
+
+    for (const session of ['sess-2', 'sess-3', 'sess-4']) {
+      act(() => {
+        result.current.startConversation()
+      })
+      await waitFor(() => expect(result.current.active.sessionId).toBe(session))
+      expect(ids).toContain(result.current.active.animation)
+      expect(result.current.active.animation).not.toBe(previous)
+      previous = result.current.active.animation
+    }
+    // Só a criação das sessões vai à API: a escolha da animação é local.
+    expect(callsTo(fetchMock, 'POST /api/sessions')).toHaveLength(4)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)).conversations.every((item) => item.animation)).toBe(true)
+  })
+
   it('restaura as conversas salvas no navegador sem abrir nova sessão', async () => {
     const saved = {
       activeId: 'c-1',

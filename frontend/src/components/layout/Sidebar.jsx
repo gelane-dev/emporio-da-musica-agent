@@ -1,6 +1,7 @@
 import { CATEGORIES } from '../../data/demo.js'
 import { lastPreview, formatWhen } from '../../utils/time.js'
 import { CategoryGlyph, GuitarMark, IconPlus, IconSearch, IconShield } from '../icons.jsx'
+import MelAvatar from '../../assets/mel/MelAvatar.jsx'
 
 export default function Sidebar({
   conversations,
@@ -37,9 +38,6 @@ export default function Sidebar({
       <section className="sidebar-block">
         <header>
           <span>Conversas recentes</span>
-          <button type="button" className="sidebar-view-all" onClick={() => onSelect(conversations[0]?.id)}>
-            Ver todas
-          </button>
         </header>
         <ul className="conversation-list">
           {conversations.length === 0 ? (
@@ -56,7 +54,7 @@ export default function Sidebar({
                     {item.customer?.avatar ? (
                       <img src={item.customer.avatar} alt={item.customer.name || item.title} />
                     ) : (
-                      <GuitarMark size={16} />
+                      <MelAvatar size={24} />
                     )}
                   </span>
                   <span className="conversation-list__copy">
@@ -65,7 +63,6 @@ export default function Sidebar({
                   </span>
                   <span className="conversation-list__meta">
                     <time>{item.timeLabel || formatWhen(item.updatedAt)}</time>
-                    {item.customer?.unread ? <span className="unread-dot" /> : null}
                   </span>
                 </button>
               </li>

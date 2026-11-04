@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { IconClip, IconSend, IconSmile } from '../icons.jsx'
+import { IconSend, IconSmile } from '../icons.jsx'
 
 /** Limite da API (POST /api/chat): 1..2000 caracteres. */
 const MAX_MESSAGE_LENGTH = 2000
@@ -38,9 +38,6 @@ export default function Composer({ disabled, onSend }) {
         onClick={() => setValue((prev) => `${prev}🎸 `.slice(0, MAX_MESSAGE_LENGTH))}
       >
         <IconSmile />
-      </button>
-      <button type="button" className="composer__icon" disabled title="Anexos ainda não estão disponíveis" aria-label="Anexar arquivo">
-        <IconClip />
       </button>
       <textarea
         rows={1}

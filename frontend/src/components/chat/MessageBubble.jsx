@@ -1,4 +1,4 @@
-import { GuitarMark } from '../icons.jsx'
+import MelAvatar from '../../assets/mel/MelAvatar.jsx'
 import ProductCard from '../products/ProductCard.jsx'
 import { formatTime } from '../../utils/time.js'
 
@@ -16,7 +16,7 @@ export default function MessageBubble({ message, onOpenProduct }) {
     <div className={`msg ${isUser ? 'msg--user' : 'msg--assistant'}`}>
       {!isUser ? (
         <span className="msg__avatar" aria-hidden="true">
-          <GuitarMark size={18} />
+          <MelAvatar size={30} />
         </span>
       ) : null}
       <div className="msg__stack">
@@ -30,7 +30,6 @@ export default function MessageBubble({ message, onOpenProduct }) {
         ))}
         <time className="msg__time" dateTime={message.createdAt}>
           {formatTime(message.createdAt)}
-          {isUser ? '  ✓✓' : ''}
         </time>
       </div>
     </div>

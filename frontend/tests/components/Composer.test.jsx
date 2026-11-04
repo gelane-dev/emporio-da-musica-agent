@@ -64,4 +64,9 @@ describe('Composer', () => {
     expect(screen.getByText('1800/2000')).toBeInTheDocument()
     expect(input).toHaveAttribute('maxLength', '2000')
   })
+
+  it('não oferece anexos: a API só aceita texto', () => {
+    render(<Composer disabled={false} onSend={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /Anexar/ })).toBeNull()
+  })
 })

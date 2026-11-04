@@ -361,3 +361,11 @@
     gap: 12px 8px;
   }
 }
+
+.detail-brand__spacer {
+  width: 40px;
+}
+
+.btn-ask--full {
+  width: 100%;
+}

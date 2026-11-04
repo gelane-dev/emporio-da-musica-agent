@@ -1,3 +1,5 @@
+import { selectNextAnimation } from '../assets/mel/melAnimations.js'
+
 /**
  * Dados demonstrativos da interface.
  * Separados da integração real (src/services). Não representam contrato da API.
@@ -58,8 +60,6 @@ export const PRODUCTS = {
     ],
     details: {
       series: 'American Elite Series · 2024 · #US2401847',
-      rating: '4.9',
-      reviews: 87,
       watermark: 'FENDER',
       features: [
         {
@@ -104,8 +104,6 @@ export const PRODUCTS = {
     ],
     details: {
       series: 'American Elite Series · 2024 · #US2401847',
-      rating: '4.9',
-      reviews: 87,
       watermark: 'FENDER',
       features: [
         {
@@ -150,8 +148,6 @@ export const PRODUCTS = {
     ],
     details: {
       series: 'Player Series · 2024 · #JB21904',
-      rating: '4.8',
-      reviews: 41,
       watermark: 'FENDER',
       features: [
         { title: 'Punch moderno', text: 'Médios claros para mix de estúdio' },
@@ -180,10 +176,10 @@ export function seedConversations() {
     {
       id: 'conv-strat',
       title: 'João Silva',
+      animation: 'ukulele',
       customer: {
         name: 'João Silva',
         avatar: '/images/avatar_joao.jpg',
-        unread: true,
       },
       updatedAt: at(10, 24),
       timeLabel: '10:24',
@@ -224,10 +220,10 @@ export function seedConversations() {
     {
       id: 'conv-maria',
       title: 'Maria Costa',
+      animation: 'dancing',
       customer: {
         name: 'Maria Costa',
         avatar: '/images/avatar_maria.jpg',
-        unread: false,
       },
       updatedAt: at(9, 48),
       timeLabel: '09:48',
@@ -255,10 +251,10 @@ export function seedConversations() {
     {
       id: 'conv-lucas',
       title: 'Lucas Almeida',
+      animation: 'headphones',
       customer: {
         name: 'Lucas Almeida',
         avatar: '/images/avatar_lucas.jpg',
-        unread: false,
       },
       updatedAt: at(18, 10),
       timeLabel: 'Ontem',
@@ -286,10 +282,10 @@ export function seedConversations() {
     {
       id: 'conv-fernanda',
       title: 'Fernanda Lima',
+      animation: 'singing',
       customer: {
         name: 'Fernanda Lima',
         avatar: '/images/avatar_fernanda.jpg',
-        unread: false,
       },
       updatedAt: at(17, 5),
       timeLabel: 'Ontem',
@@ -318,10 +314,11 @@ export function seedConversations() {
   ]
 }
 
-export function createConversation() {
+export function createConversation(animation = null) {
   return {
     id: `conv-${crypto.randomUUID()}`,
     title: 'Nova conversa',
+    animation: animation || selectNextAnimation(),
     updatedAt: new Date().toISOString(),
     messages: [
       {

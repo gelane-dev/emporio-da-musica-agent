@@ -1,31 +1,24 @@
 import { useState } from 'react'
 import {
   IconBack,
-  IconCart,
   IconChat,
-  IconDotsVertical,
-  IconHeart,
   IconLeaf,
   IconShield,
   IconSoundWave,
-  IconSparkle,
   IconTremolo,
-  IconTruck,
   LyreMark,
 } from '../icons.jsx'
 import InstrumentFigure from './InstrumentFigure.jsx'
+import MelAvatar from '../../assets/mel/MelAvatar.jsx'
+
+const FEATURE_ICONS = [<IconSoundWave key="wave" />, <IconLeaf key="leaf" />, <IconTremolo key="tremolo" />, <IconShield key="shield" />]
 
 export default function ProductDetail({ product, onClose, onAsk }) {
-  const [favorite, setFavorite] = useState(false)
-  const [cartNotice, setCartNotice] = useState(false)
   const [imgFailed, setImgFailed] = useState(false)
 
   if (!product) return null
   const details = product.details ?? {}
-
-  function handleCartClick() {
-    setCartNotice(true)
-  }
+  const features = Array.isArray(details.features) ? details.features : []
 
   function handleDirectQuestion() {
     onAsk(product)
@@ -47,18 +40,11 @@ export default function ProductDetail({ product, onClose, onAsk }) {
               <strong>DA MÚSICA</strong>
             </div>
           </div>
-          <button
-            type="button"
-            className={`detail-heart ${favorite ? 'is-fav' : ''}`}
-            onClick={() => setFavorite(!favorite)}
-            aria-label="Favoritar instrumento"
-          >
-            <IconHeart />
-          </button>
+          <span className="detail-brand__spacer" aria-hidden="true" />
         </header>
 
         <section className="detail-hero">
-          <div className="detail-watermark">{details.watermark || 'FENDER'}</div>
+          {details.watermark ? <div className="detail-watermark">{details.watermark}</div> : null}
           {product.image && !imgFailed ? (
             <img
               src={product.image}
@@ -74,92 +60,47 @@ export default function ProductDetail({ product, onClose, onAsk }) {
         <section className="detail-copy">
           <h1 id="detail-title">{product.shortName || product.name}</h1>
           <p className="detail-meta">
-            {details.series || 'American Elite Series · 2024 · #US2401847'}
-            <span>★ {details.rating || '4.9'} ({details.reviews || '87'} avaliações)</span>
+            {details.series || 'Especificações, preço e disponibilidade com a Mel no atendimento'}
           </p>
         </section>
 
-        <ul className="detail-features">
-          <li>
-            <span className="detail-features__icon">
-              <IconSoundWave />
-            </span>
-            <strong>Sons de alta definição</strong>
-            <p>Voz Strat clássica com versatilidade moderna</p>
-          </li>
-          <li>
-            <span className="detail-features__icon">
-              <IconLeaf />
-            </span>
-            <strong>Corpo de Alburno</strong>
-            <p>Leve e ressonante</p>
-          </li>
-          <li>
-            <span className="detail-features__icon">
-              <IconTremolo />
-            </span>
-            <strong>Sistema de Tremolo</strong>
-            <p>Fender 2-Point Deluxe</p>
-          </li>
-          <li>
-            <span className="detail-features__icon">
-              <IconShield />
-            </span>
-            <strong>Acabamento Premium</strong>
-            <p>Maple flameado com verniz poliuretano</p>
-          </li>
-        </ul>
+        {features.length > 0 ? (
+          <ul className="detail-features">
+            {features.map((feature, index) => (
+              <li key={feature.title}>
+                <span className="detail-features__icon">{FEATURE_ICONS[index % FEATURE_ICONS.length]}</span>
+                <strong>{feature.title}</strong>
+                <p>{feature.text}</p>
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
         <aside className="detail-note">
           <header>
             <span className="detail-note__badge">
-              <IconSparkle />
+              <MelAvatar size={24} />
             </span>
-            <strong>Assistente Empório</strong>
-            <span className="detail-note__dots">
-              <IconDotsVertical />
-            </span>
+            <strong>Mel — Assistente Musical</strong>
           </header>
           <div className="detail-note__body">
             <p>
               {details.assistantNote ||
-                'Essa é a Strat que você perguntou! Quer ver as especificações ou condições de pagamento?'}
+                'Posso verificar disponibilidade, condições de pagamento e detalhes deste instrumento para você!'}
             </p>
-            <time>09:41</time>
           </div>
         </aside>
 
-        {cartNotice ? (
-          <div className="detail-cart-hint" role="status">
-            <p>
-              💡 No Empório da Música, nosso assistente cuida de orçamentos e reservas de forma personalizada.
-            </p>
-            <button type="button" onClick={handleDirectQuestion}>
-              Perguntar ao assistente sobre compra e reserva
-            </button>
-          </div>
-        ) : null}
-
         <div className="detail-actions">
-          <button type="button" className="btn-cart" onClick={handleCartClick}>
-            <IconCart /> Adicionar ao carrinho
-          </button>
-          <button type="button" className="btn-ask" onClick={handleDirectQuestion}>
-            <IconChat /> Conversar com o assistente
+          <button type="button" className="btn-ask btn-ask--full" onClick={handleDirectQuestion}>
+            <IconChat /> Conversar com a Mel sobre este instrumento
           </button>
         </div>
 
         <footer className="detail-foot">
-          <span>
-            <IconTruck /> Envio rápido e seguro
-          </span>
-          <span className="detail-foot__divider">|</span>
-          <span>
-            <IconShield /> Garantia de 1 ano
-          </span>
+          <span>Exemplo demonstrativo: preço, estoque e condições reais são confirmados pela Mel no atendimento.</span>
         </footer>
       </div>
     </div>
   )
 }
-

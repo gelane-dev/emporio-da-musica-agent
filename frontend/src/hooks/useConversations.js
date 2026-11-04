@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createConversation, seedConversations } from '../data/demo.js'
 import { ApiError } from '../services/http.js'
 import { createSession, isDemoMode, sendChatMessage } from '../services/chatService.js'
+import { selectNextAnimation } from '../assets/mel/melAnimations.js'
 
 const DEMO_MODE = isDemoMode()
 
@@ -56,10 +57,11 @@ function isSessionFull(err) {
   return err instanceof ApiError && err.status === 429 && err.code === 'session_full'
 }
 
-function newConversation() {
-  const conversation = createConversation()
+function newConversation(avoidAnimation = null) {
+  const animation = selectNextAnimation(avoidAnimation)
+  const conversation = createConversation(animation)
   // No modo API a saudação vem do backend (POST /api/sessions), não do texto demonstrativo.
-  return DEMO_MODE ? conversation : { ...conversation, messages: [], sessionId: null }
+  return DEMO_MODE ? conversation : { ...conversation, animation, messages: [], sessionId: null }
 }
 
 function loadState() {
@@ -86,7 +88,15 @@ function persist(state) {
 
 function initialState() {
   const stored = loadState()
-  if (stored) return stored
+  if (stored) {
+    const conversations = stored.conversations.map((item, idx) => ({
+      ...item,
+      animation:
+        item.animation ||
+        selectNextAnimation(idx > 0 ? stored.conversations[idx - 1]?.animation : null),
+    }))
+    return { ...stored, conversations }
+  }
   const conversations = DEMO_MODE ? seedConversations() : [newConversation()]
   return { conversations, activeId: conversations[0].id }
 }
@@ -341,7 +351,11 @@ export function useConversations() {
 
   const startConversation = useCallback(
     (seedMessage) => {
-      const conversation = newConversation()
+      const currentActive = stateRef.current.conversations.find(
+        (item) => item.id === stateRef.current.activeId,
+      )
+      const avoidAnimation = currentActive?.animation || null
+      const conversation = newConversation(avoidAnimation)
       commit((current) => ({
         conversations: [conversation, ...current.conversations],
         activeId: conversation.id,

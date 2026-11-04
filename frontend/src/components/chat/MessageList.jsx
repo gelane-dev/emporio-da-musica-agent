@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react'
 import MessageBubble from './MessageBubble.jsx'
 import SuggestionChips from './SuggestionChips.jsx'
 import TypingIndicator from './TypingIndicator.jsx'
+import MelWelcomeStage from './MelWelcomeStage.jsx'
 
 export default function MessageList({
   messages,
+  animation = 'ukulele',
   isSending,
   error,
   onRetry,
@@ -21,6 +23,7 @@ export default function MessageList({
 
   return (
     <div className="transcript" aria-live="polite">
+      <MelWelcomeStage animation={animation} />
       {messages.map((message) => (
         <MessageBubble key={message.id} message={message} onOpenProduct={onOpenProduct} />
       ))}

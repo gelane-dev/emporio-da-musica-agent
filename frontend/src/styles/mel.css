@@ -1,0 +1,530 @@
+/* ==========================================================================
+   Mascote Mel — Identidade Visual Oficial & Animações Musicais
+   Empório da Música
+   ========================================================================== */
+
+/* --- Avatar Circular da Mel --- */
+.mel-avatar {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  vertical-align: middle;
+  flex-shrink: 0;
+  box-shadow: 0 3px 10px rgba(107, 28, 42, 0.16);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+
+.mel-avatar:hover {
+  transform: scale(1.06);
+  box-shadow: 0 4px 14px rgba(250, 45, 136, 0.28);
+}
+
+.mel-avatar svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- Container da Mascote --- */
+.mel-mascot {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  user-select: none;
+}
+
+.mel-mascot svg.mel-svg {
+  overflow: visible;
+  filter: drop-shadow(0 8px 24px rgba(60, 5, 38, 0.14));
+}
+
+.mel-character {
+  transform-origin: 100px 174px;
+}
+
+.mel-shadow {
+  transform-origin: 100px 182px;
+}
+
+/* --- ANIMAÇÃO 1: DANÇANDO ('dancing') --- */
+.mel-mascot--dancing .mel-character {
+  animation: melDanceSway 1.8s infinite ease-in-out;
+}
+
+.mel-mascot--dancing .mel-shadow {
+  animation: melShadowDance 1.8s infinite ease-in-out;
+}
+
+.mel-mascot--dancing .mel-arm-dance-left {
+  transform-origin: 60px 120px;
+  animation: melArmDanceLeft 1.8s infinite ease-in-out;
+}
+
+.mel-mascot--dancing .mel-arm-dance-right {
+  transform-origin: 140px 124px;
+  animation: melArmDanceRight 1.8s infinite ease-in-out;
+}
+
+.mel-mascot--dancing .mel-note--1 {
+  animation: melNoteDrift 2.2s infinite ease-out;
+}
+
+.mel-mascot--dancing .mel-note--2 {
+  animation: melNoteDrift 2.5s infinite ease-out 0.8s;
+}
+
+.mel-mascot--dancing .mel-note--3 {
+  animation: melNoteDrift 2s infinite ease-out 0.4s;
+}
+
+@keyframes melDanceSway {
+  0%, 100% {
+    transform: rotate(-4.5deg) translateY(0);
+  }
+  50% {
+    transform: rotate(4.5deg) translateY(-6px);
+  }
+}
+
+@keyframes melShadowDance {
+  0%, 100% {
+    transform: scaleX(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scaleX(0.9) translateX(2px);
+    opacity: 0.6;
+  }
+}
+
+@keyframes melArmDanceLeft {
+  0%, 100% {
+    transform: rotate(-18deg) translateY(-2px);
+  }
+  50% {
+    transform: rotate(14deg) translateY(3px);
+  }
+}
+
+@keyframes melArmDanceRight {
+  0%, 100% {
+    transform: rotate(16deg) translateY(3px);
+  }
+  50% {
+    transform: rotate(-16deg) translateY(-2px);
+  }
+}
+
+/* --- ANIMAÇÃO 2: TOCANDO UKULELE ('ukulele') --- */
+.mel-mascot--ukulele .mel-character {
+  animation: melUkuleleBob 1.2s infinite ease-in-out;
+}
+
+.mel-mascot--ukulele .mel-shadow {
+  animation: melUkuleleShadow 1.2s infinite ease-in-out;
+}
+
+.mel-mascot--ukulele .mel-arm-strumming {
+  transform-origin: 128px 128px;
+  animation: melStrumUkulele 0.6s infinite ease-in-out;
+}
+
+.mel-mascot--ukulele .mel-note--1 {
+  animation: melNoteFloatFromUkulele 2s infinite ease-out;
+}
+
+.mel-mascot--ukulele .mel-note--3 {
+  animation: melNoteFloatFromUkulele 2.4s infinite ease-out 0.7s;
+}
+
+@keyframes melUkuleleBob {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(1.2deg);
+  }
+}
+
+@keyframes melUkuleleShadow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(0.92);
+    opacity: 0.65;
+  }
+}
+
+@keyframes melStrumUkulele {
+  0%, 100% {
+    transform: rotate(-10deg) translateY(-1px);
+  }
+  50% {
+    transform: rotate(12deg) translateY(2px);
+  }
+}
+
+@keyframes melNoteFloatFromUkulele {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(16px, -28px) scale(1.1) rotate(15deg);
+    opacity: 0;
+  }
+}
+
+/* --- ANIMAÇÃO 3: CANTANDO ('singing') --- */
+.mel-mascot--singing .mel-character {
+  animation: melSingSway 1.6s infinite ease-in-out;
+}
+
+.mel-mascot--singing .mel-mouth--singing {
+  transform-origin: 100px 127px;
+  animation: melSingMouth 0.8s infinite ease-in-out;
+}
+
+.mel-mascot--singing .mel-note--1 {
+  animation: melNoteRiseSing 2.2s infinite ease-out;
+}
+
+.mel-mascot--singing .mel-note--2 {
+  animation: melNoteRiseSing 2.5s infinite ease-out 0.7s;
+}
+
+@keyframes melSingSway {
+  0%, 100% {
+    transform: rotate(-2.5deg) translateY(0);
+  }
+  50% {
+    transform: rotate(3deg) translateY(-5px);
+  }
+}
+
+@keyframes melSingMouth {
+  0%, 100% {
+    transform: scale(0.75, 0.6);
+  }
+  40% {
+    transform: scale(1.15, 1.25);
+  }
+  75% {
+    transform: scale(0.9, 0.8);
+  }
+}
+
+@keyframes melNoteRiseSing {
+  0% {
+    transform: translate(0, 0) scale(0.5);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-10px, -36px) scale(1.15) rotate(-18deg);
+    opacity: 0;
+  }
+}
+
+/* --- ANIMAÇÃO 4: CURTINDO MÚSICA COM FONES ('headphones') --- */
+.mel-mascot--headphones .mel-character {
+  animation: melHeadphonesGroove 2.2s infinite ease-in-out;
+}
+
+.mel-mascot--headphones .mel-shadow {
+  animation: melHeadphonesShadow 2.2s infinite ease-in-out;
+}
+
+.mel-mascot--headphones .mel-note--1 {
+  animation: melChillNote 3s infinite ease-in-out;
+}
+
+.mel-mascot--headphones .mel-note--2 {
+  animation: melChillNote 3.4s infinite ease-in-out 1.2s;
+}
+
+@keyframes melHeadphonesGroove {
+  0%, 100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(2.5deg);
+  }
+}
+
+@keyframes melHeadphonesShadow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(0.93);
+    opacity: 0.7;
+  }
+}
+
+@keyframes melChillNote {
+  0% {
+    transform: translate(0, 0) scale(0.7);
+    opacity: 0;
+  }
+  40% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(14px, -22px) scale(1) rotate(10deg);
+    opacity: 0;
+  }
+}
+
+/* --- ANIMAÇÃO 5: SURPRESA MUSICAL ('surprise') --- */
+.mel-mascot--surprise .mel-character {
+  animation: melSurpriseBounce 2s infinite ease-in-out;
+}
+
+.mel-mascot--surprise .mel-arm-surprise-left {
+  transform-origin: 72px 128px;
+  animation: melHandsSurprise 2s infinite ease-in-out;
+}
+
+.mel-mascot--surprise .mel-arm-surprise-right {
+  transform-origin: 128px 128px;
+  animation: melHandsSurprise 2s infinite ease-in-out;
+}
+
+.mel-mascot--surprise .mel-spark-1 {
+  transform-origin: 152px 50px;
+  animation: melSparkle 1.8s infinite ease-in-out;
+}
+
+.mel-mascot--surprise .mel-spark-2 {
+  transform-origin: 38px 105px;
+  animation: melSparkle 1.8s infinite ease-in-out 0.6s;
+}
+
+@keyframes melSurpriseBounce {
+  0%, 100% {
+    transform: scale(1) translateY(0);
+  }
+  15% {
+    transform: scale(1.07, 0.94) translateY(2px);
+  }
+  30% {
+    transform: scale(0.96, 1.06) translateY(-9px);
+  }
+  48% {
+    transform: scale(1.02, 0.98) translateY(-2px);
+  }
+  65% {
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes melHandsSurprise {
+  0%, 100% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.08) translateY(-2px);
+  }
+}
+
+@keyframes melSparkle {
+  0%, 100% {
+    transform: scale(0.4) rotate(0deg);
+    opacity: 0.2;
+  }
+  50% {
+    transform: scale(1.2) rotate(45deg);
+    opacity: 1;
+  }
+}
+
+@keyframes melNoteDrift {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(-32px) translateX(8px) scale(1.1) rotate(18deg);
+    opacity: 0;
+  }
+}
+
+/* --- Welcome Stage (Apresentação acolhedora da Mel no início da conversa) --- */
+.mel-welcome-stage {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 24px;
+  background: linear-gradient(135deg, rgba(255, 245, 250, 0.85) 0%, rgba(254, 237, 245, 0.6) 100%);
+  border: 1px solid rgba(250, 45, 136, 0.18);
+  border-radius: 20px;
+  box-shadow: 0 6px 20px rgba(107, 28, 42, 0.04);
+  margin-bottom: 8px;
+  max-width: 680px;
+  backdrop-filter: blur(8px);
+}
+
+.mel-welcome-stage__figure {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+
+.mel-welcome-stage__content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mel-welcome-stage__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 3px 10px;
+  background: rgba(250, 45, 136, 0.12);
+  color: #c2136e;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mel-welcome-stage__badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fa2d88;
+  box-shadow: 0 0 6px #fa2d88;
+}
+
+.mel-welcome-stage__title {
+  font-family: var(--sans);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.25;
+  margin: 0;
+}
+
+.mel-welcome-stage__desc {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.mel-welcome-stage__mood {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: 2px;
+}
+
+/* --- Responsividade Mobile --- */
+@media (max-width: 768px) {
+  .mel-welcome-stage {
+    padding: 14px 16px;
+    gap: 14px;
+    border-radius: 16px;
+  }
+
+  .mel-welcome-stage .mel-mascot {
+    width: 90px !important;
+    height: 90px !important;
+  }
+
+  .mel-welcome-stage__title {
+    font-size: 1rem;
+  }
+
+  .mel-welcome-stage__desc {
+    font-size: 0.82rem;
+  }
+}
+
+/* --- Acessibilidade: prefers-reduced-motion --- */
+@media (prefers-reduced-motion: reduce) {
+  .mel-character,
+  .mel-shadow,
+  .mel-arm-dance-left,
+  .mel-arm-dance-right,
+  .mel-arm-strumming,
+  .mel-mouth--singing,
+  .mel-arm-surprise-left,
+  .mel-arm-surprise-right,
+  .mel-spark-1,
+  .mel-spark-2,
+  .mel-note--1,
+  .mel-note--2,
+  .mel-note--3 {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .mel-avatar {
+    transition: none !important;
+  }
+}
+
+
+/* --- Avatar 3D da Mel (modelo GLB, estático) --- */
+.mel-avatar3d {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  vertical-align: middle;
+  /* Mesmo fundo do avatar 2D: a troca 2D → 3D não muda o enquadramento circular. */
+  background: radial-gradient(circle at 50% 38%, #3d152a 0%, #240c19 70%, #15060f 100%);
+  box-shadow: 0 3px 10px rgba(107, 28, 42, 0.16), inset 0 0 0 1px rgba(250, 45, 136, 0.3);
+}
+
+.mel-avatar3d__fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+}
+
+.mel-avatar3d__fallback .mel-avatar {
+  box-shadow: none;
+}
+
+.mel-avatar3d__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: melAvatar3dIn 0.35s ease-out;
+}
+
+@keyframes melAvatar3dIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mel-avatar3d__canvas {
+    animation: none;
+  }
+}
