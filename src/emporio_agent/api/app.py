@@ -33,7 +33,13 @@ from emporio_agent.api.schemas import (
     SessionCreated,
     ToolCallInfo,
 )
-from emporio_agent.api.sessions import DEFAULT_MAX_SESSIONS, SessionBusy, SessionNotFound, SessionStore
+from emporio_agent.api.sessions import (
+    DEFAULT_MAX_SESSIONS,
+    SessionBusy,
+    SessionCreationLimiter,
+    SessionNotFound,
+    SessionStore,
+)
 from emporio_agent.cli import build_agent, greeting
 from emporio_agent.config import Settings, load_settings, now, read_env
 from emporio_agent.data.loader import DataLoadError
@@ -56,13 +62,18 @@ MSG_TOO_LARGE = "A requisição é grande demais. Envie uma mensagem mais curta.
 MSG_CHAT_BUSY = "Estou atendendo muitas conversas agora. Tente novamente em alguns instantes."
 MSG_SESSION_FULL = "Esta conversa ficou muito longa. Inicie uma nova conversa para continuar."
 MSG_BAD_SESSION_ID = "O campo 'session_id' tem um formato inválido."
+# Mesmo texto do 429 do nginx (frontend/nginx/default.conf.template).
+MSG_RATE_LIMITED = "Muitas mensagens em pouco tempo. Aguarde um instante e tente de novo."
 
 MAX_BODY_BYTES = 16 * 1024
 
 _ERROR_RESPONSES: dict[int | str, dict] = {
     404: {"model": ErrorResponse, "description": "Sessão não encontrada (`session_not_found`)."},
     409: {"model": ErrorResponse, "description": "Sessão ocupada com outra mensagem (`session_busy`)."},
-    429: {"model": ErrorResponse, "description": "Conversa cheia (`session_full`)."},
+    429: {
+        "model": ErrorResponse,
+        "description": "Conversa cheia (`session_full`) ou sessões demais criadas pelo cliente (`rate_limited`).",
+    },
     413: {"model": ErrorResponse, "description": "Corpo acima de 16 KiB (`payload_too_large`)."},
     422: {"model": ErrorResponse, "description": "Requisição inválida (`invalid_request`)."},
     500: {"model": ErrorResponse, "description": "Erro inesperado (`internal_error`)."},
@@ -87,6 +98,7 @@ class ApiState:
     detail: str | None
     sessions: SessionStore
     chat_slots: threading.BoundedSemaphore
+    session_creation: SessionCreationLimiter
 
 
 def _short_id(session_id: str) -> str:
@@ -176,6 +188,7 @@ def create_app(
         ),
         # Sem teto, rajadas de conversas esgotam threads e a cota do provedor.
         chat_slots=threading.BoundedSemaphore(settings.max_concurrent_chats),
+        session_creation=SessionCreationLimiter(clock=clock),
     )
 
     # Em produção o Swagger/OpenAPI fica desligado para não expor o mapa da API.
@@ -278,6 +291,13 @@ def create_app(
         allow_credentials=False,
     )
 
+    def check_creation_allowed(request: Request) -> None:
+        # IP do cliente: no Docker vem do X-Forwarded-For que o nginx sobrescreve (uvicorn com
+        # FORWARDED_ALLOW_IPS); executada direto, é o endereço da conexão.
+        client = request.client.host if request.client else "desconhecido"
+        if not state.session_creation.allow(client):
+            raise ApiError(429, "rate_limited", MSG_RATE_LIMITED)
+
     def require_agent() -> Agent:
         if state.agent is None:
             raise ApiError(503, "agent_unavailable", MSG_UNAVAILABLE)
@@ -309,10 +329,11 @@ def create_app(
         tags=["Sessões"],
         summary="Iniciar uma conversa",
         description="Cria uma sessão em memória e devolve a saudação inicial da Mel.",
-        responses={k: _ERROR_RESPONSES[k] for k in (413, 500, 503)},
+        responses={k: _ERROR_RESPONSES[k] for k in (413, 429, 500, 503)},
     )
-    def create_session() -> SessionCreated:
+    def create_session(request: Request) -> SessionCreated:
         require_agent()
+        check_creation_allowed(request)
         current = now(state.settings)
         session = state.sessions.create(current)
         logger.info("Sessão %s criada.", _short_id(session.id))
@@ -334,7 +355,7 @@ def create_app(
         ),
         responses={k: _ERROR_RESPONSES[k] for k in (404, 409, 413, 422, 429, 500, 503)},
     )
-    def chat(body: ChatRequest) -> ChatResponse:
+    def chat(body: ChatRequest, request: Request) -> ChatResponse:
         agent = require_agent()
         # Não bloqueia: com todas as vagas ocupadas responde 503 já, sem prender a sessão nem a thread.
         if not state.chat_slots.acquire(blocking=False):
@@ -342,6 +363,8 @@ def create_app(
         try:
             session_id = body.session_id
             if session_id is None:
+                # Criar sessão aqui consome o mesmo orçamento por cliente de POST /api/sessions.
+                check_creation_allowed(request)
                 session_id = state.sessions.create(now(state.settings)).id
             try:
                 with state.sessions.use(session_id) as session:

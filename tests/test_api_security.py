@@ -313,3 +313,49 @@ def test_segredo_nao_aparece_em_respostas_nem_logs(tmp_path, caplog):
     outputs.append(degraded.get("/api/health").text)
     assert all(SECRET not in text for text in outputs)
     assert SECRET not in caplog.text
+
+
+# ------------------------------------------------------------------ criação de sessões por cliente
+
+
+def test_chat_sem_sessao_consome_o_mesmo_limite_de_criacao(tmp_path):
+    # POST /api/sessions e POST /api/chat sem session_id dividem o orçamento (6 de imediato).
+    clock = Clock()
+    client = make_client(tmp_path, [fake_text("oi")] * 10, clock=clock)
+    for _ in range(3):
+        assert client.post("/api/sessions").status_code == 201
+    for _ in range(3):
+        assert client.post("/api/chat", json={"message": "oi"}).status_code == 200
+    blocked = client.post("/api/chat", json={"message": "oi"})
+    assert blocked.status_code == 429
+    assert blocked.json()["error"] == "rate_limited"
+    assert client.post("/api/sessions").status_code == 429
+    clock.t += 6  # 10/min: uma ficha a cada 6 s
+    assert client.post("/api/chat", json={"message": "oi"}).status_code == 200
+
+
+def test_chat_bloqueado_por_limite_nao_cria_sessao(tmp_path):
+    app = make_app(tmp_path, clock=Clock())
+    client = TestClient(app)
+    for _ in range(6):
+        new_session(client)
+    assert len(app.state.api.sessions) == 6
+    assert client.post("/api/chat", json={"message": "oi"}).status_code == 429
+    assert len(app.state.api.sessions) == 6
+
+
+def test_chat_em_sessao_existente_nao_conta_como_criacao(tmp_path):
+    client = make_client(tmp_path, [fake_text("ok")] * 20, clock=Clock())
+    sid = new_session(client)
+    for _ in range(15):
+        assert client.post("/api/chat", json={"session_id": sid, "message": "oi"}).status_code == 200
+
+
+def test_limite_de_criacao_e_por_cliente(tmp_path):
+    app = make_app(tmp_path, clock=Clock())
+    a = TestClient(app, client=("203.0.113.1", 5000))
+    b = TestClient(app, client=("203.0.113.2", 5000))
+    for _ in range(6):
+        assert a.post("/api/sessions").status_code == 201
+    assert a.post("/api/sessions").status_code == 429
+    assert b.post("/api/sessions").status_code == 201

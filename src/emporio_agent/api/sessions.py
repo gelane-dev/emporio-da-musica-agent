@@ -14,6 +14,11 @@ from emporio_agent.agent.session import Session
 
 DEFAULT_MAX_SESSIONS = 200
 
+# Criação de sessões por cliente: os mesmos números do nginx (10/min, rajada de 5).
+SESSION_CREATE_PER_MINUTE = 10
+SESSION_CREATE_BURST = 5
+_MAX_TRACKED_CLIENTS = 10_000
+
 
 class SessionNotFound(Exception):
     """Sessão desconhecida (ou já descartada)."""
@@ -21,6 +26,39 @@ class SessionNotFound(Exception):
 
 class SessionBusy(Exception):
     """Já há uma mensagem sendo processada nesta sessão."""
+
+
+class SessionCreationLimiter:
+    """Balde de fichas por cliente para a criação de sessões (equivalente ao limit_req do nginx).
+
+    Risco: ``POST /api/chat`` sem ``session_id`` também cria sessão e não passa pelo limite do
+    nginx em ``POST /api/sessions``; criando sessões em massa, um cliente expulsa (LRU) as conversas
+    de outros. Um único orçamento por cliente vale para os dois caminhos.
+    """
+
+    def __init__(
+        self,
+        per_minute: int = SESSION_CREATE_PER_MINUTE,
+        burst: int = SESSION_CREATE_BURST,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._rate = per_minute / 60.0
+        self._capacity = float(burst + 1)  # nginx: 1 + burst passam de imediato (nodelay)
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._buckets: OrderedDict[str, tuple[float, float]] = OrderedDict()
+
+    def allow(self, client: str) -> bool:
+        now = self._clock()
+        with self._lock:
+            tokens, last = self._buckets.get(client, (self._capacity, now))
+            tokens = min(self._capacity, tokens + (now - last) * self._rate)
+            allowed = tokens >= 1.0
+            self._buckets[client] = (tokens - 1.0 if allowed else tokens, now)
+            self._buckets.move_to_end(client)
+            while len(self._buckets) > _MAX_TRACKED_CLIENTS:
+                self._buckets.popitem(last=False)
+            return allowed
 
 
 class _Entry:

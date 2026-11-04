@@ -15,6 +15,10 @@ services:
       API_PORT: "8000"
       # Swagger/OpenAPI desligados no contêiner (menos superfície); fora do Docker o padrão é ligado.
       API_DOCS: "false"
+      # O uvicorn aceita o X-Forwarded-For do nginx (que o sobrescreve com o IP do cliente): o
+      # limite de criação de sessões por cliente da API depende disso. A porta do backend só é
+      # publicada em 127.0.0.1, então só o nginx (e o próprio host) alcançam o backend.
+      FORWARDED_ALLOW_IPS: "*"
     # Hardening: raiz somente leitura (graváveis: /tmp e o volume runtime), sem capabilities,
     # sem ganhar privilégios.
     read_only: true

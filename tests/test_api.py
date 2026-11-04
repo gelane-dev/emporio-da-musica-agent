@@ -402,8 +402,10 @@ def test_session_id_e_token_urlsafe_longo_e_distinto(tmp_path):
     import re
 
     client, _ = make_client(tmp_path, [fake_text("Olá!")])
-    ids = {client.post("/api/sessions").json()["session_id"] for _ in range(20)}
-    ids.add(client.post("/api/chat", json={"message": "oi"}).json()["session_id"])
+    # Um IP por criação: o limite de criação de sessões por cliente não é o assunto deste teste.
+    clients = [TestClient(client.app, client=(f"198.51.100.{i}", 5000)) for i in range(21)]
+    ids = {c.post("/api/sessions").json()["session_id"] for c in clients[:20]}
+    ids.add(clients[20].post("/api/chat", json={"message": "oi"}).json()["session_id"])
     assert len(ids) == 21
     for session_id in ids:
         assert len(session_id) >= 22  # token_urlsafe(16): 128 bits
