@@ -211,7 +211,7 @@ class InformacoesLoja(Tool):
 
 
 class EstimarFreteArgs(ToolArgs):
-    cidade: str | None = Field(default=None, description="Cidade de entrega, se o cliente informou.")
+    cidade: str | None = Field(default=None, max_length=120, description="Cidade de entrega, se o cliente informou.")
     valor_pedido: float = Field(gt=0, allow_inf_nan=False, description="Valor do pedido em reais.")
 
 

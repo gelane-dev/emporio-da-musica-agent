@@ -138,7 +138,7 @@ def test_utf8_preservado(tool, runtime):
 def test_resumo_multilinha_continua_uma_linha_no_arquivo(tool, runtime):
     call(tool, motivo="reclamacao", resumo="linha 1\nlinha 2")
     assert len((runtime / "handoffs.jsonl").read_text(encoding="utf-8").splitlines()) == 1
-    assert records(runtime)[0]["resumo"] == "linha 1\nlinha 2"
+    assert records(runtime)[0]["resumo"] == "linha 1 linha 2"
 
 
 # ----------------------------------------------------------------------------- mascaramento

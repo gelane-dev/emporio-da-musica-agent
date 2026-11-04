@@ -7,7 +7,7 @@ mascarar e-mails e números longos do resumo.
 from __future__ import annotations
 
 import json
-import re
+import threading
 import uuid
 from collections.abc import Callable
 from datetime import datetime
@@ -17,15 +17,15 @@ from typing import Literal
 from pydantic import Field, field_validator
 
 from emporio_agent.domain.limitations import Limitation
+from emporio_agent.domain.text import collapse_whitespace, mask_sensitive
 from emporio_agent.tools.base import Tool, ToolArgs, ToolResult
 from emporio_agent.tools.limitations import MANUAL
 
 HANDOFF_FILE = "handoffs.jsonl"
 COMPLAINT_DEADLINE = "24 horas úteis"
 
-_EMAIL_RE = re.compile(r"[^\s@<>()\[\],;:]+@[^\s@<>()\[\],;:]+\.[^\s@<>()\[\],;:]+")
-# 8 ou mais dígitos, ignorando espaços, parênteses, pontos e hífens entre eles.
-_LONG_NUMBER_RE = re.compile(r"\(?\d(?:[\s().\-]*\d){7,}")
+# Risco: chamadas simultâneas (várias sessões) intercalariam bytes e corromperiam o JSONL.
+_WRITE_LOCK = threading.Lock()
 
 LIMITATION_PRAZO_RETORNO = Limitation(
     code="MANUAL_OMISSO",
@@ -35,12 +35,6 @@ LIMITATION_PRAZO_RETORNO = Limitation(
     ),
     source=f"{MANUAL}, seção 7.3",
 )
-
-
-def mask_sensitive(text: str) -> str:
-    """Remove e-mails e sequências de 8+ dígitos (telefones, CPF etc.) do texto."""
-    text = _EMAIL_RE.sub("[e-mail removido]", text)
-    return _LONG_NUMBER_RE.sub("[número removido]", text)
 
 
 class EncaminharAtendenteArgs(ToolArgs):
@@ -63,7 +57,8 @@ class EncaminharAtendenteArgs(ToolArgs):
     @field_validator("resumo", mode="before")
     @classmethod
     def _strip(cls, value):
-        return value.strip() if isinstance(value, str) else value
+        # Quebras de linha/controles viram espaço: o registro é sempre uma única linha JSONL.
+        return collapse_whitespace(value) if isinstance(value, str) else value
 
 
 class EncaminharAtendente(Tool):
@@ -91,8 +86,9 @@ class EncaminharAtendente(Tool):
             "pedido_id": args.pedido_id,
         }
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        with self._path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        line = json.dumps(record, ensure_ascii=False) + "\n"
+        with _WRITE_LOCK, self._path.open("a", encoding="utf-8") as handle:
+            handle.write(line)
 
         is_complaint = args.motivo == "reclamacao"
         data = {

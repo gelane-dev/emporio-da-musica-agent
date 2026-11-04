@@ -11,7 +11,7 @@ from emporio_agent.data.models import Product
 from emporio_agent.data.repository import CatalogRepository
 from emporio_agent.domain.limitations import Limitation
 from emporio_agent.domain.pricing import LIMITATION_P15, PriceQuote, format_brl, quote
-from emporio_agent.domain.text import normalize
+from emporio_agent.domain.text import clean_free_text, normalize
 from emporio_agent.tools.base import Tool, ToolArgs, ToolResult
 from emporio_agent.tools.limitations import LIMITATION_EM_BREVE, conflict_limitation
 
@@ -47,7 +47,7 @@ def product_summary(catalog: CatalogRepository, product: Product) -> tuple[dict,
         assert promo is not None
         summary["promocao"] = {
             "percentual": promo.percent,
-            "descricao": promo.description,
+            "descricao": clean_free_text(promo.description),
             "preco": format_brl(promo.price),
         }
     elif len(promotions) > 1:
@@ -64,7 +64,7 @@ def _price_payload(q: PriceQuote) -> dict:
         "promocao": (
             {
                 "percentual": q.promo.percent,
-                "descricao": q.promo.description,
+                "descricao": clean_free_text(q.promo.description),
                 "preco": format_brl(q.promo.price),
             }
             if q.promo
@@ -85,10 +85,10 @@ def _price_payload(q: PriceQuote) -> dict:
 
 class BuscarProdutosArgs(ToolArgs):
     texto: str | None = Field(
-        default=None, description="Termos de busca livres (nome, marca, tipo, característica)."
+        default=None, max_length=120, description="Termos de busca livres (nome, marca, tipo, característica)."
     )
     categoria: str | None = Field(
-        default=None, description="Nome exato de uma categoria (use listar_categorias para ver os nomes)."
+        default=None, max_length=120, description="Nome exato de uma categoria (use listar_categorias para ver os nomes)."
     )
     preco_min: float | None = Field(default=None, ge=0, allow_inf_nan=False, description="Preço de tabela mínimo, em reais.")
     preco_max: float | None = Field(default=None, ge=0, allow_inf_nan=False, description="Preço de tabela máximo, em reais.")
@@ -158,7 +158,7 @@ class BuscarProdutos(Tool):
 
 class DetalharProdutoArgs(ToolArgs):
     produto_id: int | None = Field(default=None, ge=1, description="ID do produto (preferível, quando conhecido).")
-    nome: str | None = Field(default=None, min_length=1, description="Nome (ou parte do nome) do produto.")
+    nome: str | None = Field(default=None, min_length=1, max_length=120, description="Nome (ou parte do nome) do produto.")
 
     @model_validator(mode="after")
     def _exactly_one(self) -> DetalharProdutoArgs:
@@ -218,7 +218,7 @@ class DetalharProduto(Tool):
         product = resolved
         limitations: list[Limitation] = []
 
-        description: str | None = product.description or None
+        description: str | None = clean_free_text(product.description) or None
         specs = dict(product.specs)
         conflicts = self._catalog.conflicts(product.id)
         for conflict in conflicts:
@@ -264,13 +264,13 @@ class DetalharProduto(Tool):
                     "tipo": c.kind,
                     "campos": list(c.fields),
                     "valores": dict(c.values),
-                    "observacao": c.note,
+                    "observacao": clean_free_text(c.note),
                 }
                 for c in conflicts
             ],
             "preco": preco,
             "promocoes_encerradas": [
-                {"descricao": p.description, "percentual": p.discount_percent}
+                {"descricao": clean_free_text(p.description), "percentual": p.discount_percent}
                 for p in self._catalog.inactive_promotions(product.id)
             ],
             "alternativas_sugeridas": alternatives,

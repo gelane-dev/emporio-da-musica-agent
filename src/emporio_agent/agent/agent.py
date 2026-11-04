@@ -11,7 +11,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from emporio_agent import config
-from emporio_agent.agent.output_guard import sanitize_reply
+from emporio_agent.agent.output_guard import guard_reply, sanitize_reply
 from emporio_agent.agent.prompts import build_dynamic_context, build_system_prompt
 from emporio_agent.agent.session import Session
 from emporio_agent.config import Settings
@@ -95,7 +95,8 @@ class Agent:
             logger.info("LLM usage=%s stop_reason=%s", response.usage, response.stop_reason)
             message = response.to_message()
             if not response.tool_calls:
-                message = message.model_copy(update={"content": sanitize_reply(message.content or "")})
+                safe = guard_reply(sanitize_reply(message.content or ""), session.messages)
+                message = message.model_copy(update={"content": safe})
             session.add(message)
 
             if not response.tool_calls:
@@ -118,7 +119,7 @@ class Agent:
 
             for call in response.tool_calls:
                 started = time.perf_counter()
-                result = self._tools.execute(call.name, call.arguments)
+                result = self._tools.execute(call.name, call.arguments, conversation_id=session.id)
                 duration_ms = int((time.perf_counter() - started) * 1000)
                 records.append(
                     ToolCallRecord(name=call.name, arguments=call.arguments, ok=result.ok, duration_ms=duration_ms)

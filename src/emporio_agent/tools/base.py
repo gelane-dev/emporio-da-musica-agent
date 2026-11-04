@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+from contextvars import ContextVar
 from abc import ABC, abstractmethod
 from typing import Any, Literal
 
@@ -17,7 +18,17 @@ from emporio_agent.llm.base import ToolSpec
 
 logger = logging.getLogger(__name__)
 
-ToolErrorCode = Literal["NOT_FOUND", "AMBIGUOUS", "VERIFICATION_FAILED", "INVALID_ARGUMENT", "INTERNAL_ERROR"]
+ToolErrorCode = Literal["NOT_FOUND", "AMBIGUOUS", "VERIFICATION_FAILED", "VERIFICATION_LOCKED", "INVALID_ARGUMENT", "INTERNAL_ERROR"]
+
+
+# Conversa em andamento, para ferramentas que precisam de estado POR conversa (ex.: limite de
+# tentativas de verificação). O registry é compartilhável entre sessões; o id viaja por contexto.
+_CONVERSATION_ID: ContextVar[str | None] = ContextVar("conversation_id", default=None)
+
+
+def current_conversation_id() -> str | None:
+    """Id da conversa; ``None`` fora do agente (chamada direta, sem sessão: nada a limitar)."""
+    return _CONVERSATION_ID.get()
 
 
 class ToolError(BaseModel, frozen=True):
@@ -128,13 +139,21 @@ class ToolRegistry:
             for tool in self._tools.values()
         ]
 
-    def execute(self, name: str, raw_args: dict) -> ToolResult:
+    def execute(self, name: str, raw_args: dict, conversation_id: str | None = None) -> ToolResult:
+        token = _CONVERSATION_ID.set(conversation_id)
+        try:
+            return self._execute(name, raw_args)
+        finally:
+            _CONVERSATION_ID.reset(token)
+
+    def _execute(self, name: str, raw_args: dict) -> ToolResult:
         try:
             tool = self._tools.get(name)
             if tool is None:
                 return ToolResult.failure(
                     "INVALID_ARGUMENT",
-                    f"Ferramenta desconhecida: '{name}'. Ferramentas disponíveis: {', '.join(self._tools)}.",
+                    # Não ecoa o nome recebido (pode ser conteúdo arbitrário vindo do modelo/cliente).
+                    f"Ferramenta desconhecida. Ferramentas disponíveis: {', '.join(self._tools)}.",
                 )
             try:
                 args = tool.args_model.model_validate(raw_args)
