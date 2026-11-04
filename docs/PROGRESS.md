@@ -129,14 +129,24 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 - Nenhuma decisão de negócio pendente.
 - **Provedor alterado para Groq (decisão do usuário, D17).** T14/T15 executam quando `GROQ_API_KEY` estiver no `.env` (ainda ausente em 2026-11-01).
 - RK11 (acentuação no Git Bash) resolvido na T13 (validação manual).
+- Groq reprovada na regressão `medium` (04/11/2026, cenário 5): não aprovada como padrão até correção e nova bateria completa (ver "Regressão `medium` na Groq").
 
 ## Auditoria de segurança (03/11/2026)
 
-Status: **implementado e validado localmente; NÃO publicado** (aguarda autorização do usuário para o push). Relatório: [[docs/SECURITY]]; decisão: [[TECHNICAL_DECISIONS]] D21.
+Status: **implementado, validado e publicado na `main`** (`main` sincronizada com `origin/main` em `dae3bad`, verificado em 04/11/2026). Relatório: [[docs/SECURITY]]; decisão: [[TECHNICAL_DECISIONS]] D21.
 
 - Feito: três auditorias somente leitura (API/sessões, agente/ferramentas, segredos/infra/dependências); sem achado crítico ou alto; 5 médios (M1–M5) e 5 baixos (B1–B5) corrigidos: timeout do LLM e teto de chats simultâneos, expiração e teto de mensagens por sessão, bloqueio após 5 falhas de verificação, cabeçalhos de segurança e CSP, defesas contra injeção indireta e códigos inventados (`guard_reply`, `clean_free_text`), Swagger desligável, logs sem credenciais, validação estrita de entradas, `pip-audit`/`bandit`/`npm audit` no CI, Dependabot, teste de segredos, contêineres endurecidos e limite de criação de sessão no nginx.
 - Resultados (2026-11-03): backend 1159 passed, 2 deselected; frontend 63 testes (12 arquivos), lint e build ok; `bandit -ll` sem achados; `pip-audit` sem vulnerabilidades conhecidas; `npm audit` 0 vulnerabilidades; Docker reconstruído e saudável (CSP, X-Frame-Options e nosniff presentes, `Server` sem versão, `/docs` 404, POST /api/sessions 201 e depois 429 com envelope JSON, backend com raiz somente leitura). Nenhuma chamada paga a provedores.
-- Pendências: push (precisa de autorização); o CI do GitHub ainda não rodou com os novos passos (`pip-audit`, `bandit`, `npm audit`).
+- Revisões posteriores (04/11/2026), publicadas junto: limite de criação de sessão também no `POST /api/chat` sem sessão (`91cde1c`), guarda de códigos com normalização (`c33d96d`), logs de ferramentas sem valores de argumentos (`d41cebd`) e uvicorn confiando no `X-Forwarded-For` só do IP fixo do nginx (`dae3bad`).
+- Publicação: `main` = `origin/main` = `dae3bad`. CI no GitHub para `dae3bad` (run 41767832682, evento push): os três jobs com sucesso, incluindo os passos novos `pip-audit`, `bandit` e `npm audit`. Sem pendências de publicação desta etapa.
+
+## Regressão `medium` na Groq (04/11/2026)
+
+- Executada: Groq `openai/gpt-oss-120b`, `LLM_EFFORT=medium`, 13 cenários × 1, versão `dae3bad`, provedor fixado por variáveis de ambiente (nenhuma chamada ao Claude). Resultado: **13/14, reprovada** — cenário 5 (obrigatório) falhou; repetido 2 vezes sem correção, falhou de novo (0/3 no total).
+- Falha: a resposta omite a limitação P7 (o sistema só tem a previsão de entrega, não a data real de recebimento); na 1ª execução escreveu "entregue em 22/12/2025", apresentando a previsão como data real. Sem veredito de devolução nas três. Risco: confundir previsão de entrega com data de recebimento no prazo de arrependimento.
+- Diferenças em relação ao Claude: mais chamadas de ferramentas (`buscar_produtos` antes de `detalhar_produto`; várias `detalhar_produto` no cenário 1) e resposta comercial do cenário 8 com valores corretos, porém menos completa.
+- Situação: **Claude Sonnet 5.5 aprovado (14/14)**; **Groq não aprovada como padrão** até a correção do cenário 5 e nova bateria completa. Integrações intactas. Detalhes em [[docs/E2E_RESULTS]] §3.1–§3.3; relatórios originais em `runtime/` (não versionados, sem alteração).
+- Pendências: decidir a correção (prompt, ferramenta ou código; não feita nesta etapa) e rodar a nova bateria na Groq; decidir o provedor padrão do `.env` (hoje `groq`).
 
 ## Integridade dos dados originais
 
