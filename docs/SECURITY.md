@@ -41,7 +41,7 @@ Não houve achado crítico nem alto. Foram 5 de severidade média (M1–M5) e 5 
   - `tests/test_repo_secrets.py`: padrões de chaves nos arquivos versionados, `.env` fora do git, chaves vazias no `.env.example`, frontend sem referência a chaves.
   - Compose: backend `read_only` com `tmpfs /tmp`, `cap_drop: ALL`, `no-new-privileges`; frontend com `cap_drop: ALL` e `no-new-privileges`.
   - nginx: limite próprio para `POST /api/sessions` (10/min, burst 5); dica `real_ip` comentada; HSTS indicado para o proxy TLS.
-  - API: o mesmo limite (10/min, rajada de 5) por cliente, num orçamento único para `POST /api/sessions` e `POST /api/chat` sem `session_id` (que também cria sessão e escapava do limite do nginx). No Docker o IP vem do `X-Forwarded-For`, que o nginx sobrescreve com `$remote_addr`; o uvicorn só o aceita por `FORWARDED_ALLOW_IPS` no Compose (revisão de 04/11/2026).
+  - API: o mesmo limite (10/min, rajada de 5) por cliente, num orçamento único para `POST /api/sessions` e `POST /api/chat` sem `session_id` (que também cria sessão e escapava do limite do nginx). No Docker o IP vem do `X-Forwarded-For`, que o nginx sobrescreve com `$remote_addr`; o uvicorn só o aceita do IP fixo do nginx (`FORWARDED_ALLOW_IPS=172.30.240.10`, rede `app` com sub-rede `172.30.240.0/24` e endereços automáticos só em `172.30.240.128/25`). De qualquer outra origem, inclusive a porta do backend publicada no host (chega pelo gateway da rede), o cabeçalho é ignorado (revisão de 04/11/2026; teste em `tests/test_proxy_trust.py`).
 
 ### Já estava correto (confirmado pela auditoria)
 

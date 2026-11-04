@@ -15,10 +15,11 @@ services:
       API_PORT: "8000"
       # Swagger/OpenAPI desligados no contêiner (menos superfície); fora do Docker o padrão é ligado.
       API_DOCS: "false"
-      # O uvicorn aceita o X-Forwarded-For do nginx (que o sobrescreve com o IP do cliente): o
-      # limite de criação de sessões por cliente da API depende disso. A porta do backend só é
-      # publicada em 127.0.0.1, então só o nginx (e o próprio host) alcançam o backend.
-      FORWARDED_ALLOW_IPS: "*"
+      # O uvicorn só aceita X-Forwarded-For vindo do IP fixo do nginx (rede "app" abaixo); o nginx
+      # sobrescreve o cabeçalho com o IP do cliente, e o limite de criação de sessões por cliente
+      # da API depende disso. De qualquer outra origem (inclusive a porta publicada no host, que
+      # chega pelo gateway da rede) o cabeçalho é ignorado e vale o endereço da conexão.
+      FORWARDED_ALLOW_IPS: "172.30.240.10"
     # Hardening: raiz somente leitura (graváveis: /tmp e o volume runtime), sem capabilities,
     # sem ganhar privilégios.
     read_only: true
@@ -34,6 +35,8 @@ services:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:
       - runtime:/app/runtime
+    networks:
+      - app
     restart: unless-stopped
 
   frontend:
@@ -46,6 +49,10 @@ services:
       BACKEND_URL: http://backend:8000
     ports:
       - "${FRONTEND_PORT:-8080}:8080"
+    networks:
+      app:
+        # IP fixo: é o único proxy em que o backend confia (FORWARDED_ALLOW_IPS).
+        ipv4_address: 172.30.240.10
     cap_drop:
       - ALL
     security_opt:
@@ -54,6 +61,16 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+
+networks:
+  app:
+    ipam:
+      config:
+        # Sub-rede fixa para o IP do nginx ser previsível. Endereços automáticos (backend, gateway)
+        # saem só de ip_range, fora do .10 reservado ao nginx. Se colidir com outra rede do host,
+        # troque a sub-rede aqui e o IP em ipv4_address e FORWARDED_ALLOW_IPS.
+        - subnet: 172.30.240.0/24
+          ip_range: 172.30.240.128/25
 
 volumes:
   # Encaminhamentos ao atendente (runtime/handoffs.jsonl) sobrevivem à recriação do contêiner.
