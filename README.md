@@ -220,12 +220,12 @@ Both services have health checks (`/api/health` and `/healthz`); the frontend st
 
 `BACKEND_URL` (frontend container, default `http://backend:8000`) points nginx at a backend outside Compose if needed.
 
-**Published deployment (Render + Vercel).** The project is also published without Docker Compose: the backend on Render (https://emporio-da-musica-agent.onrender.com, `python -m emporio_agent.api`) and the static frontend on Vercel (https://frontend-seci.vercel.app). The browser calls the backend directly, so:
+**Published deployment (Render + Vercel).** The project is also published without Docker Compose: the backend on Render (https://emporio-da-musica-agent.onrender.com, `python -m emporio_agent.api`) and the static frontend on Vercel (https://emporiodamusica-agent.vercel.app). The browser calls the backend directly, so:
 
 | Where | Variable | Value |
 |---|---|---|
 | Vercel (frontend, build time) | `VITE_API_BASE_URL` | the backend origin, e.g. `https://emporio-da-musica-agent.onrender.com` (no path, no trailing `/api`) |
-| Render (backend) | `CORS_ORIGINS` | the Vercel domains, comma-separated, e.g. `https://frontend-seci.vercel.app` |
+| Render (backend) | `CORS_ORIGINS` | the Vercel domains, comma-separated, e.g. `https://emporiodamusica-agent.vercel.app` |
 | Render (backend) | `API_HOST`, `API_PORT` | `0.0.0.0` and the port Render assigns (`$PORT`) |
 | Render (backend) | `LLM_PROVIDER`, `LLM_MODEL`, provider key | as in [.env.example](.env.example); keys only as Render secrets |
 
