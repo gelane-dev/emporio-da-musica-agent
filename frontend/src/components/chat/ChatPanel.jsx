@@ -1,6 +1,7 @@
-import { ClefMark, IconDotsVertical, IconHeadset, IconMenu, IconUser } from '../icons.jsx'
+import { IconMenu } from '../icons.jsx'
 import Composer from './Composer.jsx'
 import MessageList from './MessageList.jsx'
+import MelAvatar3D from '../../assets/mel/MelAvatar3D.jsx'
 
 const HEALTH_LABELS = {
   checking: { desktop: 'Verificando…', mobile: 'Verificando…', dot: 'status-dot--demo' },
@@ -37,15 +38,15 @@ export default function ChatPanel({
     <section className="chat-panel">
       <header className="chat-header">
         <span className="chat-header__mark chat-header__mark--mobile">
-          <ClefMark size={34} />
+          <MelAvatar3D size={36} />
         </span>
         <span className="chat-header__badge">
-          <IconHeadset />
+          <MelAvatar3D size={42} />
         </span>
         <div className="chat-header__copy">
           <h1>
-            <span className="chat-header__desktop-title">Atendimento Empório da Música</span>
-            <span className="chat-header__mobile-title">Empório da Música</span>
+            <span className="chat-header__desktop-title">Mel — Atendimento Empório da Música</span>
+            <span className="chat-header__mobile-title">Mel — Empório da Música</span>
           </h1>
           {isDemo ? (
             <p title="Modo demonstrativo: respostas fictícias, sem o agente real.">
@@ -61,14 +62,6 @@ export default function ChatPanel({
             </p>
           )}
         </div>
-        <div className="chat-header__actions">
-          <button type="button" className="chat-header__action" aria-label="Perfil do usuário" title="Perfil">
-            <IconUser />
-          </button>
-          <button type="button" className="chat-header__action" aria-label="Mais opções" title="Opções">
-            <IconDotsVertical />
-          </button>
-        </div>
         <button type="button" className="chat-header__menu" onClick={onOpenSidebar} aria-label="Abrir histórico">
           <IconMenu />
         </button>
@@ -76,6 +69,7 @@ export default function ChatPanel({
 
       <MessageList
         messages={conversation.messages}
+        animation={conversation.animation}
         isSending={isSending}
         error={error}
         onRetry={canRetry ? onRetry : undefined}

@@ -6,3 +6,8 @@ Dockerfile text eol=lf
 *.template text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+
+# Binários: sem conversão de fim de linha
+*.glb binary
+*.png binary
+*.jpg binary

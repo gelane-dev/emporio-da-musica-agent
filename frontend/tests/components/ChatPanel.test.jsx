@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import ChatPanel from '../../src/components/chat/ChatPanel.jsx'
 import { SUGGESTIONS } from '../../src/data/demo.js'
@@ -64,5 +64,24 @@ describe('ChatPanel', () => {
   it('oferece "Tentar de novo" só quando o erro permite', () => {
     renderPanel({ error: 'Falhou.', canRetry: false })
     expect(screen.queryByRole('button', { name: 'Tentar de novo' })).not.toBeInTheDocument()
+  })
+})
+
+describe('ChatPanel com a Mel', () => {
+  it('mostra a Mel no cabeçalho e nas mensagens e a apresentação com a animação da conversa', () => {
+    renderPanel({ conversation: { id: 'c1', animation: 'singing', messages: [GREETING] } })
+    // Cabeçalho: versão desktop e mobile (o CSS mostra uma de cada vez).
+    const header = screen.getByRole('banner')
+    expect(within(header).getAllByRole('img', { name: 'Mel — Assistente do Empório da Música' })).toHaveLength(2)
+    // Mensagem da assistente: avatar decorativo (aria-hidden), ao lado do texto.
+    const bubble = screen.getByText('Olá!').closest('.msg--assistant')
+    expect(bubble.querySelector('.msg__avatar .mel-avatar')).not.toBeNull()
+    expect(screen.getByRole('img', { name: 'Mel cantando' })).toBeInTheDocument()
+  })
+
+  it('não tem botões de perfil ou opções sem ação no backend', () => {
+    renderPanel()
+    expect(screen.queryByRole('button', { name: 'Perfil do usuário' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Mais opções' })).toBeNull()
   })
 })
