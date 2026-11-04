@@ -32,7 +32,7 @@ Não houve achado crítico nem alto. Foram 5 de severidade média (M1–M5) e 5 
 - **Disponibilidade e custo (M1, M2):** timeout do LLM, teto de chats simultâneos, expiração de sessão e teto de mensagens evitam esgotar threads, memória e a cota do provedor.
 - **Força bruta de identidade (M3):** a verificação do pedido continua em código; as tentativas são limitadas e a comparação é em tempo constante.
 - **Navegador (M4):** CSP e demais cabeçalhos reduzem XSS, clickjacking e vazamento de referrer; resposta da API não é cacheada.
-- **Prompt injection e alucinação de códigos (M5):** regra no prompt mais defesa em código (limpeza dos textos de dados e `guard_reply`), para que a segurança não dependa só da obediência do modelo.
+- **Prompt injection e alucinação de códigos (M5):** regra no prompt mais defesa em código (limpeza dos textos de dados e `guard_reply`), para que a segurança não dependa só da obediência do modelo. A busca de códigos roda sobre o texto normalizado (NFKC, maiúsculas, sem caracteres invisíveis; espaços, hífens e travessões como separador) e compara a forma canônica, então `em 20261101 abc123` ou um código com caractere invisível no meio também é barrado. Rastreio com separadores só é reconhecido com o sufixo `BR`, para não pegar frases comuns (revisão de 04/11/2026).
 - **Superfície e logs (B1, B2):** sem Swagger no Compose; logs sem credenciais nem dados pessoais.
 - **Entradas (B3, B4):** esquemas estritos e normalização.
 - **Supply chain e contêineres (B5):**
@@ -60,7 +60,7 @@ Ids de sessão com `secrets.token_urlsafe(16)`; 404 sem oráculo de existência;
 - Sem autenticação, qualquer um que alcance o site gasta a cota do provedor (mitigado pelos limites; ver recomendações).
 - Sessões em memória: uma réplica; reiniciar perde as conversas.
 - A obediência do modelo real a injeções não é testável com `FakeLLM` (só a estrutura das defesas).
-- A guarda de códigos só cobre maiúsculas.
+- A guarda de códigos reconhece só os formatos conhecidos (protocolo `EM-AAAAMMDD-XXXXXX`, rastreios da loja e dos Correios); um código escrito de forma muito diferente (por extenso, com outros separadores) não é detectado.
 - Verificação por pedido + e-mail/telefone é prova fraca de identidade (aceitável no protótipo).
 - O traceback de erro 500 vai para o log do servidor (nunca ao cliente).
 - O limite por IP só é correto se o nginx for a borda; caso contrário, configurar `real_ip`.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from collections.abc import Iterable
 
 from emporio_agent.llm.base import Message
@@ -57,9 +58,27 @@ def sanitize_reply(text: str) -> str:
 
 
 # Formato real gerado por encaminhar_atendente: EM-AAAAMMDD-XXXXXX (6 hex maiúsculos).
-_PROTOCOL_RE = re.compile(r"\bEM-\d{8}-[0-9A-F]{6}\b")
 # Rastreio dos CSVs (BRAB1234567BR) e o formato padrão dos Correios (AA123456789BR).
-_TRACKING_RE = re.compile(r"\b(?:[A-Z]{4}\d{7}[A-Z]{2}|[A-Z]{2}\d{9}[A-Z]{2})\b")
+# A busca roda sobre o texto normalizado (_normalize): maiúsculas, sem caracteres invisíveis.
+# Separadores tolerados: espaços, hífen, travessões e sinal de menos (até 3 seguidos).
+_SEP = r"[\s\-\u2010-\u2015\u2212]{0,3}"
+_START, _END = r"(?<![A-Z0-9])", r"(?![A-Z0-9])"
+_PROTOCOL_RE = re.compile(_START + r"EM" + _SEP + r"\d{8}" + _SEP + r"[0-9A-F]{6}" + _END)
+# Rastreio compacto (como sai das ferramentas): qualquer sufixo de 2 letras, como antes.
+_TRACKING_RE = re.compile(_START + r"(?:[A-Z]{4}\d{7}[A-Z]{2}|[A-Z]{2}\d{9}[A-Z]{2})" + _END)
+# Rastreio com separadores: só com sufixo BR (todos os rastreios da loja). Sem essa âncora,
+# frases comuns ("para 1234567 de") virariam falso positivo.
+_TRACKING_SPACED_RE = re.compile(
+    _START + r"(?:[A-Z]{4}" + _SEP + r"\d{7}|[A-Z]{2}" + _SEP + r"\d{9})" + _SEP + r"BR" + _END
+)
+# Invisíveis que o modelo (ou uma injeção) pode inserir no meio de um código para escapar da busca.
+_INVISIBLE_RE = re.compile(r"[\u00ad\u180e\u200b-\u200f\u2060-\u2064\ufeff]")
+_NOT_ALNUM_RE = re.compile(r"[^A-Z0-9]")
+
+
+def _normalize(text: str) -> str:
+    return _INVISIBLE_RE.sub("", unicodedata.normalize("NFKC", text)).upper()
+
 
 UNVERIFIED_CODE_REPLY = (
     "Desculpe, não consegui confirmar essa informação agora. Pode repetir o que você precisa? "
@@ -68,7 +87,14 @@ UNVERIFIED_CODE_REPLY = (
 
 
 def _codes(text: str) -> set[str]:
-    return set(_PROTOCOL_RE.findall(text)) | set(_TRACKING_RE.findall(text))
+    """Códigos citados em forma canônica (só letras e dígitos), para comparar variações de escrita."""
+    normalized = _normalize(text)
+    found = (
+        _PROTOCOL_RE.findall(normalized)
+        + _TRACKING_RE.findall(normalized)
+        + _TRACKING_SPACED_RE.findall(normalized)
+    )
+    return {_NOT_ALNUM_RE.sub("", code) for code in found}
 
 
 def guard_reply(text: str, messages: Iterable[Message]) -> str:

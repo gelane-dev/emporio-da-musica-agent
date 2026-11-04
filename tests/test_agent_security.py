@@ -260,3 +260,76 @@ def test_ferramenta_desconhecida_erro_generico(registry):
 def test_argumento_invalido_nao_ecoa_valor(registry):
     res = registry.execute("consultar_pedido", {"pedido_id": "SEGREDO-123", "email": "a@b.com"})
     assert res.error.code == "INVALID_ARGUMENT" and "SEGREDO-123" not in res.to_llm()
+
+
+# ------------------------------------------------------------------ guarda: variações de escrita
+
+
+@pytest.mark.parametrize(
+    "disfarce",
+    [
+        "em-20261101-abc123",  # minúsculas
+        "EM 20261101 ABC123",  # espaços
+        "EM\u201320261101\u2014ABC123",  # travessões
+        "EM\u221220261101\u2011ABC123",  # sinal de menos e hífen não separável
+        "EM-2026\u200b1101-AB\u200dC123",  # caracteres invisíveis
+        "E\u00adM-20261101-ABC123",  # hífen suave
+        "EM-\n20261101-ABC123",  # quebra de linha
+        "**EM-20261101-ABC123**",  # markdown
+        "brab 1234567 br",  # rastreio em minúsculas com espaços
+        "BRAB\u20131234567\u2013BR",  # rastreio com travessões
+        "BR\u200bAB1234567BR",  # rastreio com invisível
+    ],
+)
+def test_guarda_barra_codigo_inventado_mesmo_disfarcado(disfarce):
+    assert guard_reply(f"Seu código: {disfarce}.", []) == UNVERIFIED_CODE_REPLY
+
+
+@pytest.mark.parametrize(
+    "escrita",
+    ["em-20261101-abc123", "EM 20261101 ABC123", "EM\u201320261101\u2013ABC123", "EM-2026\u200b1101-ABC123"],
+)
+def test_guarda_aceita_codigo_conhecido_em_outra_escrita(escrita):
+    # A ferramenta devolveu EM-20261101-ABC123; a resposta pode escrevê-lo de outro jeito.
+    history = [Message(role="tool", tool_call_id="t", content='{"dados": {"protocolo": "EM-20261101-ABC123"}}')]
+    assert guard_reply(f"Protocolo {escrita}.", history) == f"Protocolo {escrita}."
+
+
+def test_guarda_rastreio_conhecido_em_minusculas_passa():
+    history = [Message(role="tool", tool_call_id="t", content='{"codigo_rastreio": "BRAB1234567BR"}')]
+    assert guard_reply("Rastreio: brab1234567br", history) == "Rastreio: brab1234567br"
+
+
+@pytest.mark.parametrize(
+    "frase",
+    [
+        "Chega em 2 dias úteis.",
+        "Entrega para 1234567 de clientes satisfeitos.",
+        "Temos um 123456789 de estoque? Não.",
+        "O violão custa R$ 1.299,00 em até 10x.",
+        "Ligue (67) 3321-4567 ou escreva para atendimento.",
+        "Microfones SM58 e SM57 disponíveis.",
+        "Pedido 1234567 confirmado em 01/11/2026.",
+        "Seu pedido chega em 20261101 dias.",
+        "EM-20261101-ABC1234 não é um protocolo.",
+    ],
+)
+def test_guarda_sem_falso_positivo_em_frases_comuns(frase):
+    assert guard_reply(frase, []) == frase
+
+
+def test_guarda_sem_falso_positivo_nos_dados_da_loja():
+    # Nomes, descrições e políticas reais não podem parecer protocolo/rastreio inventado.
+    import csv
+
+    from emporio_agent.agent.output_guard import _codes
+
+    data = REPO_ROOT / "data"
+    for path in data.glob("*.csv"):
+        if "orders" in path.name:
+            continue  # os rastreios reais vêm das ferramentas e são aceitos
+        with path.open(encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                for value in row.values():
+                    assert not _codes(value or ""), (path.name, value)
+    assert not _codes((REPO_ROOT / "knowledge" / "policies.md").read_text(encoding="utf-8"))
