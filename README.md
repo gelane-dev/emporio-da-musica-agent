@@ -11,6 +11,7 @@ Text-based customer service agent for the fictional musical instrument store Emp
 - [Running](#running)
 - [Running with Docker Compose](#running-with-docker-compose)
 - [HTTP API](#http-api)
+- [Security](#security)
 - [Tests](#tests)
 - [Continuous integration](#continuous-integration)
 - [Utilities](#utilities)
@@ -109,6 +110,11 @@ Edit `.env` and fill in `GROQ_API_KEY`. The `.env` file is not versioned. Variab
 | `MAX_TOOL_ITERATIONS` | `6` | tool loop iteration limit |
 | `MAX_HISTORY_TURNS` | `50` | history window |
 | `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | HTTP API only: comma-separated origins allowed by CORS (the Vite dev server) |
+| `LLM_TIMEOUT_SECONDS` | `60` | timeout of each call to the AI provider (Anthropic and Groq clients) |
+| `MAX_CONCURRENT_CHATS` | `8` | HTTP API only: chat requests processed at once; above it the API answers 503 `busy` without waiting |
+| `SESSION_TTL_MINUTES` | `30` | HTTP API only: an idle session expires after this time (next message gets 404); a session being processed never expires |
+| `MAX_MESSAGES_PER_SESSION` | `100` | HTTP API only: customer messages per session; above it, 429 `session_full` |
+| `API_DOCS` | `true` | HTTP API only: serves Swagger at `/docs`; Docker Compose sets it to `false` |
 | `MAX_SESSIONS` | `200` | HTTP API only: sessions kept in memory; above it, the least recently used idle session is dropped |
 | `API_HOST`, `API_PORT` | `127.0.0.1`, `8000` | HTTP API only: address of `python -m emporio_agent.api` (the container forces `0.0.0.0:8000`) |
 | `PUBLIC_URL` | `http://localhost:8080` | Docker Compose only: URL the browser uses to open the site; baked into the frontend build |
@@ -181,7 +187,9 @@ docker compose down         # stop (the runtime volume with handoffs is kept; ad
 | Service | Image | What it does |
 |---|---|---|
 | `backend` | [Dockerfile](Dockerfile): `python:3.13-slim`, non-root user | `python -m emporio_agent.api` on port 8000, published only on `127.0.0.1:${BACKEND_PORT}`. Contains only the code, the runtime dependencies, `knowledge/policies.md` and the CSV files (the [.dockerignore](.dockerignore) is an allow-list: no `.env`, PDFs, docs or tests). Configuration comes from `.env` through `env_file`; without the file the service still starts, in degraded mode. Volume `runtime` keeps `runtime/handoffs.jsonl`. |
-| `frontend` | [frontend/Dockerfile](frontend/Dockerfile): Node build stage + `nginxinc/nginx-unprivileged` | Serves the built site on `${FRONTEND_PORT}` and proxies `/api/` to the backend ([nginx template](frontend/nginx/default.conf.template)), so the browser talks to one origin and CORS is not involved. Long proxy timeout for slow replies, SPA fallback, long cache for hashed assets, and a per-IP rate limit on `/api/` (20 requests/min, burst 10) answered with the API's own `{error, message}` envelope. |
+| `frontend` | [frontend/Dockerfile](frontend/Dockerfile): Node build stage + `nginxinc/nginx-unprivileged` | Serves the built site on `${FRONTEND_PORT}` and proxies `/api/` to the backend ([nginx template](frontend/nginx/default.conf.template)), so the browser talks to one origin and CORS is not involved. Long proxy timeout for slow replies, SPA fallback, long cache for hashed assets, a per-IP rate limit on `/api/` (20 requests/min, burst 10) and a stricter one on `POST /api/sessions` (10/min, burst 5), both answered with the API's own `{error, message}` envelope, plus security headers (CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`) and no nginx version. |
+
+**Hardening.** The backend runs with a read-only root filesystem (`tmpfs` on `/tmp`, writable `runtime` volume), `cap_drop: ALL`, `no-new-privileges` and `API_DOCS=false` (no Swagger); the frontend drops all capabilities too. Details in [docs/SECURITY.md](docs/SECURITY.md).
 
 Both services have health checks (`/api/health` and `/healthz`); the frontend starts only after the backend is healthy. The backend health check passes in degraded mode too (the process is up); the agent status is in the body of `/api/health` and in the chat header.
 
@@ -204,7 +212,7 @@ Base URL `http://localhost:8000`, prefix `/api`, JSON in UTF-8. The examples bel
 |---|---|---|---|
 | `GET /api/health` | Service and agent status | 200 | — |
 | `POST /api/sessions` | Start a conversation; returns Mel's greeting (same text as the CLI, generated locally, no LLM call) | 201 | 413, 503, 500 |
-| `POST /api/chat` | Send a customer message; `session_id` null or missing creates a new session (without a greeting) | 200 | 404, 409, 413, 422, 503, 500 |
+| `POST /api/chat` | Send a customer message; `session_id` null or missing creates a new session (without a greeting) | 200 | 404, 409, 413, 422, 429, 503, 500 |
 | `DELETE /api/sessions/{session_id}` | End a conversation (removes it from memory) | 204, no body | 404, 500 |
 
 ```http
@@ -226,7 +234,7 @@ POST /api/chat  {"session_id": "<session_id>", "message": "Oi"}   → 200
 DELETE /api/sessions/<session_id>         → 204
 ```
 
-`message` is stripped and must have 1 to 2000 characters; `session_id`, when present, at most 64 characters; the whole body at most 16 KiB (else 413). `stop` is one of `end_turn`, `max_tokens`, `refusal`, `max_iterations`, `llm_error`. A provider failure during the conversation is **still a 200** with `stop: "llm_error"` and Mel's fallback text, exactly as in the CLI. Each item of `tool_calls` carries only `name`, `ok` and `duration_ms`; tool **arguments are never returned**, because those of `consultar_pedido` and `encaminhar_atendente` contain personal data.
+`message` is stripped (control characters removed) and must have 1 to 2000 characters; `session_id`, when present, must match `[A-Za-z0-9_-]{1,64}`; unknown body fields are rejected (422); the whole body at most 16 KiB (else 413). `stop` is one of `end_turn`, `max_tokens`, `refusal`, `max_iterations`, `llm_error`. A provider failure during the conversation is **still a 200** with `stop: "llm_error"` and Mel's fallback text, exactly as in the CLI. Each item of `tool_calls` carries only `name`, `ok` and `duration_ms`; tool **arguments are never returned**, because those of `consultar_pedido` and `encaminhar_atendente` contain personal data.
 
 **Error envelope.** Every error, including validation (422) and unexpected failures (500), has the same shape, with a message in Portuguese meant for the end user and no stack trace:
 
@@ -244,11 +252,23 @@ POST /api/sessions   (no GROQ_API_KEY)                        → 503
 | HTTP | `error` | When |
 |---|---|---|
 | 422 | `invalid_request` | invalid body, empty or too long `message` |
-| 404 | `session_not_found` | unknown `session_id` (for example after a server restart: sessions live only in memory) |
+| 404 | `session_not_found` | unknown or expired `session_id` (sessions live only in memory and expire after `SESSION_TTL_MINUTES`, 30 min idle, or on a server restart) |
 | 409 | `session_busy` | a message is already being processed in that session |
 | 413 | `payload_too_large` | request body above 16 KiB, rejected before the JSON is read |
+| 429 | `session_full` | the session reached `MAX_MESSAGES_PER_SESSION` (100 customer messages); start a new conversation (the frontend shows a notice, without "Tentar de novo") |
 | 503 | `agent_unavailable` | the agent could not be built (missing key, data or policies failed to load) |
+| 503 | `busy` | `MAX_CONCURRENT_CHATS` chats already in progress; retryable |
 | 500 | `internal_error` | unexpected exception (logged on the server, details never sent to the client) |
+
+## Security
+
+A security hardening was done on 2026-11-03 after three read-only audits (API and sessions; agent and tools; secrets, infrastructure and dependencies). No critical or high finding; the five medium and five low ones were fixed. Full report, residual risks and production recommendations: [docs/SECURITY.md](docs/SECURITY.md). Not yet published or run on GitHub's CI.
+
+- **Limits:** 60 s timeout per provider call, at most 8 concurrent chats (503 `busy`), sessions expire after 30 min idle, 100 customer messages per session (429 `session_full`).
+- **Rules in code, not only in the prompt:** after 5 failed identity checks in a conversation the order lookup is locked; a reply that cites a protocol or tracking code not produced by a tool is replaced; free text from the CSVs is cleaned and truncated before reaching the model.
+- **Web and API:** security headers and CSP in nginx and the API, strict request schemas, no session ids, messages or tool arguments in logs, Swagger off in Docker.
+- **Supply chain and containers:** `pip-audit`, `bandit` and `npm audit` in CI, Dependabot, a test that scans versioned files for keys, read-only backend container with all capabilities dropped.
+- **Still true:** no authentication (see [Known limitations](#known-limitations)).
 
 ## Tests
 
@@ -261,9 +281,9 @@ python -m pytest -q                                   # backend: full Python sui
 cd frontend && npm test && npm run lint && npm run build   # frontend: tests, static checks, production build
 ```
 
-Unit and integration tests use a fake LLM (`FakeLLM` in `tests/fakes.py`). The API tests (`tests/test_api.py`) run the FastAPI app in-process with `TestClient` and the same fake LLM: routes, status codes, error envelope, degraded mode, CORS preflight, OpenAPI routes, session store (limit, eviction, busy session, concurrent requests, random session ids), body size limit (413) and the absence of tool arguments and personal data in responses. Current state: **1105 passed, 2 deselected** (the two `llm` smoke tests below).
+Unit and integration tests use a fake LLM (`FakeLLM` in `tests/fakes.py`). The API tests (`tests/test_api.py`) run the FastAPI app in-process with `TestClient` and the same fake LLM: routes, status codes, error envelope, degraded mode, CORS preflight, OpenAPI routes, session store (limit, eviction, busy session, concurrent requests, random session ids), body size limit (413) and the absence of tool arguments and personal data in responses. Current state: **1159 passed, 2 deselected** (the two `llm` smoke tests below).
 
-The frontend suite (`frontend/tests/`, **61 tests**, Vitest + React Testing Library on jsdom) never touches the network: every test either runs in demo mode or replaces `fetch` with a route table that fails on any unmapped call. It covers the HTTP client (error envelope, network failure, timeout with abort), `chatService` in both modes, the `useConversations` hook (sending, persistence in `localStorage`, `404` with a new session and a notice, automatic retry on `409`, no retry on `422`, empty replies, failed greeting), `useBackendHealth`, the `Composer`, `MessageList`, `ChatPanel` and `Sidebar` components, and the whole `ChatPage` rendered against a mocked API (greeting, typing indicator, reply, error with "Tentar de novo", suggestions, backend down). Tests query by role, label and visible text, not by implementation details; a mutation check (breaking the 404 and 422 handling in the hook) made the suite fail as expected. `npm run lint` and `npm run build` pass.
+The frontend suite (`frontend/tests/`, **63 tests**, 12 files, Vitest + React Testing Library on jsdom) never touches the network: every test either runs in demo mode or replaces `fetch` with a route table that fails on any unmapped call. It covers the HTTP client (error envelope, network failure, timeout with abort), `chatService` in both modes, the `useConversations` hook (sending, persistence in `localStorage`, `404` with a new session and a notice, automatic retry on `409`, no retry on `422`, empty replies, failed greeting), `useBackendHealth`, the `Composer`, `MessageList`, `ChatPanel` and `Sidebar` components, and the whole `ChatPage` rendered against a mocked API (greeting, typing indicator, reply, error with "Tentar de novo", suggestions, backend down). Tests query by role, label and visible text, not by implementation details; a mutation check (breaking the 404 and 422 handling in the hook) made the suite fail as expected. `npm run lint` and `npm run build` pass.
 
 **2. Tests with a real provider (Groq by default; Anthropic as the alternative), run by hand.**
 
@@ -280,11 +300,11 @@ Tests marked `llm` are skipped by default (`addopts = "-m 'not llm'"`). The real
 
 | Job | Steps |
 |---|---|
-| Backend (pytest) | Python 3.13 with pip cache, `pip install -r requirements.txt`, `python -m pytest -q`, `python scripts/build_policies.py --check` |
-| Frontend (lint, tests, build) | Node 24 with npm cache, `npm ci`, `npm run lint`, `npm test`, `npm run build` |
+| Backend (pytest) | Python 3.13 with pip cache, `pip install -r requirements.txt`, `python -m pytest -q`, `python scripts/build_policies.py --check`, `pip-audit` (dependencies) and `bandit -ll` (static analysis) |
+| Frontend (lint, tests, build) | Node 24 with npm cache, `npm ci`, `npm run lint`, `npm test`, `npm run build`, `npm audit --omit=dev --audit-level=high` |
 | Docker images | after both jobs pass: `docker compose config --quiet` and `docker compose build` |
 
-The workflow has read-only permissions and cancels superseded runs on the same branch. No job calls a real AI provider: the `llm` smoke tests are excluded by the pytest configuration and the frontend tests mock `fetch`.
+The workflow has read-only permissions and cancels superseded runs on the same branch. [Dependabot](.github/dependabot.yml) opens weekly update PRs (pip, npm, Docker, GitHub Actions). The new audit steps have been run locally but had not yet run on GitHub at the time of writing. No job calls a real AI provider: the `llm` smoke tests are excluded by the pytest configuration and the frontend tests mock `fetch`.
 
 ## Utilities
 
@@ -643,8 +663,8 @@ Full analysis in [DATA_ANALYSIS.md](DATA_ANALYSIS.md).
 - **Web path validated once, with Anthropic only.** One short real conversation frontend → API → agent → Anthropic `claude-sonnet-5-5` (2026-11-03, [evidence](docs/e2e/web_e2e_anthropic.md)); no conversation through the web path with the default Groq provider, and all T14/T15 results come from the agent called directly. In Docker, one Groq message went through nginx → API → agent (no browser). The frontend's automated tests mock the API.
 - **API sessions are lost on restart.** Sessions live only in the server's memory; after a restart the frontend gets `404 session_not_found`, warns that the previous context was lost and resends the last message once in a new session. Earlier details (for example, the order number and e-mail already given) must be repeated.
 - **Single process.** Sessions are in the memory of one process: running several uvicorn workers or replicas would split them. No database or shared cache by design (D18).
-- **No authentication on the API.** Anyone who can reach it can open sessions and spend the provider quota. In Docker Compose the nginx proxy limits `/api/` to 20 requests per minute per IP (burst 10) and only the site port is public; run directly (`python -m emporio_agent.api`), the API has no rate limit at all. `POST /api/sessions` does not call the model and has no rate limit, so a burst of `MAX_SESSIONS` (200) calls evicts every idle session through the LRU limit, and their users lose context (`404`, then a new session). CORS does not prevent this (it only binds browsers). `python -m emporio_agent.api` listens on `127.0.0.1` by default and CORS only admits the local Vite origins. The Docker setup is ready to deploy as a demo, but a public service would also need authentication or a captcha in front of the chat. The session id is a random token (`secrets.token_urlsafe`) and is the only credential of a conversation.
-- **Per-session history grows without a bound.** `Session.messages` keeps every message and tool result of the conversation in memory; `MAX_HISTORY_TURNS` only limits what is sent to the model, and `MAX_SESSIONS` limits the number of sessions, not their size.
+- **No authentication on the API.** Anyone who can reach it can open sessions and spend the provider quota. Mitigations: in Docker Compose the nginx proxy limits `/api/` to 20 requests per minute per IP (burst 10) and session creation to 10 per minute (burst 5), and only the site port is public; the API itself caps concurrent chats (8), session lifetime (30 min idle), messages per session (100) and provider call time (60 s). Run directly (`python -m emporio_agent.api`), there is no per-IP rate limit (behind nginx every request arrives with the proxy's IP, so that limit lives in nginx), but the API listens on `127.0.0.1` by default and CORS only admits the local Vite origins (CORS does not stop non-browser clients). A public service would also need a spending cap at the provider and authentication or a captcha in front of the chat. The session id is a random token (`secrets.token_urlsafe`) and is the only credential of a conversation; the order identity check (order number plus e-mail or phone) is a weak proof of identity, acceptable for a prototype.
+- **Per-session history is capped by message count, not by size.** `MAX_MESSAGES_PER_SESSION` (100 customer messages) bounds growth; `MAX_HISTORY_TURNS` limits only what is sent to the model, and `MAX_SESSIONS` limits the number of sessions.
 - **500 errors log the traceback on the server.** The response body never carries internal details, but the server log of an unexpected exception includes its traceback, which could contain data from the request if an exception message ever did.
 - **Web chat history stays in the browser.** The frontend saves its conversations, including whatever the customer typed (order number, e-mail), in the browser's `localStorage`, with no expiry and no "clear history" button. The chat footer says so ("As conversas ficam salvas neste navegador.").
 - **A client timeout does not cancel the server.** If a reply takes longer than the 90-second client timeout, the server keeps processing and stores the answer in the session, but the user does not see it; the timeout message warns that "Tentar de novo" may send the same question again.

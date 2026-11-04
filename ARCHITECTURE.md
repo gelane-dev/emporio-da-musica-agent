@@ -877,16 +877,16 @@ class SessionStore:                       # OrderedDict[id, _Entry(session, lock
 |---|---|---|---|
 | `GET /api/health` | — | 200 `{status: ok\|degraded, agent_ready, provider, model, detail}` | — |
 | `POST /api/sessions` | vazio | 201 `{session_id, greeting, created_at}`; `greeting = cli.greeting(now, store_status(now, tz))`, sem LLM | 413, 503, 500 |
-| `POST /api/chat` | `{session_id: str\|null, message: str}` | 200 `{session_id, reply, stop, tool_calls: [{name, ok, duration_ms}]}` | 404, 409, 413, 422, 503, 500 |
+| `POST /api/chat` | `{session_id: str\|null, message: str}` | 200 `{session_id, reply, stop, tool_calls: [{name, ok, duration_ms}]}` | 404, 409, 413, 422, 429, 503, 500 |
 | `DELETE /api/sessions/{session_id}` | — | 204 sem corpo | 404, 500 |
 
-- `message`: `strip()`, 1..2000 caracteres (`schemas.MAX_MESSAGE_LENGTH`), senão 422. `session_id`: no máximo 64 caracteres (`schemas.MAX_SESSION_ID_LENGTH`), senão 422. `session_id` nulo/ausente ⇒ cria sessão (sem saudação).
+- `message`: `strip()`, 1..2000 caracteres (`schemas.MAX_MESSAGE_LENGTH`), senão 422. `session_id`: padrão `[A-Za-z0-9_-]{1,64}` (`schemas.MAX_SESSION_ID_LENGTH`), senão 422; campos extras no corpo ⇒ 422 (`extra="forbid"`); caracteres de controle são removidos da mensagem. `session_id` nulo/ausente ⇒ cria sessão (sem saudação).
 - `stop ∈ end_turn | max_tokens | refusal | max_iterations | llm_error`. Falha do provedor durante a conversa **não** é erro HTTP: 200 com `stop="llm_error"` e o texto de contingência do agente (igual à CLI).
 - `tool_calls` **nunca** inclui `arguments` (`consultar_pedido`/`encaminhar_atendente` levam e-mail, telefone e texto livre). Log INFO da rota de chat: só id da sessão, `stop` e nomes das ferramentas.
-- Envelope único de erro `{error, message}` (mensagem em pt-BR, sem detalhes internos), inclusive para 422 e 500: `invalid_request` 422, `session_not_found` 404, `session_busy` 409, `payload_too_large` 413 (corpo acima de 16 KiB, `app.MAX_BODY_BYTES`, recusado por middleware antes da leitura do JSON), `agent_unavailable` 503, `internal_error` 500; rotas inexistentes usam `not_found`/`method_not_allowed`.
-- Sessões: só em memória, um lock por sessão (segunda mensagem concorrente ⇒ 409, sem esperar), limite `MAX_SESSIONS` (padrão 200) com descarte da sessão ociosa usada há mais tempo. O `session_id` é um token aleatório de 128 bits gerado em `SessionStore.create` (`secrets.token_urlsafe(16)`), única credencial da conversa.
+- Envelope único de erro `{error, message}` (mensagem em pt-BR, sem detalhes internos), inclusive para 422 e 500: `invalid_request` 422, `session_not_found` 404, `session_busy` 409, `payload_too_large` 413 (corpo acima de 16 KiB, `app.MAX_BODY_BYTES`, recusado por middleware antes da leitura do JSON), `session_full` 429 (sessão com `MAX_MESSAGES_PER_SESSION` mensagens do cliente), `agent_unavailable` 503, `busy` 503 (já há `MAX_CONCURRENT_CHATS` conversas em processamento; `BoundedSemaphore` não bloqueante), `internal_error` 500; rotas inexistentes usam `not_found`/`method_not_allowed`.
+- Sessões: só em memória, um lock por sessão (segunda mensagem concorrente ⇒ 409, sem esperar), limite `MAX_SESSIONS` (padrão 200) com descarte da sessão ociosa usada há mais tempo; sessão ociosa por mais de `SESSION_TTL_MINUTES` (30) vira 404 (sessão ocupada nunca expira no meio); teto de `MAX_MESSAGES_PER_SESSION` (100) mensagens do cliente. Detalhes e demais proteções: [[docs/SECURITY]]. O `session_id` é um token aleatório de 128 bits gerado em `SessionStore.create` (`secrets.token_urlsafe(16)`), única credencial da conversa.
 - CORS: `CORS_ORIGINS` (padrão `http://localhost:5173,http://127.0.0.1:5173`), métodos GET/POST/DELETE/OPTIONS, header `Content-Type`, sem credenciais. Um middleware interno ao CORS converte exceções inesperadas no envelope 500 **com** cabeçalhos CORS.
-- Execução: `python -m emporio_agent.api` (uvicorn em 127.0.0.1:8000) ou `uvicorn emporio_agent.api.app:app --port 8000`. Swagger em `/docs`.
+- Execução: `python -m emporio_agent.api` (uvicorn em 127.0.0.1:8000) ou `uvicorn emporio_agent.api.app:app --port 8000`. Swagger em `/docs` só quando `API_DOCS=true` (padrão local; o Compose usa `false`).
 
 ## 6. Observabilidade
 - `logging` padrão: nível INFO registra cada tool call (nome, args, ok, duração) e uso de tokens por turno; nunca loga e-mail/telefone do cliente (mascarar).
@@ -896,7 +896,7 @@ class SessionStore:                       # OrderedDict[id, _Entry(session, lock
 - Chave de API só via `.env` (gitignored); `.env.example` versionado.
 - Verificação de identidade obrigatória para pedidos (TECHNICAL_DECISIONS D8).
 - Sem persistência de dados pessoais entre sessões; transcripts salvos apenas sob comando e em `runtime/` (gitignored). Exemplos publicados usam pedidos fictícios do próprio dataset.
-- API HTTP (D18): sem autenticação nem limite de taxa, pensada para uso local (`python -m emporio_agent.api` escuta em 127.0.0.1). Chaves continuam só no `.env` do backend; o frontend só recebe `VITE_API_BASE_URL` (tudo que começa com `VITE_` vai para o bundle do navegador). Respostas da API não trazem argumentos de ferramentas. O histórico do chat web fica no `localStorage` do navegador.
+- API HTTP (D18, D21): sem autenticação de usuários. Limite de taxa por IP só no nginx do Docker; na própria API há teto de conversas simultâneas, expiração de sessões ociosas e limite de mensagens por sessão (`docs/SECURITY.md`). Executada direto, `python -m emporio_agent.api` escuta em 127.0.0.1. Chaves continuam só no `.env` do backend; o frontend só recebe `VITE_API_BASE_URL` (tudo que começa com `VITE_` vai para o bundle do navegador). Respostas da API não trazem argumentos de ferramentas. O histórico do chat web fica no `localStorage` do navegador.
 
 ## 8. Camada HTTP e frontend (2026-11-03, D18/D19)
 

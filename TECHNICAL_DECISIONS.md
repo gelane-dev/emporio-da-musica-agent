@@ -146,6 +146,19 @@ Todas as decisões que dependiam de aprovação foram aprovadas em 2026-11-01 (v
 
 **Consequências.** `VITE_API_BASE_URL` é definido no build: trocar o endereço público (`PUBLIC_URL`) exige reconstruir o frontend. Sessões continuam em memória: uma única réplica do backend. Sem autenticação, um serviço público ainda precisaria de login ou captcha na frente do chat.
 
+## D21 — Fortalecimento de segurança (auditoria de 2026-11-03)
+
+**Contexto.** Antes de publicar, três auditorias somente leitura (API/sessões, agente/ferramentas, segredos/infra/dependências) não acharam problema crítico nem alto, mas 5 médios e 5 baixos. Relatório completo, com achados, riscos residuais e recomendações: [[docs/SECURITY]].
+
+**Decisão.**
+- **Limites de recursos:** `LLM_TIMEOUT_SECONDS=60`, `MAX_CONCURRENT_CHATS=8` (503 `busy`), `SESSION_TTL_MINUTES=30` (sessão ociosa vira 404), `MAX_MESSAGES_PER_SESSION=100` (429 `session_full`).
+- **Regras sensíveis em código, não só no prompt:** 5 falhas de verificação por conversa bloqueiam `consultar_pedido`; `guard_reply` substitui respostas com protocolo ou rastreio que não vieram de ferramenta; textos livres dos CSVs são limpos e truncados (`clean_free_text`).
+- **Superfície e entradas:** cabeçalhos de segurança e CSP no nginx e na API; `API_DOCS=false` no Compose; schemas estritos; logs sem credenciais nem dados pessoais.
+- **Supply chain e contêineres:** `pip-audit`, `bandit -ll` e `npm audit` no CI; Dependabot; teste de segredos no repositório; backend somente leitura, `cap_drop ALL`, `no-new-privileges`; limite próprio para criação de sessão no nginx.
+- **Não feito de propósito:** autenticação, rate limit por IP dentro da API, regex de preços/veredictos na saída, gitleaks no CI, pinning por digest (motivos em [[docs/SECURITY]]).
+
+**Consequências.** Sessões ociosas por mais de 30 min e conversas com mais de 100 mensagens do cliente exigem nova conversa (o frontend trata 404 e 429 `session_full`). Continuam sem autenticação e com sessões em memória (uma réplica): um serviço público precisaria de teto de gasto no provedor e captcha ou login. Validado localmente (1159 testes do backend, 63 do frontend, auditorias de dependências limpas, Docker verificado); ainda não publicado nem executado no CI do GitHub.
+
 ## D16 — Parâmetros de chamada ao modelo (2026-11-01, antes da T08)
 
 **Contexto.** Regras atuais da API para o Claude Sonnet 5.5 (`claude-sonnet-5-5`, modelo aprovado em D5), conferidas na documentação da API antes de escrever o adaptador.

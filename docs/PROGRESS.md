@@ -130,6 +130,14 @@ Medição: cada chamada custa ~2.400 tokens só de prompt + esquemas; uma bateri
 - **Provedor alterado para Groq (decisão do usuário, D17).** T14/T15 executam quando `GROQ_API_KEY` estiver no `.env` (ainda ausente em 2026-11-01).
 - RK11 (acentuação no Git Bash) resolvido na T13 (validação manual).
 
+## Auditoria de segurança (03/11/2026)
+
+Status: **implementado e validado localmente; NÃO publicado** (aguarda autorização do usuário para o push). Relatório: [[docs/SECURITY]]; decisão: [[TECHNICAL_DECISIONS]] D21.
+
+- Feito: três auditorias somente leitura (API/sessões, agente/ferramentas, segredos/infra/dependências); sem achado crítico ou alto; 5 médios (M1–M5) e 5 baixos (B1–B5) corrigidos: timeout do LLM e teto de chats simultâneos, expiração e teto de mensagens por sessão, bloqueio após 5 falhas de verificação, cabeçalhos de segurança e CSP, defesas contra injeção indireta e códigos inventados (`guard_reply`, `clean_free_text`), Swagger desligável, logs sem credenciais, validação estrita de entradas, `pip-audit`/`bandit`/`npm audit` no CI, Dependabot, teste de segredos, contêineres endurecidos e limite de criação de sessão no nginx.
+- Resultados (2026-11-03): backend 1159 passed, 2 deselected; frontend 63 testes (12 arquivos), lint e build ok; `bandit -ll` sem achados; `pip-audit` sem vulnerabilidades conhecidas; `npm audit` 0 vulnerabilidades; Docker reconstruído e saudável (CSP, X-Frame-Options e nosniff presentes, `Server` sem versão, `/docs` 404, POST /api/sessions 201 e depois 429 com envelope JSON, backend com raiz somente leitura). Nenhuma chamada paga a provedores.
+- Pendências: push (precisa de autorização); o CI do GitHub ainda não rodou com os novos passos (`pip-audit`, `bandit`, `npm audit`).
+
 ## Integridade dos dados originais
 
 Hashes SHA-256 de `data/` conferidos após cada tarefa (T01–T06): inalterados.

@@ -68,6 +68,7 @@ Tratamento de erros:
   após um timeout do cliente): até 3 novas tentativas automáticas (após 2; 3,5; 5 s) antes de
   mostrar o erro.
 - `503 agent_unavailable` — mensagem clara no banner de erro, com "Tentar de novo".
+- `503 busy` (servidor no limite de conversas simultâneas) — pode ser repetido, com "Tentar de novo". `429 session_full` (sessão com 100 mensagens) — aviso sem "Tentar de novo"; é preciso iniciar outra conversa.
 - `422` (mensagem inválida) — banner sem "Tentar de novo" (reenviar daria o mesmo erro). O
   composer já limita a mensagem a 2000 caracteres, o mesmo limite da API, com contador perto do fim.
 - Timeout (90 s) — aviso de que a resposta ainda pode estar sendo processada e de que "Tentar de
