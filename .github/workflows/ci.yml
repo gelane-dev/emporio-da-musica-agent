@@ -37,6 +37,19 @@ jobs:
       - name: Manual de políticas em dia com o PDF
         run: python scripts/build_policies.py --check
 
+      # Vulnerabilidades conhecidas nas dependências de execução (sem o pacote editável nem o pytest).
+      - name: Auditoria de dependências (pip-audit)
+        run: |
+          pip install pip-audit
+          grep -vE '^(-e |pytest==)' requirements.txt > "$RUNNER_TEMP/requirements-audit.txt"
+          pip-audit -r "$RUNNER_TEMP/requirements-audit.txt"
+
+      # Análise estática de segurança; falha em severidade média ou maior.
+      - name: Análise estática (bandit)
+        run: |
+          pip install bandit
+          bandit -q -r src -ll
+
   frontend:
     name: Frontend (lint, testes, build)
     runs-on: ubuntu-latest
@@ -55,6 +68,9 @@ jobs:
 
       - name: Instalar dependências
         run: npm ci
+
+      - name: Auditoria de dependências (npm audit)
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Lint
         run: npm run lint
