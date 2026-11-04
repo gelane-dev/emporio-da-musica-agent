@@ -97,6 +97,14 @@ aparece com os asteriscos).
 - Arquitetura completa e diagramas: `README.md` da raiz (seção *Architecture*) e
   `ARCHITECTURE.md` §8.
 
+## Deploy (Vercel)
+
+`VITE_API_BASE_URL` é lida **no build** e gravada no bundle: na Vercel, defina-a com a origem pública do
+backend (ex.: `https://emporio-da-musica-agent.onrender.com`, sem `/api` no fim) e faça um novo deploy depois
+de qualquer mudança. O backend precisa listar o domínio da Vercel em `CORS_ORIGINS`. O `npm run build` falha
+se a URL for inválida, um placeholder sem domínio (ex.: `https://SUA-URL-DO-RENDER`) ou tiver caminho
+(`config/apiBaseUrl.js`, testado em `tests/config/`).
+
 ## Mel (mascote)
 
 - **Avatar do cabeçalho:** modelo 3D real `src/assets/mel/mel_base_v04.glb` (Three.js, estático), em

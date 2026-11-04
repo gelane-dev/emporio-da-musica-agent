@@ -220,6 +220,17 @@ Both services have health checks (`/api/health` and `/healthz`); the frontend st
 
 `BACKEND_URL` (frontend container, default `http://backend:8000`) points nginx at a backend outside Compose if needed.
 
+**Published deployment (Render + Vercel).** The project is also published without Docker Compose: the backend on Render (https://emporio-da-musica-agent.onrender.com, `python -m emporio_agent.api`) and the static frontend on Vercel (https://frontend-seci.vercel.app). The browser calls the backend directly, so:
+
+| Where | Variable | Value |
+|---|---|---|
+| Vercel (frontend, build time) | `VITE_API_BASE_URL` | the backend origin, e.g. `https://emporio-da-musica-agent.onrender.com` (no path, no trailing `/api`) |
+| Render (backend) | `CORS_ORIGINS` | the Vercel domains, comma-separated, e.g. `https://frontend-seci.vercel.app` |
+| Render (backend) | `API_HOST`, `API_PORT` | `0.0.0.0` and the port Render assigns (`$PORT`) |
+| Render (backend) | `LLM_PROVIDER`, `LLM_MODEL`, provider key | as in [.env.example](.env.example); keys only as Render secrets |
+
+`VITE_API_BASE_URL` is compiled into the bundle, so a change only takes effect after a **new Vercel build**. On 2026-11-04 the published chat failed with "Não foi possível conectar ao atendimento" because the Vercel build had been made with the placeholder `https://SUA-URL-DO-RENDER`: every request went to a host that does not exist, while the backend and its CORS were fine. Since then `npm run build` refuses a URL that is invalid, has no real domain or carries a path ([frontend/config/apiBaseUrl.js](frontend/config/apiBaseUrl.js)), so a misconfigured build fails instead of being published.
+
 Validated on 2026-11-03 on Windows (Docker 29.7, Compose 5.4): both images built (backend 486 MB, mostly pandas/numpy; frontend 89 MB), both services healthy, site and SPA fallback served, `/api/health` and `POST /api/sessions` answered through the proxy, the backend running as a non-root user, the rate limit returning 429 with the JSON envelope, and one real chat message (Groq, `openai/gpt-oss-120b`) answered through nginx → API → agent with a call to `informacoes_loja`.
 
 ## HTTP API
