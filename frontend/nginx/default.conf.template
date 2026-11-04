@@ -1,6 +1,23 @@
 # Limite por IP nas rotas da API: protege a cota do provedor de IA (a API não tem autenticação).
 limit_req_zone $binary_remote_addr zone=api_per_ip:10m rate=20r/m;
 
+# Criação de sessão (POST /api/sessions): limite mais estrito que o geral. Chave vazia (GET etc.)
+# não é contada pelo nginx, então só o POST entra na zona.
+map $request_method $session_create_key {
+    POST    $binary_remote_addr;
+    default "";
+}
+limit_req_zone $session_create_key zone=session_create_per_ip:10m rate=10r/m;
+
+# Não revela a versão do nginx em cabeçalhos e páginas de erro.
+server_tokens off;
+
+# Se houver outro proxy/balanceador à frente, o IP do cliente chega em X-Forwarded-For e o limite
+# por IP passaria a contar o proxy. Descomente e ajuste para a rede do proxy:
+#   set_real_ip_from 10.0.0.0/8;
+#   real_ip_header X-Forwarded-For;
+#   real_ip_recursive on;
+
 server {
     listen 8080;
     server_name _;
@@ -9,6 +26,35 @@ server {
 
     # A API rejeita corpos acima de 16 KiB; o nginx corta antes, com folga.
     client_max_body_size 32k;
+
+    # Cabeçalhos de segurança (always = também em 4xx/5xx). add_header NÃO é herdado por um location
+    # que declare o seu próprio add_header: nesses casos (ex.: /assets/) o bloco é repetido.
+    # - nosniff: impede o navegador de "adivinhar" o tipo do arquivo.
+    # - X-Frame-Options/frame-ancestors: bloqueia clickjacking.
+    # - CSP: só scripts do próprio site; estilos/fontes também do Google Fonts (index.html);
+    #   sem 'unsafe-inline' (o build do Vite não tem scripts nem estilos inline).
+    # HSTS não é enviado aqui: o TLS termina no proxy/balanceador à frente, e é lá que ele fica
+    # (add_header Strict-Transport-Security "max-age=31536000" always;).
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'" always;
+
+    # Criação de sessão: cada uma abre estado no servidor, então tem teto próprio (somado ao geral).
+    # Só o POST é contado (ver o map acima); DELETE /api/sessions/{id} cai em /api/.
+    location = /api/sessions {
+        limit_req zone=session_create_per_ip burst=5 nodelay;
+        limit_req zone=api_per_ip burst=10 nodelay;
+        limit_req_status 429;
+        error_page 429 = @rate_limited;
+        proxy_pass ${BACKEND_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
 
     location /api/ {
         limit_req zone=api_per_ip burst=10 nodelay;
@@ -39,6 +85,12 @@ server {
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+        # Repetidos aqui porque este location tem add_header próprio (sem herança).
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'" always;
         try_files $uri =404;
     }
 

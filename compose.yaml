@@ -13,7 +13,19 @@ services:
       # Fixos no contêiner (o .env local pode ter valores para a execução fora do Docker).
       API_HOST: 0.0.0.0
       API_PORT: "8000"
-    # Publicado só no host local (Swagger em http://localhost:8000/docs); o navegador usa o proxy do frontend.
+      # Swagger/OpenAPI desligados no contêiner (menos superfície); fora do Docker o padrão é ligado.
+      API_DOCS: "false"
+    # Hardening: raiz somente leitura (graváveis: /tmp e o volume runtime), sem capabilities,
+    # sem ganhar privilégios.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Publicado só no host local; o navegador usa o proxy do frontend.
+    # Em produção este bloco "ports:" pode ser removido: só o frontend precisa ser público.
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -30,6 +42,10 @@ services:
       BACKEND_URL: http://backend:8000
     ports:
       - "${FRONTEND_PORT:-8080}:8080"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       backend:
         condition: service_healthy
