@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 MAX_MESSAGE_LENGTH = 2000
 MAX_SESSION_ID_LENGTH = 64
+# Ids gerados por token_urlsafe: restringir o alfabeto barra lixo/injeção antes de chegar ao armazenamento.
+SESSION_ID_PATTERN = r"^[A-Za-z0-9_-]+$"
+# Caracteres de controle C0 (menos LF e TAB) e DEL: podem forjar linhas de log e confundir o modelo.
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
 MSG_EMPTY = "A mensagem não pode ficar vazia."
 MSG_TOO_LONG = f"A mensagem pode ter no máximo {MAX_MESSAGE_LENGTH} caracteres."
@@ -28,15 +33,23 @@ class SessionCreated(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # campos desconhecidos indicam cliente errado ou sondagem
+
     session_id: str | None = Field(
         default=None,
         max_length=MAX_SESSION_ID_LENGTH,
+        pattern=SESSION_ID_PATTERN,
         description="Sessão existente. Nulo ou ausente cria uma sessão nova.",
     )
     message: str = Field(
         description=f"Mensagem do cliente (1 a {MAX_MESSAGE_LENGTH} caracteres, sem contar espaços nas pontas).",
         examples=["Vocês têm violão para iniciante?"],
     )
+
+    @field_validator("message", mode="before")
+    @classmethod
+    def _drop_control_chars(cls, value: object) -> object:
+        return _CONTROL_CHARS.sub("", value) if isinstance(value, str) else value
 
     @field_validator("message")
     @classmethod

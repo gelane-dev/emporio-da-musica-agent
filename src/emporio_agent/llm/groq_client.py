@@ -207,6 +207,7 @@ class GroqClient:
         api_key: str | None = None,
         client: groq.Groq | None = None,
         max_retries: int = 5,
+        timeout: float = 60.0,
         tool_use_failed_retries: int = 1,
         rate_limit_retries: int = 3,
         sleep: Callable[[float], None] = time.sleep,
@@ -216,7 +217,9 @@ class GroqClient:
         self._tool_use_failed_retries = tool_use_failed_retries
         self._rate_limit_retries = rate_limit_retries
         self._sleep = sleep
-        self._client = client or groq.Groq(api_key=api_key, max_retries=max_retries)
+        self._client = client or groq.Groq(
+            api_key=api_key, max_retries=max_retries, timeout=timeout  # sem timeout, um provedor travado prende a thread
+        )
 
     def complete(
         self,

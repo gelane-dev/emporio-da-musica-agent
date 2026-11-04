@@ -10,7 +10,9 @@ Executar: ``python -m emporio_agent.api`` ou
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+import threading
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from fastapi import FastAPI, Request, Response
@@ -51,16 +53,20 @@ MSG_INVALID = "Requisição inválida. Envie um JSON com o campo 'message' (text
 MSG_MISSING_MESSAGE = "O campo 'message' é obrigatório."
 MSG_DATA_ERROR = "Não foi possível carregar os dados da loja."
 MSG_TOO_LARGE = "A requisição é grande demais. Envie uma mensagem mais curta."
+MSG_CHAT_BUSY = "Estou atendendo muitas conversas agora. Tente novamente em alguns instantes."
+MSG_SESSION_FULL = "Esta conversa ficou muito longa. Inicie uma nova conversa para continuar."
+MSG_BAD_SESSION_ID = "O campo 'session_id' tem um formato inválido."
 
 MAX_BODY_BYTES = 16 * 1024
 
 _ERROR_RESPONSES: dict[int | str, dict] = {
     404: {"model": ErrorResponse, "description": "Sessão não encontrada (`session_not_found`)."},
     409: {"model": ErrorResponse, "description": "Sessão ocupada com outra mensagem (`session_busy`)."},
+    429: {"model": ErrorResponse, "description": "Conversa cheia (`session_full`)."},
     413: {"model": ErrorResponse, "description": "Corpo acima de 16 KiB (`payload_too_large`)."},
     422: {"model": ErrorResponse, "description": "Requisição inválida (`invalid_request`)."},
     500: {"model": ErrorResponse, "description": "Erro inesperado (`internal_error`)."},
-    503: {"model": ErrorResponse, "description": "Agente indisponível (`agent_unavailable`)."},
+    503: {"model": ErrorResponse, "description": "Agente indisponível (`agent_unavailable`) ou servidor ocupado (`busy`)."},
 }
 
 _HTTP_CODES = {404: "not_found", 405: "method_not_allowed"}
@@ -80,6 +86,12 @@ class ApiState:
     agent: Agent | None
     detail: str | None
     sessions: SessionStore
+    chat_slots: threading.BoundedSemaphore
+
+
+def _short_id(session_id: str) -> str:
+    """Só os 6 primeiros caracteres do id vão para o log: o id completo é a credencial da sessão."""
+    return session_id[:6]
 
 
 def _error(status_code: int, error: str, message: str) -> JSONResponse:
@@ -128,6 +140,8 @@ def _validation_message(exc: RequestValidationError) -> str:
         if loc[-1:] == ("session_id",):
             if err.get("type") == "string_too_long":
                 return f"O campo 'session_id' pode ter no máximo {MAX_SESSION_ID_LENGTH} caracteres."
+            if err.get("type") == "string_pattern_mismatch":
+                return MSG_BAD_SESSION_ID
             return "O campo 'session_id' precisa ser um texto ou nulo."
     return MSG_INVALID
 
@@ -136,6 +150,7 @@ def create_app(
     settings: Settings | None = None,
     llm: LLMClient | None = None,
     env: Mapping[str, str] | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> FastAPI:
     """Monta a aplicação. Se o agente não puder ser montado, sobe em modo degradado."""
     values = read_env() if env is None else env
@@ -154,10 +169,19 @@ def create_app(
         settings=settings,
         agent=agent,
         detail=detail,
-        sessions=SessionStore(_parse_max_sessions(values.get("MAX_SESSIONS"))),
+        sessions=SessionStore(
+            _parse_max_sessions(values.get("MAX_SESSIONS")),
+            ttl_seconds=settings.session_ttl_minutes * 60,
+            clock=clock,
+        ),
+        # Sem teto, rajadas de conversas esgotam threads e a cota do provedor.
+        chat_slots=threading.BoundedSemaphore(settings.max_concurrent_chats),
     )
 
+    # Em produção o Swagger/OpenAPI fica desligado para não expor o mapa da API.
+    docs_kwargs = {} if settings.api_docs else {"docs_url": None, "redoc_url": None, "openapi_url": None}
     app = FastAPI(
+        **docs_kwargs,
         title="Empório da Música — API da Mel",
         description=(
             "API de atendimento da **Mel**, assistente virtual da Empório da Música.\n\n"
@@ -220,6 +244,32 @@ def create_app(
             request._body = body  # repassa o corpo já lido à rota (cache do BaseHTTPMiddleware)
         return await call_next(request)
 
+    # Fora do corpo/erros e dentro do CORS: um log estruturado por requisição + cabeçalhos de segurança.
+    @app.middleware("http")
+    async def _log_and_harden(request: Request, call_next):
+        started = time.perf_counter()
+        status = 500
+        response = None
+        try:
+            response = await call_next(request)
+            status = response.status_code
+            return response
+        finally:
+            route = request.scope.get("route")
+            # Rota inexistente não é registrada com o caminho bruto (entrada do atacante e possível id).
+            path = getattr(route, "path", None) or "(sem rota)"
+            logger.info(
+                "request method=%s path=%s status=%d duration_ms=%d",
+                request.method, path, status, round((time.perf_counter() - started) * 1000),
+            )
+            if response is not None:
+                # nosniff/DENY/no-referrer evitam interpretação indevida; no-store evita cache de conversas.
+                response.headers["X-Content-Type-Options"] = "nosniff"
+                response.headers["X-Frame-Options"] = "DENY"
+                response.headers["Referrer-Policy"] = "no-referrer"
+                if request.url.path.startswith("/api/"):
+                    response.headers["Cache-Control"] = "no-store"
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_parse_origins(values.get("CORS_ORIGINS")),
@@ -265,7 +315,7 @@ def create_app(
         require_agent()
         current = now(state.settings)
         session = state.sessions.create(current)
-        logger.info("Sessão %s criada.", session.id)
+        logger.info("Sessão %s criada.", _short_id(session.id))
         return SessionCreated(
             session_id=session.id,
             greeting=greeting(current, store_status(current, state.settings.timezone)),
@@ -282,24 +332,33 @@ def create_app(
             "sessão nova. Falhas do provedor de IA durante a conversa ainda retornam 200, com "
             "`stop=llm_error` e uma mensagem de contingência."
         ),
-        responses={k: _ERROR_RESPONSES[k] for k in (404, 409, 413, 422, 500, 503)},
+        responses={k: _ERROR_RESPONSES[k] for k in (404, 409, 413, 422, 429, 500, 503)},
     )
     def chat(body: ChatRequest) -> ChatResponse:
         agent = require_agent()
-        session_id = body.session_id
-        if session_id is None:
-            session_id = state.sessions.create(now(state.settings)).id
+        # Não bloqueia: com todas as vagas ocupadas responde 503 já, sem prender a sessão nem a thread.
+        if not state.chat_slots.acquire(blocking=False):
+            raise ApiError(503, "busy", MSG_CHAT_BUSY)
         try:
-            with state.sessions.use(session_id) as session:
-                reply = agent.respond(session, body.message)
-        except SessionNotFound:
-            raise ApiError(404, "session_not_found", MSG_NOT_FOUND) from None
-        except SessionBusy:
-            raise ApiError(409, "session_busy", MSG_BUSY) from None
+            session_id = body.session_id
+            if session_id is None:
+                session_id = state.sessions.create(now(state.settings)).id
+            try:
+                with state.sessions.use(session_id) as session:
+                    # Histórico sem limite cresce memória e custo de tokens; conta só as mensagens do cliente.
+                    if sum(1 for m in session.messages if m.role == "user") >= state.settings.max_messages_per_session:
+                        raise ApiError(429, "session_full", MSG_SESSION_FULL)
+                    reply = agent.respond(session, body.message)
+            except SessionNotFound:
+                raise ApiError(404, "session_not_found", MSG_NOT_FOUND) from None
+            except SessionBusy:
+                raise ApiError(409, "session_busy", MSG_BUSY) from None
+        finally:
+            state.chat_slots.release()
         # Só metadados no log: nunca o texto do cliente nem argumentos de ferramentas.
         logger.info(
             "Sessão %s: stop=%s, ferramentas=%s.",
-            session_id, reply.stop, [c.name for c in reply.tool_calls],
+            _short_id(session_id), reply.stop, [c.name for c in reply.tool_calls],
         )
         return ChatResponse(
             session_id=session_id,

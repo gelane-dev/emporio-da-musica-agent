@@ -139,11 +139,14 @@ class AnthropicClient:
         api_key: str | None = None,
         client: anthropic.Anthropic | None = None,
         max_retries: int = 2,
+        timeout: float = 60.0,
     ) -> None:
         self._model = model
         self._effort = effort
         self._refusal_fallback = refusal_fallback
-        self._client = client or anthropic.Anthropic(api_key=api_key, max_retries=max_retries)
+        self._client = client or anthropic.Anthropic(
+            api_key=api_key, max_retries=max_retries, timeout=timeout  # sem timeout, um provedor travado prende a thread
+        )
 
     def complete(
         self,

@@ -18,6 +18,11 @@ Variáveis suportadas (todas opcionais):
   no fuso da loja; só data equivale a 00:00. Ausente ou vazia ⇒ hora real.
 - ``MAX_TOOL_ITERATIONS``: limite de chamadas de ferramenta por mensagem (padrão ``6``).
 - ``MAX_HISTORY_TURNS``: turnos de histórico enviados ao modelo (padrão ``50``; ver RK17).
+- ``LLM_TIMEOUT_SECONDS``: tempo máximo de cada chamada ao provedor (padrão ``60``).
+- ``MAX_CONCURRENT_CHATS``: conversas processadas ao mesmo tempo na API (padrão ``8``).
+- ``SESSION_TTL_MINUTES``: inatividade que expira uma sessão da API (padrão ``30``).
+- ``MAX_MESSAGES_PER_SESSION``: mensagens do cliente por sessão da API (padrão ``100``).
+- ``API_DOCS``: ``true``/``false`` — expõe Swagger/OpenAPI (padrão ``true``).
 
 A chave de API não faz parte de ``Settings``: é lida pelo adaptador do
 provedor (T08), para que cada provedor use sua própria variável.
@@ -56,6 +61,11 @@ class Settings(BaseModel):
     reference_datetime: datetime | None = None
     max_tool_iterations: int = Field(default=6, gt=0)
     max_history_turns: int = Field(default=50, gt=0)
+    llm_timeout_seconds: float = Field(default=60, gt=0)
+    max_concurrent_chats: int = Field(default=8, gt=0)
+    session_ttl_minutes: float = Field(default=30, gt=0)
+    max_messages_per_session: int = Field(default=100, gt=0)
+    api_docs: bool = True
 
     @field_validator("llm_provider", "llm_model")
     @classmethod
@@ -130,6 +140,11 @@ def load_settings(
         "LLM_REFUSAL_FALLBACK": "llm_refusal_fallback",
         "MAX_TOOL_ITERATIONS": "max_tool_iterations",
         "MAX_HISTORY_TURNS": "max_history_turns",
+        "LLM_TIMEOUT_SECONDS": "llm_timeout_seconds",
+        "MAX_CONCURRENT_CHATS": "max_concurrent_chats",
+        "SESSION_TTL_MINUTES": "session_ttl_minutes",
+        "MAX_MESSAGES_PER_SESSION": "max_messages_per_session",
+        "API_DOCS": "api_docs",
     }
     for env_name, field in mapping.items():
         raw = values.get(env_name, "").strip()

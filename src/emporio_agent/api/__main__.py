@@ -35,7 +35,8 @@ def main() -> None:
     # Avisos de cadastro (loader) são para desenvolvedores; mantém só erros.
     logging.getLogger("emporio_agent.data").setLevel(logging.ERROR)
     host, port = server_address(read_env())
-    uvicorn.run("emporio_agent.api.app:app", host=host, port=port)
+    # O access log do uvicorn registra caminho com o id da sessão; o app tem seu próprio log sem dados sensíveis.
+    uvicorn.run("emporio_agent.api.app:app", host=host, port=port, access_log=False)
 
 
 if __name__ == "__main__":

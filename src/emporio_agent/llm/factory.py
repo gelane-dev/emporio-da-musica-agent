@@ -22,7 +22,10 @@ def create_llm_client(settings: Settings, env: Mapping[str, str] | None = None) 
                 "Chave da API não configurada. Copie .env.example para .env e preencha "
                 "GROQ_API_KEY.",
             )
-        return GroqClient(model=settings.llm_model, effort=settings.llm_effort, api_key=groq_key)
+        return GroqClient(
+            model=settings.llm_model, effort=settings.llm_effort,
+            api_key=groq_key, timeout=settings.llm_timeout_seconds,
+        )
     if settings.llm_provider == "anthropic":
         import anthropic
 
@@ -42,8 +45,11 @@ def create_llm_client(settings: Settings, env: Mapping[str, str] | None = None) 
             "refusal_fallback": settings.llm_refusal_fallback,
         }
         if api_key:
-            return AnthropicClient(api_key=api_key, **common)
-        return AnthropicClient(client=anthropic.Anthropic(auth_token=auth_token), **common)
+            return AnthropicClient(api_key=api_key, timeout=settings.llm_timeout_seconds, **common)
+        return AnthropicClient(
+            client=anthropic.Anthropic(auth_token=auth_token, max_retries=2, timeout=settings.llm_timeout_seconds),
+            **common,
+        )
     raise LLMError(
         "config",
         f"LLM_PROVIDER desconhecido: {settings.llm_provider!r}. "
