@@ -1,7 +1,7 @@
 # Frontend: build do Vite (Node) servido por nginx sem privilégios de root.
 # Contexto de build: frontend/.
 
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
