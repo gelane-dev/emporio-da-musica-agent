@@ -148,6 +148,14 @@ Status: **implementado, validado e publicado na `main`** (`main` sincronizada co
 - Situação: **Claude Sonnet 5.5 aprovado (14/14)**; **Groq não aprovada como padrão** até a correção do cenário 5 e nova bateria completa. Integrações intactas. Detalhes em [[docs/E2E_RESULTS]] §3.1–§3.3; relatórios originais em `runtime/` (não versionados, sem alteração).
 - Pendências: decidir a correção (prompt, ferramenta ou código; não feita nesta etapa) e rodar a nova bateria na Groq; decidir o provedor padrão do `.env` (hoje `groq`).
 
+## Finalização e entrega (04/11/2026)
+
+- Mel no frontend: 2D com cinco animações (iniciada no Antigravity, concluída aqui) e avatar 3D (`mel_base_v04.glb`, Three.js) no cabeçalho; revisão das funções sem suporte no backend; negrito seguro nas respostas. Commits na `feat/mel-frontend`, integrados na `main` local.
+- Atendimento real: duas mensagens pelo caminho web com Anthropic `claude-sonnet-5-5` (preço/pagamento do Ohana CK-20; endereço e contatos), sem erros no console; capturas em `docs/screenshots/`.
+- Validação: backend 1201 passed, 2 deselected; `build_policies --check` ok; frontend 97 testes, lint e build ok; `bandit -ll`, `pip-audit` e `npm audit` limpos; Docker reconstruído e saudável (site 200, health ok, sessão 201, 422 com envelope, `/docs` 404, cabeçalhos de segurança).
+- Documentação: README (status dos provedores, capturas, Mel, testes, CI), `frontend/README.md`, D22; documento técnico em PDF gerado fora do repositório (não versionado).
+- Pendências: push (aguarda autorização); correção do cenário 5 na Groq e nova bateria; deploy público não configurado (não exigido pelo desafio).
+
 ## Integridade dos dados originais
 
 Hashes SHA-256 de `data/` conferidos após cada tarefa (T01–T06): inalterados.

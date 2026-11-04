@@ -1,6 +1,6 @@
 # Auditoria de segurança (03/11/2026)
 
-Relatório do fortalecimento de segurança do protótipo. Decisão registrada em [[TECHNICAL_DECISIONS]] (D21); estado e pendências em [[docs/PROGRESS]]. Status: implementado e validado localmente, **ainda não publicado**.
+Relatório do fortalecimento de segurança do protótipo. Decisão registrada em [[TECHNICAL_DECISIONS]] (D21); estado e pendências em [[docs/PROGRESS]]. Status: implementado, validado e publicado na `main` (CI do GitHub verde no commit `dae3bad`, run 41767832682).
 
 ## Escopo e método
 
@@ -76,7 +76,7 @@ Ids de sessão com `secrets.token_urlsafe(16)`; 404 sem oráculo de existência;
 
 ## Validação (2026-11-03)
 
-- Backend: `1159 passed, 2 deselected`. Frontend: 63 testes (12 arquivos) passando, lint e build ok.
+- Backend: `1159 passed, 2 deselected`. Frontend: 63 testes (12 arquivos) passando, lint e build ok. (Em 04/11/2026, com a revisão e a Mel: backend `1201 passed, 2 deselected`, frontend 97 testes.)
 - `bandit -ll`: sem achados (2 `B101` de baixa severidade, `assert`, ignorados por `-ll`). `pip-audit`: "No known vulnerabilities found". `npm audit`: 0 vulnerabilities.
 - Docker: imagens reconstruídas, ambos os serviços healthy; CSP, `X-Frame-Options` e `nosniff` presentes; cabeçalho `Server` sem versão; `/docs` 404 no backend; `POST /api/sessions` 201 via proxy; `Cache-Control: no-store` na API; sequência de `POST /api/sessions` retornando 429 com envelope JSON; backend com raiz somente leitura e `/app/runtime` e `/tmp` graváveis.
 - Nenhuma chamada paga a provedores; nenhuma mensagem de chat enviada nos testes de Docker.

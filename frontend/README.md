@@ -81,15 +81,15 @@ aparece com os asteriscos).
 
 ## Verificação e limitações
 
-- Testes automatizados em `tests/` (Vitest + React Testing Library, jsdom): 61 testes de
-  serviços, hooks, componentes e da `ChatPage` integrada. Nenhum teste acessa a rede: o modo API é
+- Testes automatizados em `tests/` (Vitest + React Testing Library, jsdom): 97 testes de
+  serviços, hooks, componentes, da `ChatPage` integrada e da Mel (animações, avatar 3D, modelo GLB). Nenhum teste acessa a rede: o modo API é
   ligado por arquivo (`vi.hoisted(() => vi.stubEnv('VITE_API_BASE_URL', ...))`, porque os módulos
   leem a variável na importação) e o `fetch` é trocado por uma tabela de rotas (`tests/helpers.js`)
   que falha em qualquer chamada não mapeada. `npm run lint` e `npm run build` sem erros; os três
   rodam no CI (`.github/workflows/ci.yml`). A API é testada no backend (`tests/test_api.py`).
 - Integração real validada uma vez: navegador → frontend → API → agente → Anthropic
-  `claude-sonnet-5-5` (03/11/2026, `docs/e2e/web_e2e_anthropic.md`). Com a Groq (provedor
-  padrão) o caminho web **não** foi executado.
+  `claude-sonnet-5-5` (03/11/2026, `docs/e2e/web_e2e_anthropic.md`) e de novo em 04/11/2026 (capturas em
+  `docs/screenshots/`). Com a Groq o caminho web **não** foi executado num navegador.
 - As conversas (inclusive o que o cliente digitou) ficam no `localStorage` do navegador, sem
   expiração; o rodapé informa "As conversas ficam salvas neste navegador.".
 - No modo API a resposta é só texto: sem cartões de produto. Sessões do backend vivem só em
@@ -97,8 +97,20 @@ aparece com os asteriscos).
 - Arquitetura completa e diagramas: `README.md` da raiz (seção *Architecture*) e
   `ARCHITECTURE.md` §8.
 
+## Mel (mascote)
+
+- **Avatar do cabeçalho:** modelo 3D real `src/assets/mel/mel_base_v04.glb` (Three.js, estático), em
+  `MelAvatar3D.jsx` + `melScene.js`. O Three.js é importado sob demanda quando o avatar fica visível (chunk
+  separado); sem WebGL, fora da tela ou em erro, aparece a Mel 2D. Um contexto WebGL por vez.
+- **Cartão de boas-vindas:** Mel 2D em SVG (`MelMascot.jsx`) com cinco animações em CSS (dançando,
+  ukulele, cantando, fones, surpresa). Cada conversa nova sorteia uma diferente da anterior
+  (`melAnimations.js`), sem chamada à API; `prefers-reduced-motion` desliga as animações.
+- **Avatares pequenos** (mensagens, digitando, barra lateral): Mel 2D (`MelAvatar.jsx`), com ids de
+  gradiente únicos por instância.
+- Respostas da Mel: só o negrito em Markdown é renderizado (`utils/richText.jsx`, elementos React, sem HTML bruto).
+
 ## Estrutura
 
 `src/`: `components/` (chat, layout, produtos), `pages/`, `hooks/` (estado das conversas e do backend),
-`services/` (HTTP; único lugar com caminhos `/api`), `styles/`, `data/` (conteúdo do modo demonstrativo,
+`services/` (HTTP; único lugar com caminhos `/api`), `assets/mel/` (Mel 2D e 3D), `styles/`, `data/` (conteúdo do modo demonstrativo,
 sugestões e categorias), `utils/`. `tests/` espelha o `src/`. `nginx/` e `Dockerfile`: imagem de produção.

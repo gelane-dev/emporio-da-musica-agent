@@ -157,7 +157,19 @@ Todas as decisões que dependiam de aprovação foram aprovadas em 2026-11-01 (v
 - **Supply chain e contêineres:** `pip-audit`, `bandit -ll` e `npm audit` no CI; Dependabot; teste de segredos no repositório; backend somente leitura, `cap_drop ALL`, `no-new-privileges`; limite próprio para criação de sessão no nginx.
 - **Não feito de propósito:** autenticação, rate limit por IP dentro da API, regex de preços/veredictos na saída, gitleaks no CI, pinning por digest (motivos em [[docs/SECURITY]]).
 
-**Consequências.** Sessões ociosas por mais de 30 min e conversas com mais de 100 mensagens do cliente exigem nova conversa (o frontend trata 404 e 429 `session_full`). Continuam sem autenticação e com sessões em memória (uma réplica): um serviço público precisaria de teto de gasto no provedor e captcha ou login. Validado localmente (1159 testes do backend, 63 do frontend, auditorias de dependências limpas, Docker verificado); ainda não publicado nem executado no CI do GitHub.
+**Consequências.** Sessões ociosas por mais de 30 min e conversas com mais de 100 mensagens do cliente exigem nova conversa (o frontend trata 404 e 429 `session_full`). Continuam sem autenticação e com sessões em memória (uma réplica): um serviço público precisaria de teto de gasto no provedor e captcha ou login. Validado localmente (1159 testes do backend, 63 do frontend, auditorias de dependências limpas, Docker verificado) e publicado na `main`; o CI do GitHub passou no commit publicado (`dae3bad`, run 41767832682), com `pip-audit`, `bandit` e `npm audit`. Uma segunda revisão (04/11) acrescentou o limite de criação de sessão também no `POST /api/chat`, a normalização na guarda de códigos, logs de ferramentas só com nomes de argumentos e a confiança do uvicorn só no IP fixo do nginx.
+
+## D22 — Mascote Mel no chat web (2026-11-04)
+
+**Contexto.** O usuário pediu uma identidade visual para a assistente (mascote Mel, gota rosa-roxa com flor vermelha), sem atrapalhar o atendimento, e depois a integração de um modelo 3D aprovado (`mel_base_v04.glb`, feito à parte no Blender). O frontend também mostrava funções que a API não tem.
+
+**Decisão.**
+- **3D só onde é barato:** um canvas WebGL vivo no avatar do cabeçalho; Three.js importado sob demanda quando o avatar fica visível (o gêmeo oculto mobile/desktop nunca cria contexto), modelo estático, renderização só ao redimensionar, fallback 2D em qualquer falha. Uma versão com o 3D em todos os avatares foi feita e revertida a pedido do usuário.
+- **Animações em 2D:** o cartão de boas-vindas usa a Mel em SVG com cinco animações CSS, sorteadas por conversa sem repetir a anterior, sem chamada à API e respeitando `prefers-reduced-motion`.
+- **Só o que existe:** removidos carrinho, favoritos, avaliações, perfil, opções e anexos; o detalhe de produto (só no modo demo) é rotulado como exemplo.
+- **Negrito seguro:** `**texto**` das respostas vira `<strong>` como elemento React, sem HTML bruto.
+
+**Consequências.** Nova dependência `three` (chunk de ~154 kB gzip, carregado depois da página); o bundle inicial não muda. Avatares pequenos e o cartão seguem em 2D até existirem animações 3D.
 
 ## D16 — Parâmetros de chamada ao modelo (2026-11-01, antes da T08)
 

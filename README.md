@@ -1,10 +1,13 @@
 # Empório da Música — customer service agent
 
-Text-based customer service agent for the fictional musical instrument store Empório da Música, built as a prototype for the Artefact technical challenge. The same agent is reachable from a terminal (CLI) and, through a thin HTTP API (FastAPI), from a web chat (React + Vite). This README reports real results from runs with the Groq API (the default provider) and, on 2026-11-03, one regression run and one example recording with the Anthropic API (`claude-sonnet-5-5`, the configurable alternative). Anything not yet validated with the real model is marked as pending; nothing pending is presented as passed.
+Text-based customer service agent for the fictional musical instrument store Empório da Música, built as a prototype for the Artefact technical challenge. The same agent is reachable from a terminal (CLI) and, through a thin HTTP API (FastAPI), from a web chat (React + Vite). This README reports real results from runs with both supported providers: the Groq API (`openai/gpt-oss-120b`, the default in `.env.example`) and the Anthropic API (`claude-sonnet-5-5`). Anything not validated with the real model is marked as pending; nothing pending is presented as passed.
+
+> **Provider status (2026-11-04).** The 13-scenario regression under `LLM_EFFORT=medium` **passed with Anthropic `claude-sonnet-5-5` (14/14 checks)** and **failed with Groq `openai/gpt-oss-120b` (13/14)**: on the return of order 4 (scenario 5, mandatory) Groq omitted, in 3 of 3 runs, that the system only stores an *estimated* delivery date, and once presented it as the real delivery date; it never gave an undue return verdict. **Use Anthropic to evaluate the agent.** Groq stays available and selectable, but is not approved as the default until scenario 5 is fixed and the full battery passes again. Details: [End-to-end scenario results](#end-to-end-scenario-results-t14) and [docs/E2E_RESULTS.md](docs/E2E_RESULTS.md).
 
 ## Contents
 
 - [Overview](#overview)
+- [Screenshots](#screenshots)
 - [Implemented features](#implemented-features)
 - [Technologies](#technologies)
 - [Installation and configuration](#installation-and-configuration)
@@ -44,7 +47,19 @@ How a turn works: the customer message goes to the model together with the syste
 |---|---|---|
 | CLI (`python -m emporio_agent`) | Interactive terminal conversation (`rich`), `--debug`, transcripts | Original deliverable; used for every scenario run and example recording (T14, T15) |
 | HTTP API (`python -m emporio_agent.api`) | FastAPI, four routes under `/api`, sessions in memory, Swagger at `/docs` | Commit `67f6b1f`; covered by automated tests with a fake LLM; one real conversation through it on 2026-11-03 (Anthropic) |
-| Web frontend (`frontend/`) | React 19 + Vite 8 chat that calls the API; falls back to a clearly labeled demo mode without an API URL | Commit `71bd693`; lint and build checked; one real conversation frontend → API → Anthropic on 2026-11-03 ([evidence](docs/e2e/web_e2e_anthropic.md)); not tested with Groq |
+| Web frontend (`frontend/`) | React 19 + Vite 8 chat that calls the API, with the mascot Mel (2D animated SVG and a static 3D model in the header); falls back to a clearly labeled demo mode without an API URL | 97 automated tests (Vitest); real conversations frontend → API → Anthropic on 2026-11-03 ([evidence](docs/e2e/web_e2e_anthropic.md)) and 2026-11-04 (screenshots below); in a browser, not tested with Groq |
+
+## Screenshots
+
+Real screenshots of the web chat in API mode (headless Edge, 2026-11-04). The conversation is a real one: frontend → FastAPI → agent → Anthropic `claude-sonnet-5-5`; prices, promotion, installments, address and contacts came from the tools.
+
+| Start of a conversation | A real answer (price, promotion, installments) |
+|---|---|
+| ![Mel greeting the customer, 3D avatar in the header and the 2D animated Mel in the welcome card](docs/screenshots/chat-inicio-desktop.png) | ![Real answer about the Ohana CK-20 ukulele](docs/screenshots/chat-conversa-real-desktop.png) |
+
+| Mobile (390 px) | Mel, 3D model used in the avatar |
+|---|---|
+| <img src="docs/screenshots/chat-mobile.png" alt="Real answer with the store address and contacts on a phone" width="300"> | <img src="docs/screenshots/mel-3d.png" alt="Mel 3D model (mel_base_v04.glb)" width="300"> |
 
 ## Implemented features
 
@@ -67,6 +82,8 @@ How a turn works: the customer message goes to the model together with the syste
 
 **Output protection.** The prompt forbids emojis, but the model occasionally produced one, so `agent/output_guard.py` strips emojis (and normalizes typographic hyphens in phone numbers) from the final reply before it reaches the customer. Prompt-injection defense and customer data protection live in the tool layer (identity check on orders, no contact data returned), not only in the prompt.
 
+**Web chat and the mascot Mel.** The web chat (see [Running](#running)) shows Mel as the assistant's identity: a static 3D model (`frontend/src/assets/mel/mel_base_v04.glb`, Three.js) in the header avatar, loaded on demand with a 2D fallback, and a 2D SVG Mel with five musical animations in the welcome card of each conversation (a different one from the previous conversation; `prefers-reduced-motion` is respected). Interface elements that the backend does not support (cart, favorites, ratings, attachments, profile menu) were removed; the product detail exists only in demo mode and is labeled as an example. Bold Markdown in Mel's replies is rendered safely as `<strong>` (no raw HTML).
+
 **Handoff to a human agent.** Complaints, explicit requests to talk to a person and cases that the tools and the manual cannot resolve (for example a return that depends on data the system does not have) go through `encaminhar_atendente`, which returns a protocol number such as `EM-20260325-DA4D43` (see example 3). The protocol is local; there is no real ticketing system.
 
 ## Technologies
@@ -78,6 +95,7 @@ How a turn works: the customer message goes to the model together with the syste
 - FastAPI (HTTP API) served by uvicorn (ASGI server)
 - pytest (tests); httpx, only because FastAPI's `TestClient` needs it in the API tests
 - Frontend: React 19 and Vite 8 (`@vitejs/plugin-react`), oxlint for linting; plain CSS, no UI library, no router, no state library (state lives in one hook). Node.js 20+.
+- Three.js (`three`, only for Mel's 3D avatar; loaded lazily in a separate chunk, so the initial bundle does not grow)
 - Frontend tests: Vitest with jsdom, React Testing Library and `user-event`
 - Delivery: Docker (backend on `python:3.13-slim`, frontend served by unprivileged nginx), Docker Compose, GitHub Actions
 
@@ -262,7 +280,7 @@ POST /api/sessions   (no GROQ_API_KEY)                        → 503
 
 ## Security
 
-A security hardening was done on 2026-11-03 after three read-only audits (API and sessions; agent and tools; secrets, infrastructure and dependencies). No critical or high finding; the five medium and five low ones were fixed. Full report, residual risks and production recommendations: [docs/SECURITY.md](docs/SECURITY.md). Not yet published or run on GitHub's CI.
+A security hardening was done on 2026-11-03 after three read-only audits (API and sessions; agent and tools; secrets, infrastructure and dependencies). No critical or high finding; the five medium and five low ones were fixed. Full report, residual risks and production recommendations: [docs/SECURITY.md](docs/SECURITY.md). Published on `main`; GitHub's CI passed on the published commit (run 41767832682), including `pip-audit`, `bandit` and `npm audit`. A second review on 2026-11-04 added: the session-creation limit also on `POST /api/chat` without a session, code-format normalization in the output guard, tool logs with argument names only, and uvicorn trusting `X-Forwarded-For` only from nginx's fixed IP.
 
 - **Limits:** 60 s timeout per provider call, at most 8 concurrent chats (503 `busy`), sessions expire after 30 min idle, 100 customer messages per session (429 `session_full`).
 - **Rules in code, not only in the prompt:** after 5 failed identity checks in a conversation the order lookup is locked; a reply that cites a protocol or tracking code not produced by a tool is replaced; free text from the CSVs is cleaned and truncated before reaching the model.
@@ -281,9 +299,9 @@ python -m pytest -q                                   # backend: full Python sui
 cd frontend && npm test && npm run lint && npm run build   # frontend: tests, static checks, production build
 ```
 
-Unit and integration tests use a fake LLM (`FakeLLM` in `tests/fakes.py`). The API tests (`tests/test_api.py`) run the FastAPI app in-process with `TestClient` and the same fake LLM: routes, status codes, error envelope, degraded mode, CORS preflight, OpenAPI routes, session store (limit, eviction, busy session, concurrent requests, random session ids), body size limit (413) and the absence of tool arguments and personal data in responses. Current state: **1159 passed, 2 deselected** (the two `llm` smoke tests below).
+Unit and integration tests use a fake LLM (`FakeLLM` in `tests/fakes.py`). The API tests (`tests/test_api.py`) run the FastAPI app in-process with `TestClient` and the same fake LLM: routes, status codes, error envelope, degraded mode, CORS preflight, OpenAPI routes, session store (limit, eviction, busy session, concurrent requests, random session ids), body size limit (413) and the absence of tool arguments and personal data in responses. Current state (2026-11-04): **1201 passed, 2 deselected** (the two `llm` smoke tests below).
 
-The frontend suite (`frontend/tests/`, **63 tests**, 12 files, Vitest + React Testing Library on jsdom) never touches the network: every test either runs in demo mode or replaces `fetch` with a route table that fails on any unmapped call. It covers the HTTP client (error envelope, network failure, timeout with abort), `chatService` in both modes, the `useConversations` hook (sending, persistence in `localStorage`, `404` with a new session and a notice, automatic retry on `409`, no retry on `422`, empty replies, failed greeting), `useBackendHealth`, the `Composer`, `MessageList`, `ChatPanel` and `Sidebar` components, and the whole `ChatPage` rendered against a mocked API (greeting, typing indicator, reply, error with "Tentar de novo", suggestions, backend down). Tests query by role, label and visible text, not by implementation details; a mutation check (breaking the 404 and 422 handling in the hook) made the suite fail as expected. `npm run lint` and `npm run build` pass.
+The frontend suite (`frontend/tests/`, **97 tests**, 16 files, Vitest + React Testing Library on jsdom) never touches the network: every test either runs in demo mode or replaces `fetch` with a route table that fails on any unmapped call. It covers the HTTP client (error envelope, network failure, timeout with abort), `chatService` in both modes, the `useConversations` hook (sending, persistence in `localStorage`, `404` with a new session and a notice, automatic retry on `409`, no retry on `422`, empty replies, failed greeting), `useBackendHealth`, the `Composer`, `MessageList`, `ChatPanel` and `Sidebar` components, and the whole `ChatPage` rendered against a mocked API (greeting, typing indicator, reply, error with "Tentar de novo", suggestions, backend down). It also covers Mel: the five animations and the no-repeat selection per conversation, unique SVG gradient ids, the 3D avatar states (2D fallback without WebGL or off screen, swap to 3D, context released on unmount, load failure), the real GLB parsed by Three.js with its framing, and the safe bold rendering. Tests query by role, label and visible text, not by implementation details; a mutation check (breaking the 404 and 422 handling in the hook) made the suite fail as expected. `npm run lint` and `npm run build` pass.
 
 **2. Tests with a real provider (Groq by default; Anthropic as the alternative), run by hand.**
 
@@ -292,7 +310,7 @@ python -m pytest -q -m llm   # smoke tests against the real provider (require GR
 python scripts/run_scenarios.py ...   # end-to-end scenarios (T14), see below
 ```
 
-Tests marked `llm` are skipped by default (`addopts = "-m 'not llm'"`). The real-model results ([End-to-end scenario results](#end-to-end-scenario-results-t14), [docs/E2E_RESULTS.md](docs/E2E_RESULTS.md), the recorded examples) were obtained **through the agent directly** (`scripts/run_scenarios.py`, `scripts/record_example.py`). The web path was exercised once with a real provider on 2026-11-03: a headless browser drove the real frontend (Vite, API mode) through the HTTP API to the agent with Anthropic `claude-sonnet-5-5` (`LLM_MAX_TOKENS=4096`, `medium`). Two customer messages, three model calls: the Ohana CK-20 price, promotion and installments came from `detalhar_produto`, and the follow-up "E em 4x?" was answered from the session context. The same run checked degraded mode (no key: health `degraded`, 503 shown in the chat) and an unreachable provider (200 with `stop: "llm_error"` and Mel's fallback text in the chat). Evidence: [docs/e2e/web_e2e_anthropic.md](docs/e2e/web_e2e_anthropic.md). The web path has **not** been run with Groq.
+Tests marked `llm` are skipped by default (`addopts = "-m 'not llm'"`). The real-model results ([End-to-end scenario results](#end-to-end-scenario-results-t14), [docs/E2E_RESULTS.md](docs/E2E_RESULTS.md), the recorded examples) were obtained **through the agent directly** (`scripts/run_scenarios.py`, `scripts/record_example.py`). The web path was exercised once with a real provider on 2026-11-03: a headless browser drove the real frontend (Vite, API mode) through the HTTP API to the agent with Anthropic `claude-sonnet-5-5` (`LLM_MAX_TOKENS=4096`, `medium`). Two customer messages, three model calls: the Ohana CK-20 price, promotion and installments came from `detalhar_produto`, and the follow-up "E em 4x?" was answered from the session context. The same run checked degraded mode (no key: health `degraded`, 503 shown in the chat) and an unreachable provider (200 with `stop: "llm_error"` and Mel's fallback text in the chat). Evidence: [docs/e2e/web_e2e_anthropic.md](docs/e2e/web_e2e_anthropic.md). On 2026-11-04 a second real web conversation (Anthropic, two messages: the Ohana CK-20 price and payment options, then the store address and contacts) produced the [screenshots](#screenshots), with no console errors. In a browser the web path has **not** been run with Groq (one Groq message went through nginx → API → agent in Docker, without a browser).
 
 ## Continuous integration
 
@@ -304,7 +322,7 @@ Tests marked `llm` are skipped by default (`addopts = "-m 'not llm'"`). The real
 | Frontend (lint, tests, build) | Node 24 with npm cache, `npm ci`, `npm run lint`, `npm test`, `npm run build`, `npm audit --omit=dev --audit-level=high` |
 | Docker images | after both jobs pass: `docker compose config --quiet` and `docker compose build` |
 
-The workflow has read-only permissions and cancels superseded runs on the same branch. [Dependabot](.github/dependabot.yml) opens weekly update PRs (pip, npm, Docker, GitHub Actions). The new audit steps have been run locally but had not yet run on GitHub at the time of writing. No job calls a real AI provider: the `llm` smoke tests are excluded by the pytest configuration and the frontend tests mock `fetch`.
+The workflow has read-only permissions and cancels superseded runs on the same branch. [Dependabot](.github/dependabot.yml) opens weekly update PRs (pip, npm, Docker, GitHub Actions). All steps, including the audits, passed on GitHub for the published commit `dae3bad` (run 41767832682). No job calls a real AI provider: the `llm` smoke tests are excluded by the pytest configuration and the frontend tests mock `fetch`.
 
 ## Utilities
 
@@ -579,13 +597,14 @@ emporio-da-musica-agent/
 │   │   ├── components/          # chat/, layout/, products/, icons.jsx
 │   │   ├── hooks/               # useConversations.js (chat state), useBackendHealth.js
 │   │   ├── services/            # http.js (only HTTP client), chatService.js (only place with /api paths)
+│   │   ├── assets/mel/          # Mel: 2D SVG (avatar, five animations), 3D model mel_base_v04.glb + Three.js scene
 │   │   ├── data/                # demo content, suggestions and categories (demo.js, demoChat.js)
 │   │   ├── styles/, utils/
 │   └── tests/                   # Vitest + Testing Library, mirrors src/ (services, hooks, components, pages, utils)
 ├── scripts/                     # build_policies.py, run_scenarios.py (T14), record_example.py (T15)
 ├── tests/                       # pytest suite (FakeLLM); tests/test_api.py covers the HTTP API
 ├── examples/conversations/      # real example conversations (T15)
-├── docs/                        # PROGRESS.md, AGENT_GUIDE.md, E2E_RESULTS.md, e2e/ (real transcripts)
+├── docs/                        # PROGRESS.md, AGENT_GUIDE.md, E2E_RESULTS.md, SECURITY.md, e2e/ (real transcripts), screenshots/
 ├── .github/workflows/ci.yml     # CI: backend tests, frontend lint/tests/build, Docker images
 ├── Dockerfile, .dockerignore    # backend image (allow-list context)
 ├── compose.yaml                 # backend + frontend
@@ -602,7 +621,7 @@ Full rationale in [TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md).
 - **Calculations in Python (D4).** Promotional price, PIX, installments, shipping and "open now?" come out of the tools ready to use, with `Decimal` and `ROUND_HALF_UP` rounding. The manual treats incorrect information as false advertising, and models make arithmetic and date mistakes.
 - **Default provider: Groq (D5, D17).** The decision to use Groq came from the user. `LLM_PROVIDER=groq` selects the adapter in `llm/groq_client.py` (official `groq` SDK) behind a thin `LLMClient` interface; provider and model are switchable by configuration.
   - Model `openai/gpt-oss-120b`: a Groq production model (not preview) with tool use support and a `reasoning_effort` parameter (`low|medium|high`), mapped from `LLM_EFFORT`. A configurable alternative is `llama-3.3-70b-versatile` (production, parallel tool calls).
-  - **Reasoning effort: `medium` by default (D17 revision, user decision on 2026-11-02).** The first default was `low`. While recording the return-of-order example, real runs with `low` gave a verdict on the return deadline and offered a procedure outside the manual, even after the prompt was reinforced (two recordings preserved in [docs/e2e/](docs/e2e/)). With `medium`, the same script produced no verdict and used `encaminhar_atendente`, returning a real protocol number ([docs/e2e/t15_devolucao_effort_medium.md](docs/e2e/t15_devolucao_effort_medium.md); final recording in example 3 below). The cost is more reasoning tokens per call, which weighs on the Groq daily limit. `low` remains configurable. On Groq this is evidence from one scenario, not a full validation: the 13-scenario regression under `medium` was run with the Anthropic provider (14/14 checks), not with `openai/gpt-oss-120b` (see [End-to-end scenario results](#end-to-end-scenario-results-t14)).
+  - **Reasoning effort: `medium` by default (D17 revision, user decision on 2026-11-02).** The first default was `low`. While recording the return-of-order example, real runs with `low` gave a verdict on the return deadline and offered a procedure outside the manual, even after the prompt was reinforced (two recordings preserved in [docs/e2e/](docs/e2e/)). With `medium`, the same script produced no verdict and used `encaminhar_atendente`, returning a real protocol number ([docs/e2e/t15_devolucao_effort_medium.md](docs/e2e/t15_devolucao_effort_medium.md); final recording in example 3 below). The cost is more reasoning tokens per call, which weighs on the Groq daily limit. `low` remains configurable. The full 13-scenario regression under `medium` was later run with both providers: Anthropic 14/14, Groq 13/14 (scenario 5 failed; see [End-to-end scenario results](#end-to-end-scenario-results-t14)). Groq therefore stays the configured default by the user's decision, but is **not approved** as the default until that fix and a new full battery.
   - `LLM_MAX_TOKENS=4096`: Groq's per-minute throughput limit (Developer plan baseline: 8K tokens/min for `gpt-oss-120b`) makes reserving 16000 tokens unworkable.
   - Rate limits and resilience: HTTP 429 with `retry-after` is handled by the SDK (`max_retries=5`); a malformed tool call generated by the model (`tool_use_failed`) is retried once before becoming an error; `run_scenarios.py --pause` spaces out the scenarios.
   - The `gpt-oss` reasoning is neither returned nor resent (`include_reasoning=false`): Groq does not document resending it, so the history keeps only text and tool calls.
@@ -620,6 +639,7 @@ Full rationale in [TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md).
   - **Small, bounded requests.** Bodies above 16 KiB are rejected with `413 payload_too_large` before the JSON is read; `message` has at most 2000 characters and `session_id` at most 64. The session id is a 128-bit random token (`secrets.token_urlsafe(16)`), since it is the only credential of a conversation. Caveat: for chunked bodies (no `Content-Length`) the size middleware hands the already-read body to the route through Starlette's private `request._body` cache; this relies on the pinned Starlette version and is covered by a test (`tests/test_api.py`), so an upgrade that changes it fails the suite.
   - **CORS limited** to the Vite dev server origins by default (`CORS_ORIGINS`), methods GET/POST/DELETE/OPTIONS, header `Content-Type`, no credentials.
 - **Web frontend reintroduced (D19, user decision on 2026-11-03).** The React/Vite chat had been removed from the history before publication as out of scope (see [Use of AI tools](#use-of-ai-tools)); the user brought it back on a feature branch (commit `773ed61`, integrated into `main` as `71bd693`) and connected it to the API. It is a chat, not an online store. Without `VITE_API_BASE_URL` it keeps its original demo mode with fictional answers, now **signaled in the interface** ("Modo demonstração") so it can never be mistaken for the agent. In API mode the reply is plain text: the API returns no structured product data, so product cards are not shown.
+- **Mascot Mel in the web chat (D22).** Mel gives the assistant a visual identity without competing with the conversation. The 3D model is used only where it is cheap: one live WebGL canvas in the header avatar, Three.js imported dynamically when the avatar becomes visible (the hidden mobile/desktop twin never creates a context) and a 2D fallback on any failure. The welcome card keeps the 2D SVG Mel with CSS animations, which are light and respect `prefers-reduced-motion`; a version with the 3D model in every avatar was tried and rejected by the user. No interface element pretends to be a feature the API does not have.
 - **Reference date (D9).** Real system date in production; `REFERENCE_DATE` only for tests and examples.
 
 ## Data handling and ambiguities
@@ -648,8 +668,8 @@ Full analysis in [DATA_ANALYSIS.md](DATA_ANALYSIS.md).
 
 ## Known limitations
 
-- **Scenario 5 (return of order 4 with email) was not approved with `LLM_EFFORT=low`.** It scored 0/8 over the last runs. Safety held (the agent identifies the order and gives no verdict), but the informative content was unstable: it sometimes skipped the policy lookup or omitted the deadline and the estimated delivery. Under `medium` the recorded return conversation behaved correctly. Scenario 5 passed (1/1) in the 2026-11-03 regression with Anthropic `claude-sonnet-5-5` and `medium`; it has not been re-run on Groq under `medium`.
-- **Regression of the default configuration (Groq, `openai/gpt-oss-120b`, `medium`) was not run.** The Groq daily quota was used on 2026-11-02. The single regression of the 13 scenarios under `medium` was run on 2026-11-03 with the alternative provider instead (Anthropic, `claude-sonnet-5-5`, `LLM_MAX_TOKENS=4096`): 14/14 checks, reviewed by hand. That result validates the agent with that provider; nothing in this README claims that `gpt-oss-120b` under `medium` passes the scenarios.
+- **Scenario 5 (return of order 4 with email) was not approved with `LLM_EFFORT=low`.** It scored 0/8 over the last runs. Safety held (the agent identifies the order and gives no verdict), but the informative content was unstable: it sometimes skipped the policy lookup or omitted the deadline and the estimated delivery. Under `medium` the recorded return conversation behaved correctly. Scenario 5 passed (1/1) in the 2026-11-03 regression with Anthropic `claude-sonnet-5-5` and `medium`, and **failed on Groq under `medium` in 3 of 3 runs** (2026-11-04): the estimated delivery date limitation was omitted, once with the estimate presented as the real delivery date.
+- **The default configuration (Groq, `openai/gpt-oss-120b`, `medium`) is not approved.** Its 13-scenario regression (2026-11-04) scored 13/14: scenario 5 failed. The same battery with Anthropic `claude-sonnet-5-5` scored 14/14 (2026-11-03). The fix (prompt, tool or code) was not made in the delivery window; `.env.example` keeps `groq` because it was the user's decision (D17) and Groq needs no paid key, so the README recommends Anthropic for the evaluation.
 - **The first recording of example 1 contained a generalization error.** Under Groq with `low`, the agent said that electroacoustic guitars only exist outside the R$ 1000 range without searching with that criterion; the data contain one at R$ 799. That recording is preserved unchanged in [docs/e2e/t15_catalogo_gravacao1_low_generalizacao.md](docs/e2e/t15_catalogo_gravacao1_low_generalizacao.md). Example 1 was re-recorded on 2026-11-03 with Anthropic `claude-sonnet-5-5` and `medium`, and the new recording searches with the right criterion; it has not been re-recorded on Groq under `medium`.
 - **Groq free-tier quota.** The free tier allows 200k tokens per day (rolling 24-hour window) and 8k tokens per minute for `openai/gpt-oss-120b`; each model call costs about 2.4k tokens just for the prompt and tool schemas. The 4096-token cap and the per-minute limits make long answers and back-to-back runs slower (scenario runs need `--pause`), and the daily quota was exhausted during the T14 runs. `medium` uses more reasoning tokens per call than `low`.
 - **Inconsistent catalog data (Q1–Q12).** Products with conflicting information are shown only by their registered name, with a divergence warning.
@@ -668,11 +688,11 @@ Full analysis in [DATA_ANALYSIS.md](DATA_ANALYSIS.md).
 - **500 errors log the traceback on the server.** The response body never carries internal details, but the server log of an unexpected exception includes its traceback, which could contain data from the request if an exception message ever did.
 - **Web chat history stays in the browser.** The frontend saves its conversations, including whatever the customer typed (order number, e-mail), in the browser's `localStorage`, with no expiry and no "clear history" button. The chat footer says so ("As conversas ficam salvas neste navegador.").
 - **A client timeout does not cancel the server.** If a reply takes longer than the 90-second client timeout, the server keeps processing and stores the answer in the session, but the user does not see it; the timeout message warns that "Tentar de novo" may send the same question again.
-- **Markdown shown literally in the web chat.** Mel answers in simple Markdown; the chat bubble keeps line breaks (`white-space: pre-wrap`) but does not render Markdown, so `**bold**` appears with the asterisks. (The CLI renders Markdown through `rich`.)
+- **Only bold Markdown is rendered in the web chat.** `**bold**` becomes `<strong>` (built as React elements, never raw HTML); lists and other Markdown stay as text with their line breaks (`white-space: pre-wrap`). (The CLI renders Markdown through `rich`.)
 - **Text-only replies in API mode.** The API returns only text, so the product cards and the product detail panel of the frontend appear only in demo mode, with fictional data.
 - **Demo mode is fictional.** Without `VITE_API_BASE_URL` the frontend answers from `frontend/src/data/`, not from the agent; the interface says so, but its prices and products are not the store's data.
 - **Small, heuristic end-to-end scenarios.** There are 13 scenarios plus an emoji check, evaluated by presence of terms and tools called; the report needs manual review and the model varies between runs. The passed scenarios were exercised with earlier prompt versions.
-- **Emoji removal.** The output guard is covered by automated tests; check 14 (no emojis) also passed in the 2026-11-03 regression with Anthropic. It was not re-checked on Groq under `medium`.
+- **Emoji removal.** The output guard is covered by automated tests; check 14 (no emojis) also passed in the `medium` regressions with Anthropic (2026-11-03) and Groq (2026-11-04).
 - **Credentials.** The real-provider smoke tests, the scenarios and the example recordings depend on an API key. The code was first built and tested without a live key; the real runs came afterwards.
 
 ## Conversation examples
@@ -786,23 +806,23 @@ Summary in `low`: scenarios 1-4 and 6-14 passed; **scenario 5 was not approved**
 
 **Regression under `medium` (2026-11-03, Anthropic `claude-sonnet-5-5`, `LLM_MAX_TOKENS=4096`, 13 scenarios x 1): 14/14 checks** ([report](docs/e2e/t14_regressao_claude_medium.md)). Every answer was also reviewed by hand against the critical criteria: no return verdict (scenario 5 lists the policy, warns that the delivery date is only an estimate and asks for the purchase channel and the receipt date), no procedure outside the manual (claims about return shipping, accessories, boleto and debit were checked against `knowledge/policies.md`), no customer data exposed (scenarios 9 and 11), and a handoff offered where the product data conflict (scenario 12). One wording imprecision: in scenario 2 the agent lists "Domingo e feriados: fechado" and then says it does not know whether the store opens on holidays (the system cannot tell which dates are holidays).
 
-The regression on the default configuration (Groq, `openai/gpt-oss-120b`, `medium`) was **not run** because of the Groq daily quota. Command, from the project root with `GROQ_API_KEY` in `.env`:
+**Regression under `medium` on Groq (2026-11-04, `openai/gpt-oss-120b`, `LLM_MAX_TOKENS=4096`, 13 scenarios x 1, 60 s pause, provider forced by environment variables, no Anthropic call): 13/14 checks, not approved.** Scenarios 1-4 and 6-13 and the emoji check passed; **scenario 5 failed**, and failed again in two extra runs of that scenario alone (0/3). In run 1 the answer said the order was "entregue em 22/12/2025", presenting the *estimated* delivery date as the real one; in runs 2 and 3 it asked for the purchase channel and the receipt date without warning that the system only stores an estimate. No run gave a return verdict or invented a procedure. Other differences from Anthropic: more tool calls (a `buscar_produtos` before `detalhar_produto` in scenarios 3, 8 and 12; several `detalhar_produto` calls in scenario 1) and a less complete payment answer in scenario 8 (correct values). Full comparison: [docs/E2E_RESULTS.md](docs/E2E_RESULTS.md) §3.1–3.3.
+
+Commands, from the project root (choose the provider with environment variables, which override `.env`):
 
 ```bash
-LLM_EFFORT=medium python scripts/run_scenarios.py --repeat 1 --pause 60 --report runtime/t14_regressao_medium.md
-# PowerShell: $env:LLM_EFFORT="medium"; python scripts/run_scenarios.py --repeat 1 --pause 60 --report runtime/t14_regressao_medium.md
+LLM_PROVIDER=anthropic LLM_MODEL=claude-sonnet-5-5 LLM_EFFORT=medium python scripts/run_scenarios.py --repeat 1 --pause 2 --report runtime/t14_regressao_claude_medium.md
+LLM_PROVIDER=groq LLM_MODEL=openai/gpt-oss-120b LLM_EFFORT=medium python scripts/run_scenarios.py --repeat 1 --pause 60 --report runtime/t14_regressao_groq_medium.md
+# PowerShell: $env:LLM_PROVIDER="anthropic"; $env:LLM_MODEL="claude-sonnet-5-5"; python scripts/run_scenarios.py --repeat 1 --pause 2
 ```
-
-Setting `LLM_EFFORT=medium` on the command line is only needed while the local `.env` still contains `LLM_EFFORT=low`. To repeat the Anthropic run, also set `LLM_PROVIDER=anthropic` and `LLM_MODEL=claude-sonnet-5-5`.
 
 ## What I would do with more time
 
-- Run the `medium` regression on the default Groq model as well, and broaden the evaluation (more scenarios, more repetitions, judge-based grading).
-- Understand and fix the instability of scenario 5 (return of order 4) instead of relying on the effort level alone.
+- Fix scenario 5 on Groq (the omitted estimated-delivery limitation) with a deterministic safeguard instead of relying on the model, then re-run the full battery; broaden the evaluation (more scenarios, more repetitions, judge-based grading).
 - Resolve the P1–P16 contradictions with the team and then turn the limitations into rules.
 - Add embeddings and a vector store if the manual grows.
 - Optional conversation persistence with consent, a real WhatsApp channel and holidays from a calendar.
-- Run the web path with the default Groq provider too (it was run once with Anthropic), add frontend tests, render Markdown safely in the chat bubble, and return structured product data from the API so the product cards can show real products. Before any deployment: authentication, rate limiting and a shared session store.
+- Run the web path with Groq in a browser too, render lists safely in the chat bubble (only bold is rendered today), animate the 3D Mel, and return structured product data from the API so the product cards can show real products. Before any public deployment: authentication or a captcha, a spending cap at the provider and a shared session store.
 - Broader product-conflict detection with assisted review.
 
 ## Use of AI tools
@@ -832,3 +852,5 @@ Examples of problems caught by the process (from `docs/PROGRESS.md` and `docs/E2
 History rewrite before publication. By the user's decision, the git history was rewritten before anything was published, to remove two items from every commit: the PDF with the challenge statement and an experimental frontend that was out of scope (both kept locally and not versioned). Backup references and the reflog were purged, `git fsck` is clean, and the documentation was updated to match.
 
 **API and frontend stage (2026-11-03, developed on the branch `gelane-dev/backend-e-frontend` and integrated into `main` the same day).** The user later decided to bring the frontend back and connect it to the agent through an HTTP API (D18, D19). This stage was also orchestrated with Claude agents through Orca: the coordinator (Claude Opus 5.5) first wrote the HTTP contract (routes, payloads, error envelope, CORS, session rules) from the facts of the existing code, and the two commits (`67f6b1f` API with its tests, `71bd693` frontend; cherry-picked onto `main` from the branch commits `40cafe0` and `773ed61`) carry the `Co-Authored-By: Claude Opus 5.5` trailer. The documentation update (this README, `ARCHITECTURE.md`, `TECHNICAL_DECISIONS.md`, `docs/PROGRESS.md`, `TASKS.md`) was written by a Claude agent dispatched by the coordinator, with a separate read-only reviewer agent running in parallel; the diagrams were drawn after reading the code, and every file, route and function they name was checked to exist. During development the verification was the local suite (1091 passed at `71bd693`, 1099 with the review fixes), `npm run lint` and `npm run build`. After the integration into `main`, one real conversation was run through the web path with Anthropic (see [Tests](#tests)).
+
+**Hardening, provider comparison and Mel (2026-11-03 and 2026-11-04).** Claude Code (Claude Opus 5.5) coordinated and validated; Claude Sonnet sub-agents ran the three read-only security audits, implemented the fixes in parallel on separate files and wrote the security report, and a second Sonnet review checked six specific points (sessions, rate limiting, output guard, privacy, Docker/CSP, CI) whose three findings were then fixed with tests. The coordinator ran the Groq regression and compared it with the Anthropic one without changing prompts or tools. The Mel mascot was started with **Antigravity** (the 2D SVG avatar and animations) and completed with Claude Code (unique gradient ids, palette, removal of interface elements without backend support, tests); the 3D model `mel_base_v04.glb` was produced separately in Blender and integrated with Three.js. A version with the 3D model in every avatar was built and reverted at the user's request. Every step was validated with the test suites, a headless browser (console, requests, screenshots, desktop and mobile) and Docker before committing.
