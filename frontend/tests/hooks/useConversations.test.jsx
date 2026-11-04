@@ -105,6 +105,34 @@ describe('useConversations (modo API)', () => {
     expect(result.current.canRetry).toBe(false)
   })
 
+  it('conversa no limite de mensagens (429 session_full) mostra o aviso sem nova tentativa', async () => {
+    const aviso = 'Esta conversa ficou muito longa. Inicie uma nova conversa para continuar.'
+    mockApi({
+      'POST /api/sessions': jsonResponse(SESSION),
+      'POST /api/chat': apiError(429, 'session_full', aviso),
+    })
+    const { result } = await renderReady()
+
+    await act(() => result.current.sendMessage('Oi'))
+
+    expect(result.current.error).toBe(aviso)
+    expect(result.current.canRetry).toBe(false)
+  })
+
+  it('servidor ocupado (503 busy) mostra o aviso e permite tentar de novo', async () => {
+    const aviso = 'Estou atendendo muitas conversas agora. Tente novamente em alguns instantes.'
+    mockApi({
+      'POST /api/sessions': jsonResponse(SESSION),
+      'POST /api/chat': apiError(503, 'busy', aviso),
+    })
+    const { result } = await renderReady()
+
+    await act(() => result.current.sendMessage('Oi'))
+
+    expect(result.current.error).toBe(aviso)
+    expect(result.current.canRetry).toBe(true)
+  })
+
   it('quando a sessão expirou (404), avisa e reenvia uma vez numa sessão nova', async () => {
     const fetchMock = mockApi({
       'POST /api/sessions': jsonResponse(SESSION),

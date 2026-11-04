@@ -51,6 +51,11 @@ function isInvalidRequest(err) {
   return err instanceof ApiError && err.status === 422
 }
 
+// Conversa no limite de mensagens (429 session_full): reenviar falharia de novo; o caminho é uma conversa nova.
+function isSessionFull(err) {
+  return err instanceof ApiError && err.status === 429 && err.code === 'session_full'
+}
+
 function newConversation() {
   const conversation = createConversation()
   // No modo API a saudação vem do backend (POST /api/sessions), não do texto demonstrativo.
@@ -277,8 +282,8 @@ export function useConversations() {
           err instanceof ApiError && err.code === 'timeout'
             ? CHAT_TIMEOUT_MESSAGE
             : friendlyError(err, 'Não foi possível concluir o atendimento.')
-        // 422 (mensagem inválida): reenviar o mesmo texto falharia de novo, então não há retry.
-        setErrorFor(conversationId, message, !isInvalidRequest(err))
+        // 422 (mensagem inválida) e 429 session_full: reenviar falharia de novo, então não há retry.
+        setErrorFor(conversationId, message, !isInvalidRequest(err) && !isSessionFull(err))
       } finally {
         setPendingFor(conversationId, false)
       }
