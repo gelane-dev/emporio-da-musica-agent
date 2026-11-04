@@ -49,7 +49,7 @@ Estado e pendências: [[docs/PROGRESS]]. Não duplique conteúdo: cite a seção
 
 **Segurança.** Nunca versionar `.env`, chaves, `venv/`, `node_modules/`, `dist/` ou `runtime/`; `.env.example` sem segredos. Variáveis `VITE_*` vão para o bundle do navegador: nunca coloque segredo nelas. A API não devolve argumentos de ferramentas nem dados pessoais; o `.dockerignore` da raiz é uma lista de inclusão.
 - Regras sensíveis (identidade, códigos, limites) ficam em código, não só no prompt.
-- Nunca logar o id completo da sessão (no máximo 6 caracteres), mensagens do cliente nem argumentos de ferramentas sensíveis.
+- Nunca logar o id completo da sessão (no máximo 6 caracteres), mensagens do cliente nem valores de argumentos de ferramentas (de nenhuma ferramenta: só o nome dela e os nomes dos argumentos).
 - Todo novo texto livre vindo dos dados passa por `clean_free_text` antes de chegar ao modelo.
 - Testes de segurança ficam em `tests/test_*_security.py` e `tests/test_repo_secrets.py`. Relatório da auditoria: [[docs/SECURITY]].
 

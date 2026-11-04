@@ -333,3 +333,37 @@ def test_guarda_sem_falso_positivo_nos_dados_da_loja():
                 for value in row.values():
                     assert not _codes(value or ""), (path.name, value)
     assert not _codes((REPO_ROOT / "knowledge" / "policies.md").read_text(encoding="utf-8"))
+
+
+# ------------------------------------------------------------------ logs das ferramentas
+
+
+@pytest.mark.parametrize(
+    ("tool", "args", "segredos"),
+    [
+        ("buscar_produtos", {"texto": "violão para joao.silva@mail.com cpf 123.456.789-00"}, ["joao.silva", "123.456.789"]),
+        ("detalhar_produto", {"nome": "Maria Souza (67) 99876-5432"}, ["Maria Souza", "99876"]),
+        ("consultar_pedido", {"pedido_id": 1, "email": EMAIL}, [EMAIL, "pedro.oliveira"]),
+        ("encaminhar_atendente", {"motivo": "reclamacao", "resumo": "Rua das Flores, 10"}, ["Rua das Flores"]),
+        ("ferramenta_inexistente", {"x": "valor-secreto-123"}, ["valor-secreto-123"]),
+    ],
+)
+def test_log_de_ferramenta_tem_so_nomes_nunca_valores(registry, caplog, tool, args, segredos):
+    with caplog.at_level(logging.DEBUG, logger="emporio_agent"):
+        agent_for(registry, [fake_tool_calls((tool, args)), fake_text("ok")]).respond(Session(NOW, "lg"), "oi")
+    records = [r.getMessage() for r in caplog.records if r.getMessage().startswith("tool=")]
+    assert records == [records[0]] and f"tool={tool}" in records[0]
+    for name in args:
+        assert name in records[0]  # nomes dos argumentos continuam no log
+    for segredo in segredos:
+        assert segredo not in caplog.text
+
+
+def test_log_limita_nomes_de_argumentos_vindos_do_modelo(registry, caplog):
+    args = {f"campo_{i:02d}_" + "x" * 60: i for i in range(30)}
+    with caplog.at_level(logging.INFO, logger="emporio_agent"):
+        agent_for(registry, [fake_tool_calls(("buscar_produtos", args)), fake_text("ok")]).respond(
+            Session(NOW, "lm"), "oi"
+        )
+    line = next(r.getMessage() for r in caplog.records if r.getMessage().startswith("tool="))
+    assert line.count("campo_") == 10 and "x" * 41 not in line

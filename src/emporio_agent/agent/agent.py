@@ -40,8 +40,17 @@ FALLBACK_LLM_ERROR = (
 
 AgentStop = Literal["end_turn", "max_tokens", "refusal", "max_iterations", "llm_error"]
 
-# Ferramentas cujos argumentos contêm dados pessoais: nunca vão para o log.
-_SENSITIVE_TOOLS = frozenset({"consultar_pedido", "encaminhar_atendente"})
+# Valores de argumentos nunca vão para o log, em nenhuma ferramenta: e-mail/telefone de
+# consultar_pedido, mas também o texto livre de buscar_produtos ou detalhar_produto, onde o
+# cliente pode ter digitado dados pessoais. Só o nome da ferramenta e os nomes dos argumentos.
+_MAX_LOGGED_ARG_NAMES = 10
+
+
+def _arg_names(arguments: object) -> list[str]:
+    if not isinstance(arguments, dict):
+        return []
+    # Nomes vêm do modelo (podem ser inválidos): truncados e em quantidade limitada.
+    return sorted(str(name)[:40] for name in arguments)[:_MAX_LOGGED_ARG_NAMES]
 
 
 class ToolCallRecord(BaseModel):
@@ -124,12 +133,10 @@ class Agent:
                 records.append(
                     ToolCallRecord(name=call.name, arguments=call.arguments, ok=result.ok, duration_ms=duration_ms)
                 )
-                if call.name in _SENSITIVE_TOOLS:
-                    logger.info("tool=%s ok=%s duration_ms=%d", call.name, result.ok, duration_ms)
-                else:
-                    logger.info(
-                        "tool=%s args=%s ok=%s duration_ms=%d", call.name, call.arguments, result.ok, duration_ms
-                    )
+                logger.info(
+                    "tool=%s arg_names=%s ok=%s duration_ms=%d",
+                    call.name, _arg_names(call.arguments), result.ok, duration_ms,
+                )
                 session.add(
                     Message(role="tool", tool_call_id=call.id, content=result.to_llm(), is_error=not result.ok)
                 )
