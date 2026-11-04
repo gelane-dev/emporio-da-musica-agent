@@ -52,8 +52,9 @@ class Settings(BaseModel):
     data_dir: Path = REPO_ROOT / "data"
     policies_path: Path = REPO_ROOT / "knowledge" / "policies.md"
     runtime_dir: Path = REPO_ROOT / "runtime"
-    llm_provider: str = "groq"
-    llm_model: str = "openai/gpt-oss-120b"
+    # Padrão: Anthropic, aprovado na regressão medium (14/14); a Groq segue como alternativa (13/14).
+    llm_provider: str = "anthropic"
+    llm_model: str = "claude-sonnet-5-5"
     llm_max_tokens: int = Field(default=4096, gt=0)
     llm_effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
     llm_refusal_fallback: bool = True

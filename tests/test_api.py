@@ -49,20 +49,20 @@ def test_health_ok(tmp_path):
     assert body == {
         "status": "ok",
         "agent_ready": True,
-        "provider": "groq",
-        "model": "openai/gpt-oss-120b",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
         "detail": None,
     }
 
 
 def test_health_degraded_sem_chave(tmp_path):
-    app = create_app(make_settings(tmp_path), env={})  # sem llm e sem GROQ_API_KEY
+    app = create_app(make_settings(tmp_path), env={})  # sem llm e sem ANTHROPIC_API_KEY (provedor padrão)
     response = TestClient(app).get("/api/health")
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "degraded"
     assert body["agent_ready"] is False
-    assert "GROQ_API_KEY" in body["detail"]
+    assert "ANTHROPIC_API_KEY" in body["detail"]
 
 
 def test_health_degraded_dados_ausentes(tmp_path):

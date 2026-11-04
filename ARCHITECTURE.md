@@ -692,7 +692,7 @@ Erros (exceções do SDK ⇒ `LLMError`, mensagens fixas, nunca texto bruto da A
 
 **`llm/factory.py`**: `llm_provider == "groq"` ⇒ `GroqClient(model=settings.llm_model, effort=settings.llm_effort, api_key=env["GROQ_API_KEY"])`; sem `GROQ_API_KEY` ⇒ `LLMError(kind="auth")` com instrução do `.env`. `"anthropic"` continua suportado (inalterado). Provedor desconhecido ⇒ `config`, citando `anthropic` e `groq`.
 
-**`config.py`**: padrões passam a `llm_provider="groq"`, `llm_model="openai/gpt-oss-120b"`, `llm_max_tokens=4096` (limite de vazão por minuto da Groq; a resposta + raciocínio `low` cabem com folga). `llm_refusal_fallback` permanece, usado só pelo adaptador Anthropic. `.env.example` documenta `GROQ_API_KEY` (e mantém `ANTHROPIC_API_KEY` como alternativa comentada).
+**`config.py`**: padrões passam a `llm_provider="groq"`, `llm_model="openai/gpt-oss-120b"` (até 04/11/2026; desde a D23 o padrão é `anthropic` / `claude-sonnet-5-5`), `llm_max_tokens=4096` (limite de vazão por minuto da Groq; a resposta + raciocínio `low` cabem com folga). `llm_refusal_fallback` permanece, usado só pelo adaptador Anthropic. `.env.example` documenta `GROQ_API_KEY` (e mantém `ANTHROPIC_API_KEY` como alternativa comentada).
 
 **`scripts/run_scenarios.py`**: opção `--pause SEGUNDOS` entre cenários, padrão **60** (medição da T14: um cenário consome 6 a 10 mil tokens; com 10 s de pausa a 2ª repetição estourou o limite de 8 mil tokens/min).
 

@@ -1,8 +1,8 @@
 # Empório da Música — customer service agent
 
-Text-based customer service agent for the fictional musical instrument store Empório da Música, built as a prototype for the Artefact technical challenge. The same agent is reachable from a terminal (CLI) and, through a thin HTTP API (FastAPI), from a web chat (React + Vite). This README reports real results from runs with both supported providers: the Groq API (`openai/gpt-oss-120b`, the default in `.env.example`) and the Anthropic API (`claude-sonnet-5-5`). Anything not validated with the real model is marked as pending; nothing pending is presented as passed.
+Text-based customer service agent for the fictional musical instrument store Empório da Música, built as a prototype for the Artefact technical challenge. The same agent is reachable from a terminal (CLI) and, through a thin HTTP API (FastAPI), from a web chat (React + Vite). This README reports real results from runs with both supported providers: the Anthropic API (`claude-sonnet-5-5`, the default since 2026-11-04) and the Groq API (`openai/gpt-oss-120b`, the alternative and the earlier default). Anything not validated with the real model is marked as pending; nothing pending is presented as passed.
 
-> **Provider status (2026-11-04).** The 13-scenario regression under `LLM_EFFORT=medium` **passed with Anthropic `claude-sonnet-5-5` (14/14 checks)** and **failed with Groq `openai/gpt-oss-120b` (13/14)**: on the return of order 4 (scenario 5, mandatory) Groq omitted, in 3 of 3 runs, that the system only stores an *estimated* delivery date, and once presented it as the real delivery date; it never gave an undue return verdict. **Use Anthropic to evaluate the agent.** Groq stays available and selectable, but is not approved as the default until scenario 5 is fixed and the full battery passes again. Details: [End-to-end scenario results](#end-to-end-scenario-results-t14) and [docs/E2E_RESULTS.md](docs/E2E_RESULTS.md).
+> **Provider status (2026-11-04).** The 13-scenario regression under `LLM_EFFORT=medium` **passed with Anthropic `claude-sonnet-5-5` (14/14 checks)** and **failed with Groq `openai/gpt-oss-120b` (13/14)**: on the return of order 4 (scenario 5, mandatory) Groq omitted, in 3 of 3 runs, that the system only stores an *estimated* delivery date, and once presented it as the real delivery date; it never gave an undue return verdict. **Anthropic is therefore the default provider** (`.env.example` and `config.py`, changed on 2026-11-04 by the user's decision). Groq stays available and selectable (`LLM_PROVIDER=groq`), but is not approved until scenario 5 is fixed and the full battery passes again. Details: [End-to-end scenario results](#end-to-end-scenario-results-t14) and [docs/E2E_RESULTS.md](docs/E2E_RESULTS.md).
 
 ## Contents
 
@@ -89,8 +89,8 @@ Real screenshots of the web chat in API mode (headless Edge, 2026-11-04). The co
 ## Technologies
 
 - Python 3.13
-- Groq SDK (`groq`) with `openai/gpt-oss-120b` as the default model
-- Anthropic SDK (`anthropic`) as a configurable alternative
+- Anthropic SDK (`anthropic`) with `claude-sonnet-5-5` as the default model
+- Groq SDK (`groq`) with `openai/gpt-oss-120b` as a configurable alternative
 - pandas (CSV data in memory), pydantic (tool argument and result models, API schemas), pypdf (offline extraction of the policy PDF), rapidfuzz (fuzzy product search), rich (CLI formatting), python-dotenv, tzdata
 - FastAPI (HTTP API) served by uvicorn (ASGI server)
 - pytest (tests); httpx, only because FastAPI's `TestClient` needs it in the API tests
@@ -103,7 +103,7 @@ Pinned versions are in [requirements.txt](requirements.txt) and [frontend/packag
 
 ## Installation and configuration
 
-Requirements: Python 3.13 (`requires-python = ">=3.13"`), Node.js 20+ for the web chat, and a Groq API key (`GROQ_API_KEY`) to talk to the default model. Alternatively, an Anthropic key (`ANTHROPIC_API_KEY`) with `LLM_PROVIDER=anthropic`. The automated tests need no key. With Docker installed, Python and Node are not needed on the host: see [Running with Docker Compose](#running-with-docker-compose).
+Requirements: Python 3.13 (`requires-python = ">=3.13"`), Node.js 20+ for the web chat, and an Anthropic API key (`ANTHROPIC_API_KEY`) to talk to the default model. Alternatively, a Groq key (`GROQ_API_KEY`) with `LLM_PROVIDER=groq`. The automated tests need no key. With Docker installed, Python and Node are not needed on the host: see [Running with Docker Compose](#running-with-docker-compose).
 
 ```bash
 python -m venv venv
@@ -113,17 +113,17 @@ pip install -r requirements.txt
 cp .env.example .env           # PowerShell: Copy-Item .env.example .env
 ```
 
-Edit `.env` and fill in `GROQ_API_KEY`. The `.env` file is not versioned. Variables (defaults as in [.env.example](.env.example)):
+Edit `.env` and fill in `ANTHROPIC_API_KEY`. The `.env` file is not versioned. Variables (defaults as in [.env.example](.env.example)):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `LLM_PROVIDER` | `groq` | AI provider (`groq` or `anthropic`) |
-| `LLM_MODEL` | `openai/gpt-oss-120b` | model |
+| `LLM_PROVIDER` | `anthropic` | AI provider (`anthropic` or `groq`) |
+| `LLM_MODEL` | `claude-sonnet-5-5` | model (`openai/gpt-oss-120b` with Groq) |
 | `LLM_MAX_TOKENS` | `4096` | response token limit |
 | `LLM_EFFORT` | `medium` | reasoning depth (`low`, `medium`, `high`, `xhigh`, `max`); on Groq it maps to `reasoning_effort` for `gpt-oss` models (`xhigh` and `max` become `high`) |
 | `LLM_REFUSAL_FALLBACK` | `true` | server-side refusal fallback (Anthropic provider only) |
-| `GROQ_API_KEY` | empty | Groq API key (default provider) |
-| `ANTHROPIC_API_KEY` | empty | Anthropic API key (only with `LLM_PROVIDER=anthropic`) |
+| `ANTHROPIC_API_KEY` | empty | Anthropic API key (default provider) |
+| `GROQ_API_KEY` | empty | Groq API key (only with `LLM_PROVIDER=groq`) |
 | `REFERENCE_DATE` | empty | controlled date/time (see [Running](#running)) |
 | `MAX_TOOL_ITERATIONS` | `6` | tool loop iteration limit |
 | `MAX_HISTORY_TURNS` | `50` | history window |
@@ -140,7 +140,7 @@ Edit `.env` and fill in `GROQ_API_KEY`. The `.env` file is not versioned. Variab
 
 Note: the default of `LLM_EFFORT` is now `medium` (it was `low` earlier in the project; see [Technical decisions](#technical-decisions)). An older local `.env` that still contains `LLM_EFFORT=low` overrides the default, so update or remove that line.
 
-To use Anthropic instead, set `LLM_PROVIDER=anthropic`, `LLM_MODEL=claude-sonnet-5-5`, `LLM_MAX_TOKENS=16000` and `ANTHROPIC_API_KEY`.
+To use Groq instead, set `LLM_PROVIDER=groq`, `LLM_MODEL=openai/gpt-oss-120b` and `GROQ_API_KEY` (keep `LLM_MAX_TOKENS=4096`, because of Groq's per-minute limit). Before 2026-11-04 Groq was the default; see [Technical decisions](#technical-decisions).
 
 ## Running
 
@@ -170,7 +170,7 @@ Without an API key for the selected provider (for example, no `.env`), the CLI e
 
 ### Backend: HTTP API
 
-From the repository root, with the virtual environment active and `GROQ_API_KEY` in `.env`:
+From the repository root, with the virtual environment active and `ANTHROPIC_API_KEY` in `.env`:
 
 ```bash
 python -m emporio_agent.api                                       # uvicorn on http://127.0.0.1:8000
@@ -197,7 +197,7 @@ npm run dev                 # http://localhost:5173
 Requires Docker with Compose v2. From the repository root:
 
 ```bash
-cp .env.example .env        # PowerShell: Copy-Item .env.example .env — then fill in GROQ_API_KEY
+cp .env.example .env        # PowerShell: Copy-Item .env.example .env — then fill in ANTHROPIC_API_KEY
 docker compose up --build   # site at http://localhost:8080, Swagger at http://localhost:8000/docs
 docker compose down         # stop (the runtime volume with handoffs is kept; add -v to drop it)
 ```
@@ -237,9 +237,9 @@ Base URL `http://localhost:8000`, prefix `/api`, JSON in UTF-8. The examples bel
 GET /api/health                       → 200
 {"status": "ok", "agent_ready": true, "provider": "groq", "model": "openai/gpt-oss-120b", "detail": null}
 
-GET /api/health   (no GROQ_API_KEY)   → 200
-{"status": "degraded", "agent_ready": false, "provider": "groq", "model": "openai/gpt-oss-120b",
- "detail": "Chave da API não configurada. Copie .env.example para .env e preencha GROQ_API_KEY."}
+GET /api/health   (no ANTHROPIC_API_KEY)   → 200
+{"status": "degraded", "agent_ready": false, "provider": "anthropic", "model": "claude-sonnet-5-5",
+ "detail": "Chave da API não configurada. Copie .env.example para .env e preencha ANTHROPIC_API_KEY."}
 
 POST /api/sessions                    → 201
 {"session_id": "<session_id>",
@@ -263,7 +263,7 @@ POST /api/chat  {"session_id": "deadbeef", "message": "Oi"}   → 404
 POST /api/chat  {"session_id": "<session_id>", "message": "   "}  → 422
 {"error": "invalid_request", "message": "A mensagem não pode ficar vazia."}
 
-POST /api/sessions   (no GROQ_API_KEY)                        → 503
+POST /api/sessions   (no ANTHROPIC_API_KEY)                   → 503
 {"error": "agent_unavailable", "message": "O atendimento está indisponível no momento. Tente novamente mais tarde."}
 ```
 
@@ -303,10 +303,10 @@ Unit and integration tests use a fake LLM (`FakeLLM` in `tests/fakes.py`). The A
 
 The frontend suite (`frontend/tests/`, **97 tests**, 16 files, Vitest + React Testing Library on jsdom) never touches the network: every test either runs in demo mode or replaces `fetch` with a route table that fails on any unmapped call. It covers the HTTP client (error envelope, network failure, timeout with abort), `chatService` in both modes, the `useConversations` hook (sending, persistence in `localStorage`, `404` with a new session and a notice, automatic retry on `409`, no retry on `422`, empty replies, failed greeting), `useBackendHealth`, the `Composer`, `MessageList`, `ChatPanel` and `Sidebar` components, and the whole `ChatPage` rendered against a mocked API (greeting, typing indicator, reply, error with "Tentar de novo", suggestions, backend down). It also covers Mel: the five animations and the no-repeat selection per conversation, unique SVG gradient ids, the 3D avatar states (2D fallback without WebGL or off screen, swap to 3D, context released on unmount, load failure), the real GLB parsed by Three.js with its framing, and the safe bold rendering. Tests query by role, label and visible text, not by implementation details; a mutation check (breaking the 404 and 422 handling in the hook) made the suite fail as expected. `npm run lint` and `npm run build` pass.
 
-**2. Tests with a real provider (Groq by default; Anthropic as the alternative), run by hand.**
+**2. Tests with a real provider (Anthropic by default; Groq as the alternative), run by hand.**
 
 ```bash
-python -m pytest -q -m llm   # smoke tests against the real provider (require GROQ_API_KEY / ANTHROPIC_API_KEY)
+python -m pytest -q -m llm   # smoke tests against the real providers (require ANTHROPIC_API_KEY / GROQ_API_KEY)
 python scripts/run_scenarios.py ...   # end-to-end scenarios (T14), see below
 ```
 
@@ -475,8 +475,8 @@ flowchart TB
 
     subgraph llmpkg["llm/"]
         factory["factory.py<br/>create_llm_client"]
-        groq["groq_client.py<br/>GroqClient (default)"]
-        anth["anthropic_client.py<br/>AnthropicClient"]
+        groq["groq_client.py<br/>GroqClient (alternative)"]
+        anth["anthropic_client.py<br/>AnthropicClient (default)"]
     end
 
     tools["tools/__init__.py<br/>build_tool_registry → ToolRegistry<br/>catalog · order · policy · handoff tools"]
@@ -582,7 +582,7 @@ emporio-da-musica-agent/
 │   │   ├── schemas.py           # Pydantic request/response/error models
 │   │   └── sessions.py          # SessionStore: in-memory sessions, lock per session, LRU limit
 │   ├── agent/                   # Agent.respond (tool-use loop), Session, prompts, output guard
-│   ├── llm/                     # LLMClient interface, Groq (default) and Anthropic adapters
+│   ├── llm/                     # LLMClient interface, Anthropic (default) and Groq adapters
 │   ├── tools/                   # 8 tools + ToolRegistry
 │   ├── data/                    # CSV loader, models, quality checks, repositories
 │   ├── domain/                  # pure rules: pricing, shipping, store hours, limitations
@@ -619,9 +619,9 @@ Full rationale in [TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md).
 
 - **Agent approach (D1).** Function calling with a custom loop of about 100 lines and an iteration limit. Rejected: SQL agent (room for wrong queries and it exposes the customer table), pure RAG (price and stock need exactness and numeric filters) and LangChain/LangGraph/LlamaIndex (abstraction with no gain at this size). Every query decision is observable in the tool log (`--debug`).
 - **Calculations in Python (D4).** Promotional price, PIX, installments, shipping and "open now?" come out of the tools ready to use, with `Decimal` and `ROUND_HALF_UP` rounding. The manual treats incorrect information as false advertising, and models make arithmetic and date mistakes.
-- **Default provider: Groq (D5, D17).** The decision to use Groq came from the user. `LLM_PROVIDER=groq` selects the adapter in `llm/groq_client.py` (official `groq` SDK) behind a thin `LLMClient` interface; provider and model are switchable by configuration.
+- **Default provider: Anthropic since 2026-11-04 (D23); Groq before (D5, D17).** Groq was the user's first choice (no paid key); after the `medium` regressions (Anthropic 14/14, Groq 13/14) the user made Anthropic `claude-sonnet-5-5` the default in `config.py` and `.env.example`, keeping Groq selectable. The Groq details below still apply when it is selected. `LLM_PROVIDER=groq` selects the adapter in `llm/groq_client.py` (official `groq` SDK) behind a thin `LLMClient` interface; provider and model are switchable by configuration.
   - Model `openai/gpt-oss-120b`: a Groq production model (not preview) with tool use support and a `reasoning_effort` parameter (`low|medium|high`), mapped from `LLM_EFFORT`. A configurable alternative is `llama-3.3-70b-versatile` (production, parallel tool calls).
-  - **Reasoning effort: `medium` by default (D17 revision, user decision on 2026-11-02).** The first default was `low`. While recording the return-of-order example, real runs with `low` gave a verdict on the return deadline and offered a procedure outside the manual, even after the prompt was reinforced (two recordings preserved in [docs/e2e/](docs/e2e/)). With `medium`, the same script produced no verdict and used `encaminhar_atendente`, returning a real protocol number ([docs/e2e/t15_devolucao_effort_medium.md](docs/e2e/t15_devolucao_effort_medium.md); final recording in example 3 below). The cost is more reasoning tokens per call, which weighs on the Groq daily limit. `low` remains configurable. The full 13-scenario regression under `medium` was later run with both providers: Anthropic 14/14, Groq 13/14 (scenario 5 failed; see [End-to-end scenario results](#end-to-end-scenario-results-t14)). Groq therefore stays the configured default by the user's decision, but is **not approved** as the default until that fix and a new full battery.
+  - **Reasoning effort: `medium` by default (D17 revision, user decision on 2026-11-02).** The first default was `low`. While recording the return-of-order example, real runs with `low` gave a verdict on the return deadline and offered a procedure outside the manual, even after the prompt was reinforced (two recordings preserved in [docs/e2e/](docs/e2e/)). With `medium`, the same script produced no verdict and used `encaminhar_atendente`, returning a real protocol number ([docs/e2e/t15_devolucao_effort_medium.md](docs/e2e/t15_devolucao_effort_medium.md); final recording in example 3 below). The cost is more reasoning tokens per call, which weighs on the Groq daily limit. `low` remains configurable. The full 13-scenario regression under `medium` was later run with both providers: Anthropic 14/14, Groq 13/14 (scenario 5 failed; see [End-to-end scenario results](#end-to-end-scenario-results-t14)). Groq is therefore **not approved** until that fix and a new full battery, and Anthropic became the default (D23).
   - `LLM_MAX_TOKENS=4096`: Groq's per-minute throughput limit (Developer plan baseline: 8K tokens/min for `gpt-oss-120b`) makes reserving 16000 tokens unworkable.
   - Rate limits and resilience: HTTP 429 with `retry-after` is handled by the SDK (`max_retries=5`); a malformed tool call generated by the model (`tool_use_failed`) is retried once before becoming an error; `run_scenarios.py --pause` spaces out the scenarios.
   - The `gpt-oss` reasoning is neither returned nor resent (`include_reasoning=false`): Groq does not document resending it, so the history keeps only text and tool calls.
@@ -669,7 +669,7 @@ Full analysis in [DATA_ANALYSIS.md](DATA_ANALYSIS.md).
 ## Known limitations
 
 - **Scenario 5 (return of order 4 with email) was not approved with `LLM_EFFORT=low`.** It scored 0/8 over the last runs. Safety held (the agent identifies the order and gives no verdict), but the informative content was unstable: it sometimes skipped the policy lookup or omitted the deadline and the estimated delivery. Under `medium` the recorded return conversation behaved correctly. Scenario 5 passed (1/1) in the 2026-11-03 regression with Anthropic `claude-sonnet-5-5` and `medium`, and **failed on Groq under `medium` in 3 of 3 runs** (2026-11-04): the estimated delivery date limitation was omitted, once with the estimate presented as the real delivery date.
-- **The default configuration (Groq, `openai/gpt-oss-120b`, `medium`) is not approved.** Its 13-scenario regression (2026-11-04) scored 13/14: scenario 5 failed. The same battery with Anthropic `claude-sonnet-5-5` scored 14/14 (2026-11-03). The fix (prompt, tool or code) was not made in the delivery window; `.env.example` keeps `groq` because it was the user's decision (D17) and Groq needs no paid key, so the README recommends Anthropic for the evaluation.
+- **Groq (`openai/gpt-oss-120b`, `medium`) is not approved.** Its 13-scenario regression (2026-11-04) scored 13/14: scenario 5 failed. The same battery with Anthropic `claude-sonnet-5-5` scored 14/14 (2026-11-03), so Anthropic is the default; it requires a paid key. The Groq fix (prompt, tool or code) was not made in the delivery window.
 - **The first recording of example 1 contained a generalization error.** Under Groq with `low`, the agent said that electroacoustic guitars only exist outside the R$ 1000 range without searching with that criterion; the data contain one at R$ 799. That recording is preserved unchanged in [docs/e2e/t15_catalogo_gravacao1_low_generalizacao.md](docs/e2e/t15_catalogo_gravacao1_low_generalizacao.md). Example 1 was re-recorded on 2026-11-03 with Anthropic `claude-sonnet-5-5` and `medium`, and the new recording searches with the right criterion; it has not been re-recorded on Groq under `medium`.
 - **Groq free-tier quota.** The free tier allows 200k tokens per day (rolling 24-hour window) and 8k tokens per minute for `openai/gpt-oss-120b`; each model call costs about 2.4k tokens just for the prompt and tool schemas. The 4096-token cap and the per-minute limits make long answers and back-to-back runs slower (scenario runs need `--pause`), and the daily quota was exhausted during the T14 runs. `medium` uses more reasoning tokens per call than `low`.
 - **Inconsistent catalog data (Q1–Q12).** Products with conflicting information are shown only by their registered name, with a divergence warning.

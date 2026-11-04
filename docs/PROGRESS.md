@@ -154,7 +154,8 @@ Status: **implementado, validado e publicado na `main`** (`main` sincronizada co
 - Atendimento real: duas mensagens pelo caminho web com Anthropic `claude-sonnet-5-5` (preço/pagamento do Ohana CK-20; endereço e contatos), sem erros no console; capturas em `docs/screenshots/`.
 - Validação: backend 1201 passed, 2 deselected; `build_policies --check` ok; frontend 97 testes, lint e build ok; `bandit -ll`, `pip-audit` e `npm audit` limpos; Docker reconstruído e saudável (site 200, health ok, sessão 201, 422 com envelope, `/docs` 404, cabeçalhos de segurança).
 - Documentação: README (status dos provedores, capturas, Mel, testes, CI), `frontend/README.md`, D22; documento técnico em PDF gerado fora do repositório (não versionado).
-- Pendências: push (aguarda autorização); correção do cenário 5 na Groq e nova bateria; deploy público não configurado (não exigido pelo desafio).
+- Provedor padrão trocado para a Anthropic `claude-sonnet-5-5` (D23, decisão do usuário); a Groq segue como alternativa.
+- Pendências: correção do cenário 5 na Groq e nova bateria; deploy público não configurado (não exigido pelo desafio).
 
 ## Integridade dos dados originais
 

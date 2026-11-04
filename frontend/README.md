@@ -19,7 +19,7 @@ Com o modo API, suba antes o backend na raiz do repositório:
 venv/Scripts/python.exe -m uvicorn emporio_agent.api.app:app --reload --port 8000
 ```
 
-O backend precisa de `GROQ_API_KEY` no `.env` da raiz. Sem a chave, `GET /api/health` responde
+O backend precisa de `ANTHROPIC_API_KEY` no `.env` da raiz (provedor padrão; com `LLM_PROVIDER=groq`, `GROQ_API_KEY`). Sem a chave, `GET /api/health` responde
 `degraded` e o chat mostra que o atendimento está indisponível. O CORS do backend libera
 `http://localhost:5173` e `http://127.0.0.1:5173` por padrão (`CORS_ORIGINS`).
 

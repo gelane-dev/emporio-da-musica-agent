@@ -477,15 +477,15 @@ def test_factory_groq_blank_key_raises_auth():
     assert exc.value.kind == "auth"
 
 
-def test_factory_default_settings_ignores_anthropic_key():
+def test_factory_groq_ignores_anthropic_key():
     with pytest.raises(LLMError) as exc:
-        create_llm_client(Settings(), env={"ANTHROPIC_API_KEY": "sk-ant-x"})
+        create_llm_client(Settings(llm_provider="groq", llm_model=GPT_OSS), env={"ANTHROPIC_API_KEY": "sk-ant-x"})
     assert exc.value.kind == "auth"
     assert "GROQ_API_KEY" in exc.value.message
 
 
 def test_factory_builds_groq_client_with_key():
-    client = create_llm_client(Settings(), env={"GROQ_API_KEY": SECRET})
+    client = create_llm_client(Settings(llm_provider="groq", llm_model=GPT_OSS), env={"GROQ_API_KEY": SECRET})
     assert isinstance(client, GroqClient)
 
 
@@ -513,17 +513,18 @@ def test_factory_unknown_provider_raises_config_naming_both():
 
 # --- Settings padrão ----------------------------------------------------------
 
-def test_settings_defaults_are_groq():
+def test_settings_defaults_are_anthropic():
+    # Padrão trocado para a Anthropic (aprovada 14/14); a Groq é selecionada por configuração.
     s = Settings()
-    assert s.llm_provider == "groq"
-    assert s.llm_model == GPT_OSS
+    assert s.llm_provider == "anthropic"
+    assert s.llm_model == "claude-sonnet-5-5"
     assert s.llm_max_tokens == 4096
     assert s.llm_effort == "medium"
 
 
 def test_load_settings_defaults_without_env(tmp_path):
     s = load_settings(env_file=tmp_path / "nao_existe.env", environ={})
-    assert (s.llm_provider, s.llm_model, s.llm_max_tokens) == ("groq", GPT_OSS, 4096)
+    assert (s.llm_provider, s.llm_model, s.llm_max_tokens) == ("anthropic", "claude-sonnet-5-5", 4096)
 
 
 # --- smoke test real (pulado por padrão: pytest -m llm) -----------------------
@@ -533,7 +534,8 @@ def test_real_smoke_groq_responds_to_ola():
     env = read_env()
     if not (env.get("GROQ_API_KEY") or "").strip():
         pytest.skip("GROQ_API_KEY ausente no .env/ambiente")
-    client = create_llm_client(load_settings(), env)
+    # A Groq não é mais o padrão: o smoke test a seleciona explicitamente.
+    client = create_llm_client(load_settings(environ={**env, "LLM_PROVIDER": "groq", "LLM_MODEL": GPT_OSS}), env)
     response = client.complete(
         system="Você é um atendente de loja de instrumentos musicais. Responda em português, em uma frase curta.",
         system_dynamic=None,

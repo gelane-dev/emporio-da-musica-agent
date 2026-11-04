@@ -79,7 +79,8 @@ Nas três execuções a Groq **não deu veredito sobre a devolução** e não in
 ### 3.3 Situação dos provedores
 
 - **Aprovado:** Anthropic Claude Sonnet 5.5 (`LLM_PROVIDER=anthropic`, `LLM_MODEL=claude-sonnet-5-5`, `ANTHROPIC_API_KEY`).
-- **Não aprovado como padrão:** Groq `openai/gpt-oss-120b` em `medium` (`LLM_PROVIDER=groq`, `LLM_MODEL=openai/gpt-oss-120b`, `GROQ_API_KEY`), até a correção do cenário 5 e **uma nova bateria completa dos 13 cenários** na Groq. A integração continua disponível e selecionável; nada foi removido nem alterado nela.
+- **Padrão desde 04/11/2026 (D23):** Anthropic `claude-sonnet-5-5` em `config.py` e `.env.example`.
+- **Não aprovado:** Groq `openai/gpt-oss-120b` em `medium` (`LLM_PROVIDER=groq`, `LLM_MODEL=openai/gpt-oss-120b`, `GROQ_API_KEY`), até a correção do cenário 5 e **uma nova bateria completa dos 13 cenários** na Groq. A integração continua disponível e selecionável; nada foi removido nem alterado nela.
 - A correção (no prompt, na ferramenta ou em código) não foi feita: a tarefa de 04/11 proibia mudanças em prompts, ferramentas e integrações.
 
 | Prioridade | Escopo | Comando (ambiente virtual ativo, `GROQ_API_KEY` no `.env`) | Custo estimado | Status |

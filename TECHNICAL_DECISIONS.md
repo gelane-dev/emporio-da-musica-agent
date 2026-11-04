@@ -159,6 +159,14 @@ Todas as decisões que dependiam de aprovação foram aprovadas em 2026-11-01 (v
 
 **Consequências.** Sessões ociosas por mais de 30 min e conversas com mais de 100 mensagens do cliente exigem nova conversa (o frontend trata 404 e 429 `session_full`). Continuam sem autenticação e com sessões em memória (uma réplica): um serviço público precisaria de teto de gasto no provedor e captcha ou login. Validado localmente (1159 testes do backend, 63 do frontend, auditorias de dependências limpas, Docker verificado) e publicado na `main`; o CI do GitHub passou no commit publicado (`dae3bad`, run 41767832682), com `pip-audit`, `bandit` e `npm audit`. Uma segunda revisão (04/11) acrescentou o limite de criação de sessão também no `POST /api/chat`, a normalização na guarda de códigos, logs de ferramentas só com nomes de argumentos e a confiança do uvicorn só no IP fixo do nginx.
 
+## D23 — Provedor padrão: Anthropic (2026-11-04, decisão do usuário)
+
+**Contexto.** A Groq (`openai/gpt-oss-120b`) era o padrão desde a D17, por não exigir chave paga. Na regressão `medium` dos 13 cenários, a Anthropic (`claude-sonnet-5-5`) fez 14/14 e a Groq 13/14: no cenário 5 (devolução do pedido 4) a Groq omitiu, em 3 de 3 execuções, que o sistema só guarda a previsão de entrega.
+
+**Decisão.** `config.py` e `.env.example` passam a `LLM_PROVIDER=anthropic`, `LLM_MODEL=claude-sonnet-5-5`, `LLM_MAX_TOKENS=4096` (a configuração validada). A Groq continua selecionável por configuração, sem mudança no adaptador; os testes da Groq passam a selecioná-la explicitamente.
+
+**Consequências.** Rodar o agente exige uma chave paga da Anthropic; a Groq segue como alternativa gratuita, não aprovada até a correção do cenário 5 e nova bateria. O `.env` local de cada pessoa não muda sozinho: quem copiou o exemplo antigo precisa ajustar `LLM_PROVIDER`/`LLM_MODEL`.
+
 ## D22 — Mascote Mel no chat web (2026-11-04)
 
 **Contexto.** O usuário pediu uma identidade visual para a assistente (mascote Mel, gota rosa-roxa com flor vermelha), sem atrapalhar o atendimento, e depois a integração de um modelo 3D aprovado (`mel_base_v04.glb`, feito à parte no Blender). O frontend também mostrava funções que a API não tem.
