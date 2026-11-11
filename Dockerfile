@@ -1,6 +1,6 @@
 # Backend: API FastAPI do agente Mel (python -m emporio_agent.api).
 # Contexto de build: raiz do repositório (o .dockerignore deixa entrar só o necessário).
-FROM python:3.13-slim
+FROM python:3.15-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
